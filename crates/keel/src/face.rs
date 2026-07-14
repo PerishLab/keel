@@ -49,8 +49,24 @@ impl<S: Store> Core<S> {
         self.store.end(&self.plan, name, key)
     }
 
-    pub fn tie(&self, owner: &str, bond: &str, ends: Ends) -> Result<i64, Error> {
-        self.store.tie(&self.plan, owner, bond, ends)
+    pub fn tie(
+        &self,
+        owner: &str,
+        bond: &str,
+        ends: Ends,
+        fields: &[(&str, &str)],
+    ) -> Result<i64, Error> {
+        self.store.tie(&self.plan, owner, bond, ends, fields)
+    }
+
+    pub fn set_tie(
+        &self,
+        owner: &str,
+        bond: &str,
+        key: i64,
+        fields: &[(&str, &str)],
+    ) -> Result<(), Error> {
+        self.store.set_tie(&self.plan, owner, bond, key, fields)
     }
 
     pub fn ties(&self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {

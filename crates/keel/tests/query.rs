@@ -110,6 +110,7 @@ fn run() {
                 left: ada,
                 right: math,
             },
+            &[],
         )
         .expect("tie");
 

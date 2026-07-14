@@ -19,7 +19,7 @@ struct Student {
     no: string,
     #[field(string)]
     name: string,
-    #[relation(Course, n2m)]
+    #[relation(Course, n2m, grade = string)]
     courses: Course,
 }
 

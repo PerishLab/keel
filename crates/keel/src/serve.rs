@@ -4,7 +4,7 @@ use crate::store::Store;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::{delete, get, post};
+use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -34,7 +34,10 @@ pub async fn listen<S: Store + 'static>(
             get(one::<S>).patch(edit::<S>).delete(remove::<S>),
         )
         .route("/{unit}/{id}/{bond}", get(no_read).post(attach::<S>))
-        .route("/{unit}/{id}/{bond}/{tie}", delete(detach::<S>))
+        .route(
+            "/{unit}/{id}/{bond}/{tie}",
+            patch(patch_tie::<S>).delete(detach::<S>),
+        )
         .with_state(core);
     let prefix = prefix.trim_end_matches('/');
     let app = if prefix.is_empty() {
@@ -149,11 +152,6 @@ async fn remove<S: Store>(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(Deserialize)]
-struct TieBody {
-    right: i64,
-}
-
 async fn no_read() -> StatusCode {
     StatusCode::NOT_FOUND
 }
@@ -161,21 +159,47 @@ async fn no_read() -> StatusCode {
 async fn attach<S: Store>(
     State(core): State<Arc<Core<S>>>,
     Path((unit, id, bond)): Path<(String, i64, String)>,
-    Json(body): Json<TieBody>,
+    Json(body): Json<Map<String, Value>>,
 ) -> Result<(StatusCode, Json<Value>), Fault> {
     let name = unit_name(core.as_ref(), &unit)?;
     let bond = bond_name(core.as_ref(), &name, &bond)?;
+    let right = body
+        .get("right")
+        .and_then(|v| v.as_i64())
+        .ok_or_else(|| Fault::bad("right needs integer".into()))?;
+    let fields = cells_skip(&body, &["right"])?;
+    let pairs: Vec<(&str, &str)> = fields
+        .iter()
+        .map(|(k, v)| (k.as_str(), v.as_str()))
+        .collect();
     let key = core
-        .tie(
-            &name,
-            &bond,
-            crate::life::Ends {
-                left: id,
-                right: body.right,
-            },
-        )
+        .tie(&name, &bond, crate::life::Ends { left: id, right }, &pairs)
         .map_err(Fault::from)?;
     Ok((StatusCode::CREATED, Json(json!({ "id": key }))))
+}
+
+async fn patch_tie<S: Store>(
+    State(core): State<Arc<Core<S>>>,
+    Path((unit, id, bond, tie)): Path<(String, i64, String, i64)>,
+    Json(body): Json<Map<String, Value>>,
+) -> Result<StatusCode, Fault> {
+    let name = unit_name(core.as_ref(), &unit)?;
+    let bond = bond_name(core.as_ref(), &name, &bond)?;
+    let ties = core.ties(&name, &bond, id).map_err(Fault::from)?;
+    if !ties.iter().any(|row| row.key() == tie) {
+        return Err(Fault {
+            status: StatusCode::NOT_FOUND,
+            note: format!("missing tie {tie}"),
+        });
+    }
+    let fields = cells(&body)?;
+    let pairs: Vec<(&str, &str)> = fields
+        .iter()
+        .map(|(k, v)| (k.as_str(), v.as_str()))
+        .collect();
+    core.set_tie(&name, &bond, tie, &pairs)
+        .map_err(Fault::from)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn detach<S: Store>(
@@ -213,8 +237,15 @@ fn bond_name<S: Store>(core: &Core<S>, unit: &str, bond: &str) -> Result<String,
 }
 
 fn cells(body: &Map<String, Value>) -> Result<BTreeMap<String, String>, Fault> {
+    cells_skip(body, &[])
+}
+
+fn cells_skip(body: &Map<String, Value>, skip: &[&str]) -> Result<BTreeMap<String, String>, Fault> {
     let mut out = BTreeMap::new();
     for (key, value) in body {
+        if skip.iter().any(|s| *s == key) {
+            continue;
+        }
         let text = match value {
             Value::String(s) => s.clone(),
             Value::Number(n) => n.to_string(),
@@ -254,14 +285,17 @@ fn row_json(row: &crate::life::Row) -> Value {
 }
 
 fn tie_json(tie: &crate::life::Tie) -> Value {
-    json!({
-        "id": tie.key(),
-        "left": tie.left(),
-        "right": tie.right(),
-        "expires_at": tie.expires(),
-        "created_at": tie.created(),
-        "updated_at": tie.updated(),
-    })
+    let mut map = Map::new();
+    map.insert("id".into(), json!(tie.key()));
+    map.insert("left".into(), json!(tie.left()));
+    map.insert("right".into(), json!(tie.right()));
+    for (k, v) in tie.cells() {
+        map.insert(k.clone(), Value::String(v.clone()));
+    }
+    map.insert("expires_at".into(), json!(tie.expires()));
+    map.insert("created_at".into(), json!(tie.created()));
+    map.insert("updated_at".into(), json!(tie.updated()));
+    Value::Object(map)
 }
 
 struct Fault {

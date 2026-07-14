@@ -220,11 +220,10 @@ truncation is forbidden.
 | Cap seat | **C0** — engine constants; error on overflow |
 | Association data | **Bond attrs** on n2m join — see `docs/bond.md` |
 
-## Open (see `docs/bond.md`)
+## Bond suite (see `docs/bond.md`)
 
-- Macro grammar for bond fields; write/set on ties.
-- Edge `where` (P1/P2); end vs ties (K*); live-unique re-enroll (U*).
-- Reverse/roster remains R0 until shared-arc mirror is designed.
+Adopted: M1b attrs, W1b set_tie, P1 `has`, K1 live-target filter, U1
+live-unique, R0 no reverse.
 
 ## Must not
 

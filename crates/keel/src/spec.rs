@@ -24,6 +24,7 @@ pub struct Bond {
     name: String,
     kind: bond::Kind,
     target: String,
+    fields: Vec<Field>,
 }
 
 pub struct Builder {
@@ -76,6 +77,10 @@ impl Bond {
     pub fn target(&self) -> &str {
         &self.target
     }
+
+    pub fn fields(&self) -> &[Field] {
+        &self.fields
+    }
 }
 
 impl Builder {
@@ -92,11 +97,20 @@ impl Builder {
         name: impl Into<String>,
         kind: bond::Kind,
         target: impl Into<String>,
+        fields: &[(&str, atom::Kind)],
     ) -> Self {
+        let fields = fields
+            .iter()
+            .map(|(n, k)| Field {
+                name: (*n).to_string(),
+                kind: *k,
+            })
+            .collect();
         self.bonds.push(Bond {
             name: name.into(),
             kind,
             target: target.into(),
+            fields,
         });
         self
     }

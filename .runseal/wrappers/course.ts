@@ -61,12 +61,24 @@ try {
   const bobId = num(bob.id);
 
   await check("enroll ada", async () => {
-    await postJson(`/student/${adaId}/courses`, { right: algoId });
-    await postJson(`/student/${adaId}/courses`, { right: dbId });
-    await postJson(`/student/${adaId}/courses`, { right: netId });
+    await postJson(`/student/${adaId}/courses`, {
+      right: algoId,
+      grade: "A",
+    });
+    await postJson(`/student/${adaId}/courses`, {
+      right: dbId,
+      grade: "B",
+    });
+    await postJson(`/student/${adaId}/courses`, {
+      right: netId,
+      grade: "",
+    });
   });
   await check("enroll bob", async () => {
-    await postJson(`/student/${bobId}/courses`, { right: algoId });
+    await postJson(`/student/${bobId}/courses`, {
+      right: algoId,
+      grade: "",
+    });
   });
 
   await check("list courses", async () => {

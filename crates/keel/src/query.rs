@@ -21,6 +21,7 @@ pub enum Op {
     Gt,
     Ge,
     In,
+    Has,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -219,6 +220,7 @@ pub fn run(plan: &Plan, store: &impl Store, tree: &Tree) -> Result<Pack, Error> 
     if !tree.preds().is_empty() {
         rows.retain(|row| pass(row, tree.preds()));
     }
+    hold(plan, store, &name, &mut rows, tree.preds())?;
     order(&mut rows, tree.sort());
     page(&mut rows, tree.after(), tree.limit());
     let keys: Vec<i64> = rows.iter().map(|row| row.key()).collect();
@@ -231,7 +233,13 @@ pub fn run(plan: &Plan, store: &impl Store, tree: &Tree) -> Result<Pack, Error> 
         .ok_or_else(|| Error::Missing(name.clone()))?;
     for bond in tree.links() {
         let bond = edge(unit, bond)?;
-        let ties = pull(plan, store, &name, &bond, &keys)?;
+        let target = unit
+            .bonds()
+            .iter()
+            .find(|e| e.name() == bond)
+            .map(|e| e.target().to_string())
+            .ok_or_else(|| Error::Adapt(format!("unknown bond {bond}")))?;
+        let ties = pull(plan, store, &name, &bond, &target, &keys)?;
         let key = format!("{root}.{bond}");
         bags.insert(key, Bag::Bond(ties));
     }
@@ -319,12 +327,16 @@ fn pull(
     store: &impl Store,
     owner: &str,
     bond: &str,
+    target: &str,
     keys: &[i64],
 ) -> Result<Vec<Tie>, Error> {
     let mut ties = Vec::new();
     for &key in keys {
         let part = store.ties(plan, owner, bond, key)?;
         for tie in part {
+            if !store.live_has(plan, target, tie.right())? {
+                continue;
+            }
             ties.push(tie);
             if ties.len() > TIE_CAP {
                 return Err(Error::Adapt("tie cap exceeded".into()));
@@ -338,6 +350,14 @@ fn pull(
 fn take_pred(scan: &mut Scan<'_>) -> Result<Pred, Error> {
     let field = scan.ident()?;
     scan.ws();
+    if scan.opt("has") {
+        let value = scan.quoted()?;
+        return Ok(Pred {
+            field,
+            op: Op::Has,
+            values: vec![value],
+        });
+    }
     if scan.opt("in") {
         let values = take_list(scan)?;
         return Ok(Pred {
@@ -389,6 +409,12 @@ fn write_pred(out: &mut String, pred: &Pred) {
         out.push(')');
         return;
     }
+    if pred.op() == Op::Has {
+        out.push_str("has \"");
+        out.push_str(&escape(pred.value()));
+        out.push('"');
+        return;
+    }
     out.push_str(mark(pred.op()));
     out.push_str(" \"");
     out.push_str(&escape(pred.value()));
@@ -404,6 +430,7 @@ fn mark(op: Op) -> &'static str {
         Op::Gt => ">",
         Op::Ge => ">=",
         Op::In => "in",
+        Op::Has => "has",
     }
 }
 
@@ -454,6 +481,11 @@ fn check(plan: &Plan, name: &str, preds: &[Pred], sort: Option<&Sort>) -> Result
         .get(name)
         .ok_or_else(|| Error::Missing(name.into()))?;
     for pred in preds {
+        if pred.op() == Op::Has {
+            edge(unit, pred.field())?;
+            key_text(pred.value())?;
+            continue;
+        }
         slot(unit, pred.field())?;
         if pred.field() == ddl::KEY {
             for value in pred.values() {
@@ -477,6 +509,32 @@ fn slot(unit: &crate::plan::Unit, field: &str) -> Result<(), Error> {
     Err(Error::Adapt(format!("unknown field {field}")))
 }
 
+fn hold(
+    plan: &Plan,
+    store: &impl Store,
+    owner: &str,
+    rows: &mut Vec<Row>,
+    preds: &[Pred],
+) -> Result<(), Error> {
+    for pred in preds {
+        if pred.op() != Op::Has {
+            continue;
+        }
+        let bond = edge(
+            plan.units()
+                .get(owner)
+                .ok_or_else(|| Error::Missing(owner.into()))?,
+            pred.field(),
+        )?;
+        let right = key_text(pred.value())?;
+        rows.retain(|row| match store.ties(plan, owner, &bond, row.key()) {
+            Ok(ties) => ties.iter().any(|tie| tie.right() == right),
+            Err(_) => false,
+        });
+    }
+    Ok(())
+}
+
 fn key_text(text: &str) -> Result<i64, Error> {
     text.parse::<i64>()
         .map_err(|_| Error::Adapt("id needs integer".into()))
@@ -487,6 +545,9 @@ fn pass(row: &Row, preds: &[Pred]) -> bool {
 }
 
 fn hit(row: &Row, pred: &Pred) -> bool {
+    if pred.op() == Op::Has {
+        return true;
+    }
     if pred.field() == ddl::KEY {
         return hit_key(row.key(), pred);
     }
@@ -501,6 +562,7 @@ fn hit(row: &Row, pred: &Pred) -> bool {
         Op::Gt => got.as_str() > pred.value(),
         Op::Ge => got.as_str() >= pred.value(),
         Op::In => pred.values().iter().any(|want| want == got),
+        Op::Has => true,
     }
 }
 
@@ -516,6 +578,7 @@ fn hit_key(key: i64, pred: &Pred) -> bool {
             .values()
             .iter()
             .any(|want| key_text(want).is_ok_and(|n| n == key)),
+        Op::Has => false,
     }
 }
 

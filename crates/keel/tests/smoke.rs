@@ -132,6 +132,7 @@ fn bond() {
                 left: student,
                 right: math,
             },
+            &[],
         )
         .expect("tie math");
     let t2 = core
@@ -142,6 +143,7 @@ fn bond() {
                 left: student,
                 right: art,
             },
+            &[],
         )
         .expect("tie art");
     assert_ne!(t1, t2);

@@ -26,6 +26,7 @@ pub struct Tie {
     key: i64,
     left: i64,
     right: i64,
+    cells: BTreeMap<String, String>,
     expires: Option<i64>,
     created: i64,
     updated: i64,
@@ -64,6 +65,10 @@ impl Tie {
 
     pub fn right(&self) -> i64 {
         self.right
+    }
+
+    pub fn cells(&self) -> &BTreeMap<String, String> {
+        &self.cells
     }
 
     pub fn expires(&self) -> Option<i64> {
@@ -208,27 +213,109 @@ impl<'a> Work<'a> {
         Ok(())
     }
 
-    pub fn tie(&self, plan: &Plan, owner: &str, bond: &str, ends: Ends) -> Result<i64, Error> {
+    pub fn tie(
+        &self,
+        plan: &Plan,
+        owner: &str,
+        bond: &str,
+        ends: Ends,
+        fields: &[(&str, &str)],
+    ) -> Result<i64, Error> {
         let (unit, edge) = edge(plan, owner, bond)?;
         if edge.kind() != bond::Kind::N2m {
             return Err(Error::Adapt("bond is not n2m".into()));
         }
+        bond_part(edge, fields)?;
+        if self.live_pair(plan, owner, bond, ends.left, ends.right)? {
+            return Err(Error::Adapt("live pair exists".into()));
+        }
         let tick = now();
         let src = ddl::side(unit.name());
         let dst = ddl::side(edge.target());
+        let mut cols = vec![src, dst];
+        for slot in edge.fields() {
+            cols.push(slot.name().to_string());
+        }
+        cols.push(ddl::EXPIRES.to_string());
+        cols.push(ddl::CREATED.to_string());
+        cols.push(ddl::UPDATED.to_string());
+        let marks = (1..=cols.len())
+            .map(|i| format!("?{i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
         let text = format!(
-            "INSERT INTO {} ({}, {}, {}, {}, {}) VALUES (?1, ?2, NULL, ?3, ?3)",
+            "INSERT INTO {} ({}) VALUES ({})",
             ddl::join(unit.name(), edge.name()),
-            src,
-            dst,
-            ddl::EXPIRES,
-            ddl::CREATED,
-            ddl::UPDATED
+            cols.join(", "),
+            marks
         );
+        let mut vals: Vec<rusqlite::types::Value> = Vec::new();
+        vals.push(rusqlite::types::Value::Integer(ends.left));
+        vals.push(rusqlite::types::Value::Integer(ends.right));
+        for slot in edge.fields() {
+            let hit = fields
+                .iter()
+                .find(|(k, _)| *k == slot.name())
+                .map(|(_, v)| *v)
+                .unwrap_or("");
+            vals.push(rusqlite::types::Value::Text(hit.to_string()));
+        }
+        vals.push(rusqlite::types::Value::Null);
+        vals.push(rusqlite::types::Value::Integer(tick));
+        vals.push(rusqlite::types::Value::Integer(tick));
         self.conn
-            .execute(&text, params![ends.left, ends.right, tick])
+            .execute(&text, rusqlite::params_from_iter(vals))
             .map_err(fail)?;
         Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn set_tie(
+        &self,
+        plan: &Plan,
+        owner: &str,
+        bond: &str,
+        key: i64,
+        fields: &[(&str, &str)],
+    ) -> Result<(), Error> {
+        let (unit, edge) = edge(plan, owner, bond)?;
+        bond_part(edge, fields)?;
+        if fields.is_empty() {
+            return Err(Error::Adapt("empty set".into()));
+        }
+        let tick = now();
+        let mut text = format!("UPDATE {} SET ", ddl::join(unit.name(), edge.name()));
+        let mut vals: Vec<rusqlite::types::Value> = Vec::new();
+        for (i, (col, val)) in fields.iter().enumerate() {
+            if i > 0 {
+                text.push_str(", ");
+            }
+            text.push_str(col);
+            text.push_str(" = ?");
+            text.push_str(&(i + 1).to_string());
+            vals.push(rusqlite::types::Value::Text(val.to_string()));
+        }
+        let n = fields.len();
+        text.push_str(&format!(
+            ", {} = ?{} WHERE {} = ?{} AND ({} IS NULL OR {} > ?{})",
+            ddl::UPDATED,
+            n + 1,
+            ddl::KEY,
+            n + 2,
+            ddl::EXPIRES,
+            ddl::EXPIRES,
+            n + 3
+        ));
+        vals.push(rusqlite::types::Value::Integer(tick));
+        vals.push(rusqlite::types::Value::Integer(key));
+        vals.push(rusqlite::types::Value::Integer(tick));
+        let changed = self
+            .conn
+            .execute(&text, rusqlite::params_from_iter(vals))
+            .map_err(fail)?;
+        if changed == 0 {
+            return Err(Error::Adapt(format!("missing tie {key}")));
+        }
+        Ok(())
     }
 
     pub fn ties(&self, plan: &Plan, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
@@ -236,16 +323,22 @@ impl<'a> Work<'a> {
         let tick = now();
         let src = ddl::side(unit.name());
         let dst = ddl::side(edge.target());
-        let text = format!(
-            "SELECT {}, {}, {}, {}, {}, {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) ORDER BY {}",
-            ddl::KEY,
+        let mut cols = vec![
+            ddl::KEY.to_string(),
             src,
             dst,
-            ddl::EXPIRES,
-            ddl::CREATED,
-            ddl::UPDATED,
+            ddl::EXPIRES.to_string(),
+            ddl::CREATED.to_string(),
+            ddl::UPDATED.to_string(),
+        ];
+        for slot in edge.fields() {
+            cols.push(slot.name().to_string());
+        }
+        let text = format!(
+            "SELECT {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) ORDER BY {}",
+            cols.join(", "),
             ddl::join(unit.name(), edge.name()),
-            src,
+            ddl::side(unit.name()),
             ddl::EXPIRES,
             ddl::EXPIRES,
             ddl::KEY
@@ -254,14 +347,7 @@ impl<'a> Work<'a> {
         let mut rows = stmt.query(params![left, tick]).map_err(fail)?;
         let mut out = Vec::new();
         while let Some(row) = rows.next().map_err(fail)? {
-            out.push(Tie {
-                key: row.get(0).map_err(fail)?,
-                left: row.get(1).map_err(fail)?,
-                right: row.get(2).map_err(fail)?,
-                expires: row.get(3).optional().map_err(fail)?.flatten(),
-                created: row.get(4).map_err(fail)?,
-                updated: row.get(5).map_err(fail)?,
-            });
+            out.push(read_tie(edge, row)?);
         }
         Ok(out)
     }
@@ -281,6 +367,57 @@ impl<'a> Work<'a> {
             return Err(Error::Adapt(format!("missing tie {key}")));
         }
         Ok(())
+    }
+
+    pub fn live_has(&self, plan: &Plan, name: &str, key: i64) -> Result<bool, Error> {
+        let unit = find(plan, name)?;
+        let tick = now();
+        let text = format!(
+            "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
+            ddl::table(unit.name()),
+            ddl::KEY,
+            ddl::EXPIRES,
+            ddl::EXPIRES
+        );
+        let mut stmt = self.conn.prepare(&text).map_err(fail)?;
+        let found = stmt.exists(params![key, tick]).map_err(fail)?;
+        Ok(found)
+    }
+
+    pub fn live_pair(
+        &self,
+        plan: &Plan,
+        owner: &str,
+        bond: &str,
+        left: i64,
+        right: i64,
+    ) -> Result<bool, Error> {
+        let (unit, edge) = edge(plan, owner, bond)?;
+        let tick = now();
+        let src = ddl::side(unit.name());
+        let dst = ddl::side(edge.target());
+        let text = format!(
+            "SELECT 1 FROM {} WHERE {} = ?1 AND {} = ?2 AND ({} IS NULL OR {} > ?3) LIMIT 1",
+            ddl::join(unit.name(), edge.name()),
+            src,
+            dst,
+            ddl::EXPIRES,
+            ddl::EXPIRES
+        );
+        let mut stmt = self.conn.prepare(&text).map_err(fail)?;
+        let found = stmt.exists(params![left, right, tick]).map_err(fail)?;
+        Ok(found)
+    }
+
+    pub fn live_right(
+        &self,
+        plan: &Plan,
+        owner: &str,
+        bond: &str,
+        left: i64,
+        right: i64,
+    ) -> Result<bool, Error> {
+        self.live_pair(plan, owner, bond, left, right)
     }
 }
 
@@ -342,6 +479,47 @@ fn part(unit: &Unit, fields: &[(&str, &str)]) -> Result<(), Error> {
         }
     }
     Ok(())
+}
+
+fn bond_part(edge: &Edge, fields: &[(&str, &str)]) -> Result<(), Error> {
+    for (k, _) in fields {
+        if *k == "right"
+            || *k == "left"
+            || *k == ddl::KEY
+            || *k == ddl::EXPIRES
+            || *k == ddl::CREATED
+            || *k == ddl::UPDATED
+        {
+            return Err(Error::Adapt(format!("control field {k}")));
+        }
+        if !edge.fields().iter().any(|s| s.name() == *k) {
+            return Err(Error::Adapt(format!("unknown field {k}")));
+        }
+    }
+    Ok(())
+}
+
+fn read_tie(edge: &Edge, row: &rusqlite::Row<'_>) -> Result<Tie, Error> {
+    let key: i64 = row.get(0).map_err(fail)?;
+    let left: i64 = row.get(1).map_err(fail)?;
+    let right: i64 = row.get(2).map_err(fail)?;
+    let expires: Option<i64> = row.get(3).optional().map_err(fail)?.flatten();
+    let created: i64 = row.get(4).map_err(fail)?;
+    let updated: i64 = row.get(5).map_err(fail)?;
+    let mut cells = BTreeMap::new();
+    for (i, slot) in edge.fields().iter().enumerate() {
+        let value: String = row.get(6 + i).map_err(fail)?;
+        cells.insert(slot.name().to_string(), value);
+    }
+    Ok(Tie {
+        key,
+        left,
+        right,
+        cells,
+        expires,
+        created,
+        updated,
+    })
 }
 
 fn read(unit: &Unit, row: &rusqlite::Row<'_>) -> Result<Row, Error> {

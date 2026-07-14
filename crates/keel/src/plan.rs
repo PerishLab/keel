@@ -28,6 +28,7 @@ pub struct Edge {
     name: String,
     kind: bond::Kind,
     target: String,
+    fields: Vec<Slot>,
 }
 
 #[derive(Clone, Debug)]
@@ -75,6 +76,14 @@ impl Unit {
                 name: bond.name().to_string(),
                 kind: bond.kind(),
                 target: bond.target().to_string(),
+                fields: bond
+                    .fields()
+                    .iter()
+                    .map(|field| Slot {
+                        name: field.name().to_string(),
+                        kind: field.kind(),
+                    })
+                    .collect(),
             })
             .collect();
         Ok(Self {
@@ -123,6 +132,10 @@ impl Edge {
 
     pub fn target(&self) -> &str {
         &self.target
+    }
+
+    pub fn fields(&self) -> &[Slot] {
+        &self.fields
     }
 }
 

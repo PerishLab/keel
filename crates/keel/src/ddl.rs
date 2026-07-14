@@ -49,6 +49,11 @@ fn form(node: &Unit) -> String {
 fn arc(node: &Unit, bond: &str, target: &str, kind: bond::Kind) -> String {
     match kind {
         bond::Kind::N2m => {
+            let edge = node
+                .bonds()
+                .iter()
+                .find(|edge| edge.name() == bond)
+                .expect("bond");
             let left = side(node.name());
             let right = side(target);
             let mut cols = vec![
@@ -56,8 +61,10 @@ fn arc(node: &Unit, bond: &str, target: &str, kind: bond::Kind) -> String {
                 format!("{left} INTEGER NOT NULL"),
                 format!("{right} INTEGER NOT NULL"),
             ];
+            for slot in edge.fields() {
+                cols.push(format!("{} {} NOT NULL", slot.name(), cast(slot.kind())));
+            }
             stamp(node.reign(), &mut cols);
-            cols.push(format!("UNIQUE({left}, {right})"));
             format!(
                 "CREATE TABLE IF NOT EXISTS {} ({});",
                 join(node.name(), bond),

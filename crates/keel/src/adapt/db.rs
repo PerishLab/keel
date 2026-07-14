@@ -83,10 +83,30 @@ impl Store for Sqlite {
         life::Work::new(conn).end(plan, name, key)
     }
 
-    fn tie(&self, plan: &Plan, owner: &str, bond: &str, ends: Ends) -> Result<i64, Error> {
+    fn tie(
+        &self,
+        plan: &Plan,
+        owner: &str,
+        bond: &str,
+        ends: Ends,
+        fields: &[(&str, &str)],
+    ) -> Result<i64, Error> {
         let guard = self.conn.lock().map_err(lock)?;
         let conn = guard.as_ref().ok_or_else(unwired)?;
-        life::Work::new(conn).tie(plan, owner, bond, ends)
+        life::Work::new(conn).tie(plan, owner, bond, ends, fields)
+    }
+
+    fn set_tie(
+        &self,
+        plan: &Plan,
+        owner: &str,
+        bond: &str,
+        key: i64,
+        fields: &[(&str, &str)],
+    ) -> Result<(), Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).set_tie(plan, owner, bond, key, fields)
     }
 
     fn ties(&self, plan: &Plan, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
@@ -99,6 +119,12 @@ impl Store for Sqlite {
         let guard = self.conn.lock().map_err(lock)?;
         let conn = guard.as_ref().ok_or_else(unwired)?;
         life::Work::new(conn).cut(plan, owner, bond, key)
+    }
+
+    fn live_has(&self, plan: &Plan, name: &str, key: i64) -> Result<bool, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).live_has(plan, name, key)
     }
 
     fn has(&self, name: &str) -> Result<bool, Error> {
