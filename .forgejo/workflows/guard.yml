@@ -1,0 +1,30 @@
+name: guard
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  guard:
+    runs-on: docker
+    container: mirror.perish.lan/ci/deno
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Guard
+        run: |
+          set -eu
+          deno run \
+            --allow-read \
+            --allow-write \
+            --allow-env \
+            --allow-net \
+            --allow-run \
+            --config .runseal/deno.json \
+            --lock .runseal/deno.lock \
+            --frozen=true \
+            .runseal/wrappers/guard.ts

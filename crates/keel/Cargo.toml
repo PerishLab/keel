@@ -1,0 +1,11 @@
+[package]
+name = "keel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Personal-style data model description library"
+readme = "../../README.md"
+
+[lib]
+path = "src/lib.rs"

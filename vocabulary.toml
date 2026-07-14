@@ -1,0 +1,10 @@
+# vocabulary.toml — registered compound atoms.
+#
+# A multi-segment declared name is DEBT unless it appears here with a non-empty
+# rationale. Under zero compromise almost every compound should be refactored
+# (pushed into a namespace or renamed to one atom), NOT registered. Keep this
+# list tiny; a growing list is vocabulary sprawl. An entry with an empty
+# rationale does not register — the rationale requirement is enforced, not
+# advisory.
+
+[compound]

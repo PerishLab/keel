@@ -1,0 +1,39 @@
+[scan]
+include = [
+  "crates/**/*.rs",
+  "docs/**/*.md",
+]
+exclude = [
+  "**/target/**",
+]
+
+[module]
+roots = [
+  "crates/*/src",
+  "crates/*/tests",
+  "docs",
+]
+
+[limit]
+block = 4
+path = 4
+
+[comment]
+allow = false
+
+[word]
+single = true
+
+[[grant]]
+syntax = "test"
+paths = ["crates/*/tests/**/*.rs"]
+
+[[boundary]]
+paths = [".forgejo/**"]
+note = "ci infra; product depth and comment laws do not apply"
+allow = ["path", "comment"]
+
+[[boundary]]
+paths = [".runseal/**"]
+note = "runseal operator glue is vendored; guarded by deno fmt and deno check instead"
+allow = ["path", "comment", "word"]
