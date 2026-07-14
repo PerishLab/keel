@@ -17,8 +17,8 @@ relations only. The engine owns every control field and control capability.
 
 ## Growth order
 
-1. Pure data layer (current)
-2. Mature adaptors — sqlite first (closed loop); other stores later
+1. Pure data layer + sqlite DDL wire (current)
+2. Mature adaptors — engine-internal row lifecycle next; other stores later
 3. Capability
 4. Identity
 5. Real estate scenarios

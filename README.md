@@ -40,21 +40,21 @@ struct Student {
 fn main() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let _core = bind(
-        graph,
-        keel::adapt::http::Utopia,
-        keel::adapt::db::Sqlite,
-    )
-    .expect("bind");
+    let db = keel::adapt::db::Sqlite::memory();
+    let _core = bind(graph, keel::adapt::http::Utopia, &db).expect("bind");
 }
 ```
 
+`Sqlite::wire` opens an in-memory (or file) database and applies engine DDL:
+resource tables, n2m join tables, and reign columns (`id`, `expires_at`,
+`created_at`, `updated_at`). No business create/query API.
+
 ## Shape
 
-- `crates/keel` — graph, plan, sealed reign, adapt ports
+- `crates/keel` — graph, plan, ddl, sealed reign, adapt ports
 - `crates/macro` — `#[resource]` / `#[field]` / `#[relation]`
-- control plane (reign) is engine-only: expires, created, updated always applied in plan
-- `adapt::db::Sqlite` — cold-start db port (wire still plan-level; file/memory engine next)
+- control plane (reign) is engine-only and always present in DDL
+- `adapt::db::Sqlite` — closed-loop db adapt (`memory` / `file`)
 
 ## Operating
 

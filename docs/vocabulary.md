@@ -30,3 +30,10 @@ so the shared meaning stays true.
 - `lift` — raise a graph or spec into the next engine form.
 - `link` — macro-side relation attribute parse.
 - `sqlite` — cold-start db adapt implementation (closed loop, no daemon).
+- `ddl` — engine SQL projection of a plan (tables, reign columns, joins).
+- `cols` — adaptor diagnostic: list columns of a wired table.
+- `has` — adaptor diagnostic: whether a table exists after wire.
+- `cast` — map a field atom kind to a storage type name.
+- `form` — DDL for one resource unit table.
+- `arc` — DDL for one relation join table.
+- `stamp` — append reign control columns onto a DDL column list.

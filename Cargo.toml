@@ -13,4 +13,5 @@ keel = { path = "crates/keel" }
 keel-macro = { path = "crates/macro" }
 proc-macro2 = "1"
 quote = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
 syn = { version = "2", features = ["full"] }
