@@ -80,14 +80,33 @@ fn life() {
         Some("ada")
     );
 
+    core.set("Student", b, &[("nickname", "bobby")])
+        .expect("set b");
+    let rows = core.live("Student").expect("live after set");
+    let bob = rows.iter().find(|row| row.key() == b).expect("b");
+    assert_eq!(
+        bob.cells().get("nickname").map(String::as_str),
+        Some("bobby")
+    );
+    assert_eq!(
+        bob.cells().get("avatar").map(String::as_str),
+        Some("https://b.example/b")
+    );
+    assert!(bob.updated() >= bob.created());
+
+    assert!(core.set("Student", b, &[]).is_err());
+    assert!(core.set("Student", b, &[("missing", "x")]).is_err());
+    assert!(core.set("Student", b, &[("id", "9")]).is_err());
+
     core.end("Student", a).expect("end a");
     let rows = core.live("Student").expect("live after end");
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].key(), b);
     assert_eq!(
         rows[0].cells().get("nickname").map(String::as_str),
-        Some("bob")
+        Some("bobby")
     );
+    assert!(core.set("Student", a, &[("nickname", "gone")]).is_err());
 }
 
 #[test]

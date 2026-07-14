@@ -48,7 +48,7 @@ fn main() {
 
 | Method | Meaning |
 |--------|---------|
-| `put` / `live` / `end` | resource rows; `live` builds AST then runs |
+| `put` / `set` / `live` / `end` | insert, partial update, live list, soft-end |
 | `query` / `ask` | text → AST → run; `ask` takes `Tree` directly |
 | AST | `from` + where + `link` + order/page → always **pack** |
 | `tie` / `ties` / `cut` | n2m write on Core; read via `link` bond bags (H0) |
@@ -65,6 +65,7 @@ Native REST per resource (**no association queries**):
 | `GET` | `{prefix}/{unit}` | `live` |
 | `GET` | `{prefix}/{unit}/{id}` | one live row by id |
 | `POST` | `{prefix}/{unit}` | `put` |
+| `PATCH` | `{prefix}/{unit}/{id}` | `set` (partial body) |
 | `DELETE` | `{prefix}/{unit}/{id}` | `end` |
 | `POST` | `{prefix}/query` | body `{"q":…}` → always pack |
 

@@ -240,6 +240,23 @@ try {
       throw new Error("expected id order");
     }
   });
+  await check("PATCH /student/:id", async () => {
+    const res = await fetch(`${base}/student/${adaId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ nickname: "ada2" }),
+    });
+    if (!res.ok) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    if (body.nickname !== "ada2") {
+      throw new Error("expected patched nickname");
+    }
+    if (body.avatar !== "https://a.example/a") {
+      throw new Error("expected avatar kept");
+    }
+  });
   await check("no bond REST", async () => {
     const res = await fetch(`${base}/student/1/classes`);
     if (res.status !== 404) {

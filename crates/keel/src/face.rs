@@ -27,6 +27,10 @@ impl<S: Store> Core<S> {
         self.store.put(&self.plan, name, fields)
     }
 
+    pub fn set(&self, name: &str, key: i64, fields: &[(&str, &str)]) -> Result<(), Error> {
+        self.store.set(&self.plan, name, key, fields)
+    }
+
     pub fn live(&self, name: &str) -> Result<Vec<Row>, Error> {
         let pack = self.ask(&query::form(name))?;
         Ok(pack.rows().to_vec())

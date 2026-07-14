@@ -7,7 +7,7 @@ engine projections, not business authoring surfaces.
 ## Product boundary
 
 - **Business**: `#[resource]`, `#[field]`, `#[relation]`, `Graph::plug`, `bind`.
-- **Engine face (`Core`)**: `put` / `live` / `end` / `tie` / `ties` / `cut`.
+- **Engine face (`Core`)**: `put` / `set` / `live` / `end` / `tie` / `ties` / `cut`.
 - **Runtime policy**: repo-rooted `keel.toml` (`[listen]`, `[store]`); load via
   `config::load(root)`; missing file => defaults (memory store, 127.0.0.1:3000).
 - **HTTP (axum)**: native REST per resource (no association reads); global

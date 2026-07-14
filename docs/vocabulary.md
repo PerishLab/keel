@@ -39,6 +39,7 @@ so the shared meaning stays true.
 - `stamp` — append reign control columns onto a DDL column list.
 - `life` — engine-internal row lifecycle (put / live / end).
 - `put` — engine insert of business cells with reign stamps.
+- `set` — partial update of live business cells; bumps updated_at.
 - `live` — rows in the effective time slice.
 - `end` — stamp expires_at to now; row leaves the live slice.
 - `row` — one engine-read record (key, cells, reign times).

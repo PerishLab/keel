@@ -5,6 +5,7 @@ use crate::plan::Plan;
 pub trait Store: Send + Sync {
     fn wire(&self, plan: &Plan) -> Result<(), Error>;
     fn put(&self, plan: &Plan, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error>;
+    fn set(&self, plan: &Plan, name: &str, key: i64, fields: &[(&str, &str)]) -> Result<(), Error>;
     fn live(&self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error>;
     fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error>;
     fn tie(&self, plan: &Plan, owner: &str, bond: &str, ends: Ends) -> Result<i64, Error>;

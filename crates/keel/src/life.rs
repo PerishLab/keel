@@ -163,6 +163,51 @@ impl<'a> Work<'a> {
         Ok(())
     }
 
+    pub fn set(
+        &self,
+        plan: &Plan,
+        name: &str,
+        key: i64,
+        fields: &[(&str, &str)],
+    ) -> Result<(), Error> {
+        let unit = find(plan, name)?;
+        part(unit, fields)?;
+        let tick = now();
+        let mut text = format!("UPDATE {} SET ", ddl::table(unit.name()));
+        let mut vals: Vec<rusqlite::types::Value> = Vec::new();
+        for (i, (col, val)) in fields.iter().enumerate() {
+            if i > 0 {
+                text.push_str(", ");
+            }
+            text.push_str(col);
+            text.push_str(" = ?");
+            text.push_str(&(i + 1).to_string());
+            vals.push(rusqlite::types::Value::Text(val.to_string()));
+        }
+        let n = fields.len();
+        text.push_str(&format!(
+            ", {} = ?{} WHERE {} = ?{} AND ({} IS NULL OR {} > ?{})",
+            ddl::UPDATED,
+            n + 1,
+            ddl::KEY,
+            n + 2,
+            ddl::EXPIRES,
+            ddl::EXPIRES,
+            n + 3
+        ));
+        vals.push(rusqlite::types::Value::Integer(tick));
+        vals.push(rusqlite::types::Value::Integer(key));
+        vals.push(rusqlite::types::Value::Integer(tick));
+        let changed = self
+            .conn
+            .execute(&text, rusqlite::params_from_iter(vals))
+            .map_err(fail)?;
+        if changed == 0 {
+            return Err(Error::Adapt(format!("missing row {key}")));
+        }
+        Ok(())
+    }
+
     pub fn tie(&self, plan: &Plan, owner: &str, bond: &str, ends: Ends) -> Result<i64, Error> {
         let (unit, edge) = edge(plan, owner, bond)?;
         if edge.kind() != bond::Kind::N2m {
@@ -277,6 +322,21 @@ fn check(unit: &Unit, fields: &[(&str, &str)]) -> Result<(), Error> {
         }
     }
     for (k, _) in fields {
+        if !unit.fields().iter().any(|s| s.name() == *k) {
+            return Err(Error::Adapt(format!("unknown field {k}")));
+        }
+    }
+    Ok(())
+}
+
+fn part(unit: &Unit, fields: &[(&str, &str)]) -> Result<(), Error> {
+    if fields.is_empty() {
+        return Err(Error::Adapt("empty set".into()));
+    }
+    for (k, _) in fields {
+        if *k == ddl::KEY || *k == ddl::EXPIRES || *k == ddl::CREATED || *k == ddl::UPDATED {
+            return Err(Error::Adapt(format!("control field {k}")));
+        }
         if !unit.fields().iter().any(|s| s.name() == *k) {
             return Err(Error::Adapt(format!("unknown field {k}")));
         }

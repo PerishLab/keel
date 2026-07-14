@@ -65,6 +65,12 @@ impl Store for Sqlite {
         life::Work::new(conn).put(plan, name, fields)
     }
 
+    fn set(&self, plan: &Plan, name: &str, key: i64, fields: &[(&str, &str)]) -> Result<(), Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).set(plan, name, key, fields)
+    }
+
     fn live(&self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error> {
         let guard = self.conn.lock().map_err(lock)?;
         let conn = guard.as_ref().ok_or_else(unwired)?;

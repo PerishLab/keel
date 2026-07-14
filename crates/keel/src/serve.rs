@@ -29,7 +29,10 @@ pub async fn listen<S: Store + 'static>(
         .route("/health", get(health))
         .route("/query", post(run::<S>))
         .route("/{unit}", get(list::<S>).post(create::<S>))
-        .route("/{unit}/{id}", get(one::<S>).delete(remove::<S>))
+        .route(
+            "/{unit}/{id}",
+            get(one::<S>).patch(edit::<S>).delete(remove::<S>),
+        )
         .with_state(core);
     let prefix = prefix.trim_end_matches('/');
     let app = if prefix.is_empty() {
@@ -101,6 +104,29 @@ async fn one<S: Store>(
     Path((unit, id)): Path<(String, i64)>,
 ) -> Result<Json<Value>, Fault> {
     let name = unit_name(core.as_ref(), &unit)?;
+    let q = format!(r#"from {name} where id = "{id}""#);
+    let pack = core.query(&q).map_err(Fault::from)?;
+    match pack.rows().first() {
+        Some(row) => Ok(Json(row_json(row))),
+        None => Err(Fault {
+            status: StatusCode::NOT_FOUND,
+            note: format!("missing row {id}"),
+        }),
+    }
+}
+
+async fn edit<S: Store>(
+    State(core): State<Arc<Core<S>>>,
+    Path((unit, id)): Path<(String, i64)>,
+    Json(body): Json<Map<String, Value>>,
+) -> Result<Json<Value>, Fault> {
+    let name = unit_name(core.as_ref(), &unit)?;
+    let fields = cells(&body)?;
+    let pairs: Vec<(&str, &str)> = fields
+        .iter()
+        .map(|(k, v)| (k.as_str(), v.as_str()))
+        .collect();
+    core.set(&name, id, &pairs).map_err(Fault::from)?;
     let q = format!(r#"from {name} where id = "{id}""#);
     let pack = core.query(&q).map_err(Fault::from)?;
     match pack.rows().first() {
@@ -202,6 +228,10 @@ impl From<Error> for Fault {
     fn from(err: Error) -> Self {
         match err {
             Error::Missing(name) => Self::miss(&name),
+            Error::Adapt(note) if note.starts_with("missing row") => Self {
+                status: StatusCode::NOT_FOUND,
+                note,
+            },
             Error::Adapt(note) => Self {
                 status: StatusCode::BAD_REQUEST,
                 note,
