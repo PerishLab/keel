@@ -41,6 +41,37 @@ fn parse() {
         r#"from student slice live where nickname = "ada""#
     );
 
+    let tree = query::parse(r#"from Student where nickname != "ada""#).expect("ne");
+    assert_eq!(tree.preds()[0].op(), Op::Ne);
+    assert_eq!(
+        query::digest(&tree),
+        r#"from student slice live where nickname != "ada""#
+    );
+
+    let tree = query::parse(r#"from Student where nickname < "m""#).expect("lt");
+    assert_eq!(tree.preds()[0].op(), Op::Lt);
+    let tree = query::parse(r#"from Student where nickname <= "m""#).expect("le");
+    assert_eq!(tree.preds()[0].op(), Op::Le);
+    let tree = query::parse(r#"from Student where nickname > "m""#).expect("gt");
+    assert_eq!(tree.preds()[0].op(), Op::Gt);
+    let tree = query::parse(r#"from Student where nickname >= "m""#).expect("ge");
+    assert_eq!(tree.preds()[0].op(), Op::Ge);
+    assert_eq!(
+        query::digest(&tree),
+        r#"from student slice live where nickname >= "m""#
+    );
+
+    let tree = query::parse(r#"from Student where nickname in ("ada", "bob")"#).expect("in");
+    assert_eq!(tree.preds()[0].op(), Op::In);
+    assert_eq!(
+        tree.preds()[0].values(),
+        &["ada".to_string(), "bob".to_string()]
+    );
+    assert_eq!(
+        query::digest(&tree),
+        r#"from student slice live where nickname in ("ada", "bob")"#
+    );
+
     let tree =
         query::parse(r#"from Student where nickname = "ada" and avatar = "https://a.example/a""#)
             .expect("and");
@@ -73,6 +104,8 @@ fn parse() {
     assert!(query::parse("from Student where").is_err());
     assert!(query::parse("from Student where nickname").is_err());
     assert!(query::parse(r#"from Student where nickname = ada"#).is_err());
+    assert!(query::parse(r#"from Student where nickname in ()"#).is_err());
+    assert!(query::parse(r#"from Student where nickname ~ "x""#).is_err());
     assert!(query::parse("from Student limit 0").is_err());
     assert!(query::parse("from Student limit").is_err());
     assert!(query::parse(r#"from Student after "x""#).is_err());
@@ -127,6 +160,34 @@ fn run() {
         .query(r#"from Student where nickname = "zoe""#)
         .expect("miss");
     assert!(rows.is_empty());
+
+    let rows = core
+        .query(r#"from Student where nickname != "ada""#)
+        .expect("ne");
+    assert_eq!(rows.len(), 2);
+
+    let rows = core
+        .query(r#"from Student where nickname < "b""#)
+        .expect("lt");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].key(), ada);
+
+    let rows = core
+        .query(r#"from Student where nickname >= "bob""#)
+        .expect("ge");
+    assert_eq!(rows.len(), 2);
+
+    let rows = core
+        .query(r#"from Student where nickname in ("ada", "cy")"#)
+        .expect("in");
+    assert_eq!(rows.len(), 2);
+    assert!(rows.iter().any(|row| row.key() == ada));
+    assert!(rows.iter().any(|row| row.key() == cy));
+
+    let rows = core
+        .query(r#"from Student where nickname != "ada" and nickname < "d""#)
+        .expect("mix");
+    assert_eq!(rows.len(), 2);
 
     let rows = core
         .query("from Student order by nickname desc")

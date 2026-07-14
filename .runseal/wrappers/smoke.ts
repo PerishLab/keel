@@ -122,6 +122,25 @@ try {
     const body = await res.json();
     bobId = body.id;
   });
+  await check("POST /query scalar", async () => {
+    const res = await fetch(`${base}/query`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        q: 'from Student where nickname != "ada" and nickname in ("bob", "zoe")',
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    if (!Array.isArray(body) || body.length !== 1) {
+      throw new Error("expected one scalar row");
+    }
+    if (body[0].nickname !== "bob") {
+      throw new Error("expected bob from scalar ops");
+    }
+  });
   await check("POST /query order limit", async () => {
     const res = await fetch(`${base}/query`, {
       method: "POST",

@@ -12,6 +12,12 @@ pub enum Slice {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Op {
     Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    In,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -24,7 +30,7 @@ pub enum Rank {
 pub struct Pred {
     field: String,
     op: Op,
-    value: String,
+    values: Vec<String>,
 }
 
 impl Pred {
@@ -37,7 +43,11 @@ impl Pred {
     }
 
     pub fn value(&self) -> &str {
-        &self.value
+        self.values.first().map(String::as_str).unwrap_or("")
+    }
+
+    pub fn values(&self) -> &[String] {
+        &self.values
     }
 }
 
@@ -115,16 +125,7 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
     scan.ws();
     if scan.opt("where") {
         loop {
-            let field = scan.ident()?;
-            scan.ws();
-            scan.ch('=')?;
-            scan.ws();
-            let value = scan.quoted()?;
-            preds.push(Pred {
-                field,
-                op: Op::Eq,
-                value,
-            });
+            preds.push(take_pred(&mut scan)?);
             scan.ws();
             if !scan.opt("and") {
                 break;
@@ -177,16 +178,12 @@ pub fn digest(tree: &Tree) -> String {
         Slice::Live => format!("from {unit} slice live"),
     };
     for (i, pred) in tree.preds().iter().enumerate() {
-        let _ = pred.op();
         if i == 0 {
             out.push_str(" where ");
         } else {
             out.push_str(" and ");
         }
-        out.push_str(pred.field());
-        out.push_str(" = \"");
-        out.push_str(&escape(pred.value()));
-        out.push('"');
+        write_pred(&mut out, pred);
     }
     if let Some(sort) = tree.sort() {
         out.push_str(" order by ");
@@ -207,6 +204,78 @@ pub fn digest(tree: &Tree) -> String {
         out.push('"');
     }
     out
+}
+
+fn take_pred(scan: &mut Scan<'_>) -> Result<Pred, Error> {
+    let field = scan.ident()?;
+    scan.ws();
+    if scan.opt("in") {
+        let values = take_list(scan)?;
+        return Ok(Pred {
+            field,
+            op: Op::In,
+            values,
+        });
+    }
+    let op = scan.op()?;
+    scan.ws();
+    let value = scan.quoted()?;
+    Ok(Pred {
+        field,
+        op,
+        values: vec![value],
+    })
+}
+
+fn take_list(scan: &mut Scan<'_>) -> Result<Vec<String>, Error> {
+    scan.ch('(')?;
+    let mut values = Vec::new();
+    loop {
+        values.push(scan.quoted()?);
+        scan.ws();
+        if !scan.comma() {
+            break;
+        }
+    }
+    scan.ch(')')?;
+    if values.is_empty() {
+        return Err(Error::Adapt("empty in list".into()));
+    }
+    Ok(values)
+}
+
+fn write_pred(out: &mut String, pred: &Pred) {
+    out.push_str(pred.field());
+    out.push(' ');
+    if pred.op() == Op::In {
+        out.push_str("in (");
+        for (i, value) in pred.values().iter().enumerate() {
+            if i > 0 {
+                out.push_str(", ");
+            }
+            out.push('"');
+            out.push_str(&escape(value));
+            out.push('"');
+        }
+        out.push(')');
+        return;
+    }
+    out.push_str(mark(pred.op()));
+    out.push_str(" \"");
+    out.push_str(&escape(pred.value()));
+    out.push('"');
+}
+
+fn mark(op: Op) -> &'static str {
+    match op {
+        Op::Eq => "=",
+        Op::Ne => "!=",
+        Op::Lt => "<",
+        Op::Le => "<=",
+        Op::Gt => ">",
+        Op::Ge => ">=",
+        Op::In => "in",
+    }
 }
 
 fn take_sort(scan: &mut Scan<'_>) -> Result<Option<Sort>, Error> {
@@ -269,9 +338,22 @@ fn check(plan: &Plan, name: &str, preds: &[Pred], sort: Option<&Sort>) -> Result
 }
 
 fn pass(row: &Row, preds: &[Pred]) -> bool {
-    preds.iter().all(|pred| match pred.op() {
-        Op::Eq => row.cells().get(pred.field()).map(String::as_str) == Some(pred.value()),
-    })
+    preds.iter().all(|pred| hit(row, pred))
+}
+
+fn hit(row: &Row, pred: &Pred) -> bool {
+    let Some(got) = row.cells().get(pred.field()) else {
+        return false;
+    };
+    match pred.op() {
+        Op::Eq => got == pred.value(),
+        Op::Ne => got != pred.value(),
+        Op::Lt => got.as_str() < pred.value(),
+        Op::Le => got.as_str() <= pred.value(),
+        Op::Gt => got.as_str() > pred.value(),
+        Op::Ge => got.as_str() >= pred.value(),
+        Op::In => pred.values().iter().any(|want| want == got),
+    }
 }
 
 fn order(rows: &mut [Row], sort: Option<&Sort>) {
@@ -423,6 +505,28 @@ impl<'a> Scan<'a> {
         Ok(n)
     }
 
+    fn op(&mut self) -> Result<Op, Error> {
+        self.ws();
+        let rest = self.rest();
+        let (op, n) = if rest.starts_with("!=") {
+            (Op::Ne, 2)
+        } else if rest.starts_with("<=") {
+            (Op::Le, 2)
+        } else if rest.starts_with(">=") {
+            (Op::Ge, 2)
+        } else if rest.starts_with('<') {
+            (Op::Lt, 1)
+        } else if rest.starts_with('>') {
+            (Op::Gt, 1)
+        } else if rest.starts_with('=') {
+            (Op::Eq, 1)
+        } else {
+            return Err(Error::Adapt("expected op".into()));
+        };
+        self.at += n;
+        Ok(op)
+    }
+
     fn ch(&mut self, want: char) -> Result<(), Error> {
         self.ws();
         let mut chars = self.rest().chars();
@@ -432,6 +536,16 @@ impl<'a> Scan<'a> {
                 Ok(())
             }
             _ => Err(Error::Adapt(format!("expected {want}"))),
+        }
+    }
+
+    fn comma(&mut self) -> bool {
+        self.ws();
+        if self.rest().starts_with(',') {
+            self.at += 1;
+            true
+        } else {
+            false
         }
     }
 
