@@ -4,7 +4,7 @@ use crate::store::Store;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -33,6 +33,8 @@ pub async fn listen<S: Store + 'static>(
             "/{unit}/{id}",
             get(one::<S>).patch(edit::<S>).delete(remove::<S>),
         )
+        .route("/{unit}/{id}/{bond}", get(no_read).post(attach::<S>))
+        .route("/{unit}/{id}/{bond}/{tie}", delete(detach::<S>))
         .with_state(core);
     let prefix = prefix.trim_end_matches('/');
     let app = if prefix.is_empty() {
@@ -147,8 +149,67 @@ async fn remove<S: Store>(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Deserialize)]
+struct TieBody {
+    right: i64,
+}
+
+async fn no_read() -> StatusCode {
+    StatusCode::NOT_FOUND
+}
+
+async fn attach<S: Store>(
+    State(core): State<Arc<Core<S>>>,
+    Path((unit, id, bond)): Path<(String, i64, String)>,
+    Json(body): Json<TieBody>,
+) -> Result<(StatusCode, Json<Value>), Fault> {
+    let name = unit_name(core.as_ref(), &unit)?;
+    let bond = bond_name(core.as_ref(), &name, &bond)?;
+    let key = core
+        .tie(
+            &name,
+            &bond,
+            crate::life::Ends {
+                left: id,
+                right: body.right,
+            },
+        )
+        .map_err(Fault::from)?;
+    Ok((StatusCode::CREATED, Json(json!({ "id": key }))))
+}
+
+async fn detach<S: Store>(
+    State(core): State<Arc<Core<S>>>,
+    Path((unit, id, bond, tie)): Path<(String, i64, String, i64)>,
+) -> Result<StatusCode, Fault> {
+    let name = unit_name(core.as_ref(), &unit)?;
+    let bond = bond_name(core.as_ref(), &name, &bond)?;
+    let ties = core.ties(&name, &bond, id).map_err(Fault::from)?;
+    if !ties.iter().any(|row| row.key() == tie) {
+        return Err(Fault {
+            status: StatusCode::NOT_FOUND,
+            note: format!("missing tie {tie}"),
+        });
+    }
+    core.cut(&name, &bond, tie).map_err(Fault::from)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 fn unit_name<S: Store>(core: &Core<S>, route: &str) -> Result<String, Fault> {
     crate::query::resolve(core.plan(), route).map_err(Fault::from)
+}
+
+fn bond_name<S: Store>(core: &Core<S>, unit: &str, bond: &str) -> Result<String, Fault> {
+    let node = core
+        .plan()
+        .units()
+        .get(unit)
+        .ok_or_else(|| Fault::miss(unit))?;
+    node.bonds()
+        .iter()
+        .find(|edge| edge.name().eq_ignore_ascii_case(bond))
+        .map(|edge| edge.name().to_string())
+        .ok_or_else(|| Fault::bad(format!("unknown bond {bond}")))
 }
 
 fn cells(body: &Map<String, Value>) -> Result<BTreeMap<String, String>, Fault> {

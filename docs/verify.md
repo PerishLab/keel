@@ -18,7 +18,7 @@ start is done; failures mean cold start is not closed.
 - `live` == root rows of `query("from Unit")` pack; scalar `where` + order/page
 - `where id` / `order by id` on engine key; `id in ("…")` for H0 follow-up loads
 - `POST /query` always pack `{root,bags}`; optional `link` → bond bags (H0)
-- REST: health, list/create/get-one/patch/delete; **no** association routes
+- REST: resource CRUD + edge write (tie/cut); **no** association GET
 - guard green without docker daemon
 
 ## Must not require (out)

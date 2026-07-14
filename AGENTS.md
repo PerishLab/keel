@@ -10,9 +10,9 @@ engine projections, not business authoring surfaces.
 - **Engine face (`Core`)**: `put` / `set` / `live` / `end` / `tie` / `ties` / `cut`.
 - **Runtime policy**: repo-rooted `keel.toml` (`[listen]`, `[store]`); load via
   `config::load(root)`; missing file => defaults (memory store, 127.0.0.1:3000).
-- **HTTP (axum)**: native REST per resource (no association reads); global
-  `POST {prefix}/query` with text DSL (`{"q":"from Unit"}`); host/port/prefix
-  from `keel.toml`. Filter/order/page live inside DSL only (not REST query params).
+- **HTTP (axum)**: resource REST + edge **write** (`tie`/`cut` routes); no
+  association **reads**. Global `POST {prefix}/query` DSL; host/port/prefix
+  from `keel.toml`. Filter/order/page/link only inside DSL.
 - **Sidecar**: `sidecar.toml` manages `keel-api` process; health should match
   `[listen]` in `keel.toml` (do not dual-author ports).
 - **Edge reads** (when implemented): always-pack `/query`; `link` → bond bags

@@ -307,7 +307,7 @@ fn edge<'a>(plan: &'a Plan, owner: &str, bond: &str) -> Result<(&'a Unit, &'a Ed
     let edge = unit
         .bonds()
         .iter()
-        .find(|edge| edge.name() == bond)
+        .find(|edge| edge.name().eq_ignore_ascii_case(bond))
         .ok_or_else(|| Error::Adapt(format!("missing bond {bond}")))?;
     Ok((unit, edge))
 }

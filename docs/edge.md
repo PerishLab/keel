@@ -13,8 +13,15 @@ Edge reads return a **pack**: named flat **bags**, not a nested document tree.
 - Bond bags are honest **tie** projections, not embedded target rows.
 - Clients assemble trees from bags by id. The engine does not nest.
 
-REST stays free of association routes. Edge **read** lives only in query DSL.
-Edge **write** stays on Core (`tie` / `cut`).
+Edge **read** lives only in query DSL (no association GET). Edge **write** is
+Core (`tie` / `cut`) and may be projected over HTTP:
+
+| Method | Path | Core |
+|--------|------|------|
+| `POST` | `{prefix}/{unit}/{id}/{bond}` | `tie` body `{"right": <id>}` → `{"id": <tie>}` |
+| `DELETE` | `{prefix}/{unit}/{id}/{bond}/{tie}` | `cut` (tie must belong to that left) |
+
+`GET …/{bond}` remains **404** (reads stay in `/query` + `link`).
 
 ## Wire shape (settled)
 
@@ -221,7 +228,7 @@ truncation is forbidden.
 
 - Nested GraphQL-style response trees as the primary edge delivery.
 - Order/page on bond bags.
-- Association REST routes.
+- Association REST **reads** (GET on bonds).
 - Engine-invented reverse edges.
 - Silent partial closures.
 - Dual bag naming schemes (always table / `{table}.{bond}`).

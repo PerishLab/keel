@@ -67,6 +67,8 @@ Native REST per resource (**no association queries**):
 | `POST` | `{prefix}/{unit}` | `put` |
 | `PATCH` | `{prefix}/{unit}/{id}` | `set` (partial body) |
 | `DELETE` | `{prefix}/{unit}/{id}` | `end` |
+| `POST` | `{prefix}/{unit}/{id}/{bond}` | `tie` body `{"right": id}` |
+| `DELETE` | `{prefix}/{unit}/{id}/{bond}/{tie}` | `cut` |
 | `POST` | `{prefix}/query` | body `{"q":…}` → always pack |
 
 `listen.prefix` in `keel.toml` is the api prefix (default empty).

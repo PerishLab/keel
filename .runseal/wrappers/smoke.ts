@@ -257,8 +257,66 @@ try {
       throw new Error("expected avatar kept");
     }
   });
-  await check("no bond REST", async () => {
-    const res = await fetch(`${base}/student/1/classes`);
+  let classId = 0;
+  let tieId = 0;
+  await check("POST /class", async () => {
+    const res = await fetch(`${base}/class`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "math" }),
+    });
+    if (res.status !== 201) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    classId = body.id;
+  });
+  await check("POST edge tie", async () => {
+    const res = await fetch(`${base}/student/${adaId}/classes`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ right: classId }),
+    });
+    if (res.status !== 201) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    if (typeof body.id !== "number") {
+      throw new Error("missing tie id");
+    }
+    tieId = body.id;
+  });
+  await check("POST /query link after tie", async () => {
+    const res = await fetch(`${base}/query`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        q: `from Student where id = "${adaId}" link classes`,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    const bonds = body.bags["student.classes"];
+    if (!Array.isArray(bonds) || bonds.length !== 1) {
+      throw new Error("expected one bond");
+    }
+    if (bonds[0].left !== adaId || bonds[0].right !== classId) {
+      throw new Error("expected tie ends");
+    }
+  });
+  await check("DELETE edge cut", async () => {
+    const res = await fetch(
+      `${base}/student/${adaId}/classes/${tieId}`,
+      { method: "DELETE" },
+    );
+    if (res.status !== 204) {
+      throw new Error(`status ${res.status}`);
+    }
+  });
+  await check("no bond REST read", async () => {
+    const res = await fetch(`${base}/student/${adaId}/classes`);
     if (res.status !== 404) {
       throw new Error(`expected 404, got ${res.status}`);
     }
