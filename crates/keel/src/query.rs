@@ -1,8 +1,11 @@
 use crate::adapt::Error;
 use crate::ddl;
-use crate::life::Row;
+use crate::life::{Row, Tie};
 use crate::plan::Plan;
 use crate::store::Store;
+use std::collections::BTreeMap;
+
+pub const TIE_CAP: usize = 10_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Slice {
@@ -72,6 +75,7 @@ pub struct Tree {
     from: String,
     slice: Slice,
     preds: Vec<Pred>,
+    links: Vec<String>,
     sort: Option<Sort>,
     limit: Option<usize>,
     after: Option<i64>,
@@ -90,6 +94,10 @@ impl Tree {
         &self.preds
     }
 
+    pub fn links(&self) -> &[String] {
+        &self.links
+    }
+
     pub fn sort(&self) -> Option<&Sort> {
         self.sort.as_ref()
     }
@@ -103,6 +111,46 @@ impl Tree {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Bag {
+    Unit(Vec<Row>),
+    Bond(Vec<Tie>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Pack {
+    root: String,
+    bags: BTreeMap<String, Bag>,
+}
+
+impl Pack {
+    pub fn root(&self) -> &str {
+        &self.root
+    }
+
+    pub fn bags(&self) -> &BTreeMap<String, Bag> {
+        &self.bags
+    }
+
+    pub fn unit(&self, key: &str) -> Option<&[Row]> {
+        match self.bags.get(key) {
+            Some(Bag::Unit(rows)) => Some(rows.as_slice()),
+            _ => None,
+        }
+    }
+
+    pub fn bond(&self, key: &str) -> Option<&[Tie]> {
+        match self.bags.get(key) {
+            Some(Bag::Bond(ties)) => Some(ties.as_slice()),
+            _ => None,
+        }
+    }
+
+    pub fn rows(&self) -> &[Row] {
+        self.unit(&self.root).unwrap_or(&[])
+    }
+}
+
 pub type Ask = Tree;
 
 pub fn form(unit: &str) -> Tree {
@@ -110,6 +158,7 @@ pub fn form(unit: &str) -> Tree {
         from: unit.to_string(),
         slice: Slice::Live,
         preds: Vec::new(),
+        links: Vec::new(),
         sort: None,
         limit: None,
         after: None,
@@ -132,6 +181,7 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
             }
         }
     }
+    let links = take_links(&mut scan)?;
     let sort = take_sort(&mut scan)?;
     let limit = take_limit(&mut scan)?;
     let after = take_after(&mut scan)?;
@@ -143,6 +193,7 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
         from: unit,
         slice: Slice::Live,
         preds,
+        links,
         sort,
         limit,
         after,
@@ -158,9 +209,10 @@ pub fn resolve(plan: &Plan, unit: &str) -> Result<String, Error> {
         .ok_or_else(|| Error::Missing(unit.into()))
 }
 
-pub fn run(plan: &Plan, store: &impl Store, tree: &Tree) -> Result<Vec<Row>, Error> {
+pub fn run(plan: &Plan, store: &impl Store, tree: &Tree) -> Result<Pack, Error> {
     let name = resolve(plan, tree.from())?;
     check(plan, &name, tree.preds(), tree.sort())?;
+    check_links(plan, &name, tree.links())?;
     let mut rows = match tree.slice() {
         Slice::Live => store.live(plan, &name)?,
     };
@@ -169,7 +221,16 @@ pub fn run(plan: &Plan, store: &impl Store, tree: &Tree) -> Result<Vec<Row>, Err
     }
     order(&mut rows, tree.sort());
     page(&mut rows, tree.after(), tree.limit());
-    Ok(rows)
+    let keys: Vec<i64> = rows.iter().map(|row| row.key()).collect();
+    let root = ddl::table(&name);
+    let mut bags = BTreeMap::new();
+    bags.insert(root.clone(), Bag::Unit(rows));
+    for bond in tree.links() {
+        let ties = pull(plan, store, &name, bond, &keys)?;
+        let key = format!("{root}.{bond}");
+        bags.insert(key, Bag::Bond(ties));
+    }
+    Ok(Pack { root, bags })
 }
 
 pub fn digest(tree: &Tree) -> String {
@@ -184,6 +245,10 @@ pub fn digest(tree: &Tree) -> String {
             out.push_str(" and ");
         }
         write_pred(&mut out, pred);
+    }
+    for bond in tree.links() {
+        out.push_str(" link ");
+        out.push_str(bond);
     }
     if let Some(sort) = tree.sort() {
         out.push_str(" order by ");
@@ -204,6 +269,56 @@ pub fn digest(tree: &Tree) -> String {
         out.push('"');
     }
     out
+}
+
+fn take_links(scan: &mut Scan<'_>) -> Result<Vec<String>, Error> {
+    let mut links = Vec::new();
+    loop {
+        scan.ws();
+        if !scan.opt("link") {
+            break;
+        }
+        let bond = scan.ident()?;
+        if links.iter().any(|have| have == &bond) {
+            return Err(Error::Adapt(format!("duplicate link {bond}")));
+        }
+        links.push(bond);
+    }
+    Ok(links)
+}
+
+fn check_links(plan: &Plan, name: &str, links: &[String]) -> Result<(), Error> {
+    let unit = plan
+        .units()
+        .get(name)
+        .ok_or_else(|| Error::Missing(name.into()))?;
+    for bond in links {
+        if !unit.bonds().iter().any(|edge| edge.name() == bond) {
+            return Err(Error::Adapt(format!("unknown bond {bond}")));
+        }
+    }
+    Ok(())
+}
+
+fn pull(
+    plan: &Plan,
+    store: &impl Store,
+    owner: &str,
+    bond: &str,
+    keys: &[i64],
+) -> Result<Vec<Tie>, Error> {
+    let mut ties = Vec::new();
+    for &key in keys {
+        let part = store.ties(plan, owner, bond, key)?;
+        for tie in part {
+            ties.push(tie);
+            if ties.len() > TIE_CAP {
+                return Err(Error::Adapt("tie cap exceeded".into()));
+            }
+        }
+    }
+    ties.sort_by_key(|tie| tie.key());
+    Ok(ties)
 }
 
 fn take_pred(scan: &mut Scan<'_>) -> Result<Pred, Error> {

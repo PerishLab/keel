@@ -25,7 +25,7 @@ engine projections, not business authoring surfaces.
 1. Pure data + sqlite DDL (done)
 2. Row + n2m lifecycle (done)
 3. Core face + axum + sidecar + verify (done)
-4. Query AST scalar + order/page (done); edge nav under `docs/edge.md`
+4. Query AST + pack + `link` H0 (done); more edge later under `docs/edge.md`
 5. Capability → identity → real estate scenarios
 
 ## Laws

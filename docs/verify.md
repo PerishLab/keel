@@ -15,18 +15,17 @@ start is done; failures mean cold start is not closed.
 
 - Business-only resource DSL; reign columns engine-owned
 - sqlite wire + put/live/end + tie/ties/cut on Core
-- `live` == `query("from Unit")` sugar; scalar `where` ops + `order by` / `limit` / `after`
+- `live` == root rows of `query("from Unit")` pack; scalar `where` + order/page
+- `POST /query` always returns pack `{root,bags}`; optional `link` → bond bags (H0)
 - `keel.toml` load defaults + file store open
 - REST: health, unit list/create/delete; **no** association routes
-- `POST {prefix}/query` with `{"q":"from Unit"}`
 - guard green without docker daemon
 
 ## Must not require (out)
 
-- edge navigation in DSL yet (law already settled in `docs/edge.md`)
-- nested GraphQL document responses as edge delivery
+- target hydrate from `link` (H0 only); nested GraphQL document responses
 - association REST, reverse edges, reverse-query privilege
-- order/page on non-root bags (forbidden when edge lands)
+- order/page on non-root bags
 - field validation, capability, identity, postgres
 - pagination/cache performance; multi-field order; keyset beyond id cursor
 - end cascading ties, business unique policy

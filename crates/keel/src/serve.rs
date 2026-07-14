@@ -67,9 +67,8 @@ async fn run<S: Store>(
     State(core): State<Arc<Core<S>>>,
     Json(body): Json<QueryBody>,
 ) -> Result<Json<Value>, Fault> {
-    let rows = core.query(&body.q).map_err(Fault::from)?;
-    let body: Vec<Value> = rows.iter().map(row_json).collect();
-    Ok(Json(Value::Array(body)))
+    let pack = core.query(&body.q).map_err(Fault::from)?;
+    Ok(Json(pack_json(&pack)))
 }
 
 async fn list<S: Store>(
@@ -127,6 +126,18 @@ fn cells(body: &Map<String, Value>) -> Result<BTreeMap<String, String>, Fault> {
     Ok(out)
 }
 
+fn pack_json(pack: &crate::query::Pack) -> Value {
+    let mut bags = Map::new();
+    for (key, bag) in pack.bags() {
+        let list = match bag {
+            crate::query::Bag::Unit(rows) => Value::Array(rows.iter().map(row_json).collect()),
+            crate::query::Bag::Bond(ties) => Value::Array(ties.iter().map(tie_json).collect()),
+        };
+        bags.insert(key.clone(), list);
+    }
+    json!({ "root": pack.root(), "bags": bags })
+}
+
 fn row_json(row: &crate::life::Row) -> Value {
     let mut map = Map::new();
     map.insert("id".into(), json!(row.key()));
@@ -137,6 +148,17 @@ fn row_json(row: &crate::life::Row) -> Value {
     map.insert("created_at".into(), json!(row.created()));
     map.insert("updated_at".into(), json!(row.updated()));
     Value::Object(map)
+}
+
+fn tie_json(tie: &crate::life::Tie) -> Value {
+    json!({
+        "id": tie.key(),
+        "left": tie.left(),
+        "right": tie.right(),
+        "expires_at": tie.expires(),
+        "created_at": tie.created(),
+        "updated_at": tie.updated(),
+    })
 }
 
 struct Fault {

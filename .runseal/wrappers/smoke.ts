@@ -85,7 +85,8 @@ try {
       throw new Error(`status ${res.status}`);
     }
     const body = await res.json();
-    if (!Array.isArray(body) || body.length < 1) {
+    const rows = packRows(body, "student");
+    if (rows.length < 1) {
       throw new Error("expected query rows");
     }
   });
@@ -99,10 +100,11 @@ try {
       throw new Error(`status ${res.status}`);
     }
     const body = await res.json();
-    if (!Array.isArray(body) || body.length !== 1) {
+    const rows = packRows(body, "student");
+    if (rows.length !== 1) {
       throw new Error("expected one filtered row");
     }
-    if (body[0].nickname !== "ada") {
+    if (rows[0].nickname !== "ada") {
       throw new Error("expected ada");
     }
   });
@@ -134,10 +136,11 @@ try {
       throw new Error(`status ${res.status}`);
     }
     const body = await res.json();
-    if (!Array.isArray(body) || body.length !== 1) {
+    const rows = packRows(body, "student");
+    if (rows.length !== 1) {
       throw new Error("expected one scalar row");
     }
-    if (body[0].nickname !== "bob") {
+    if (rows[0].nickname !== "bob") {
       throw new Error("expected bob from scalar ops");
     }
   });
@@ -153,10 +156,11 @@ try {
       throw new Error(`status ${res.status}`);
     }
     const body = await res.json();
-    if (!Array.isArray(body) || body.length !== 1) {
+    const rows = packRows(body, "student");
+    if (rows.length !== 1) {
       throw new Error("expected one ordered row");
     }
-    if (body[0].nickname !== "bob") {
+    if (rows[0].nickname !== "bob") {
       throw new Error("expected bob first by desc");
     }
   });
@@ -172,11 +176,36 @@ try {
       throw new Error(`status ${res.status}`);
     }
     const body = await res.json();
-    if (!Array.isArray(body) || body.length !== 1) {
+    const rows = packRows(body, "student");
+    if (rows.length !== 1) {
       throw new Error("expected one cursor row");
     }
-    if (body[0].nickname !== "ada") {
+    if (rows[0].nickname !== "ada") {
       throw new Error("expected ada after bob cursor");
+    }
+  });
+  await check("POST /query link", async () => {
+    const res = await fetch(`${base}/query`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ q: "from Student link classes" }),
+    });
+    if (!res.ok) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    if (body.root !== "student") {
+      throw new Error("expected root student");
+    }
+    const rows = packRows(body, "student");
+    if (rows.length < 1) {
+      throw new Error("expected root rows");
+    }
+    if (!Array.isArray(body.bags["student.classes"])) {
+      throw new Error("expected bond bag");
+    }
+    if (body.bags.class !== undefined) {
+      throw new Error("H0 must not hydrate class bag");
     }
   });
   await check("no bond REST", async () => {
@@ -225,6 +254,21 @@ async function ready(url: string, tries: number): Promise<void> {
     await sleep(250);
   }
   throw new Error(`timeout waiting for ${url}`);
+}
+
+function packRows(body: Record<string, unknown>, unit: string): Array<Record<string, unknown>> {
+  if (typeof body.root !== "string") {
+    throw new Error("pack missing root");
+  }
+  const bags = body.bags as Record<string, unknown> | undefined;
+  if (!bags || typeof bags !== "object") {
+    throw new Error("pack missing bags");
+  }
+  const rows = bags[unit];
+  if (!Array.isArray(rows)) {
+    throw new Error(`missing unit bag ${unit}`);
+  }
+  return rows as Array<Record<string, unknown>>;
 }
 
 async function check(label: string, run: () => Promise<void>): Promise<void> {

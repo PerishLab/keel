@@ -50,9 +50,9 @@ fn main() {
 |--------|---------|
 | `put` / `live` / `end` | resource rows; `live` builds AST then runs |
 | `query` / `ask` | text → AST → run; `ask` takes `Tree` directly |
-| AST | `from` + live + scalar `where` (`=` `!=` `<` `<=` `>` `>=` `in`) + order/page |
-| `tie` / `ties` / `cut` | n2m edges (Core only for now; not default REST) |
-| edge law | flat multi-bag pack; root-only order/page — `docs/edge.md` |
+| AST | `from` + where + `link` + order/page → always **pack** |
+| `tie` / `ties` / `cut` | n2m write on Core; read via `link` bond bags (H0) |
+| edge law | flat pack; root-only order/page — `docs/edge.md` |
 | `serve` / `listen` | axum (`http` feature) |
 
 ### HTTP surface
