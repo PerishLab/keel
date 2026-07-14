@@ -7,7 +7,8 @@ lag; behavior that lands must not violate this document.
 
 Edge reads return a **pack**: named flat **bags**, not a nested document tree.
 
-- One bag per unit kind involved.
+- One bag per unit kind involved (root always; targets only if a future hydrate
+  mode adds them — current mode is **H0**, bond bags only).
 - One bag per selected bond.
 - Bond bags are honest **tie** projections, not embedded target rows.
 - Clients assemble trees from bags by id. The engine does not nest.
@@ -17,33 +18,51 @@ Edge **write** stays on Core (`tie` / `cut`).
 
 ## Wire shape (settled)
 
-### Pack JSON
+### Always pack (A)
 
-`POST {prefix}/query` body stays `{"q":"<dsl>"}`. Response object:
+Every successful `POST {prefix}/query` returns a pack **object**, including
+when the DSL has no `link`:
 
 ```json
 {
   "root": "student",
   "bags": {
-    "student": [ /* row */ ],
-    "student.classes": [ /* tie */ ],
-    "class": [ /* row */ ]
+    "student": [ /* row */ ]
   }
 }
 ```
+
+There is no array-shaped `/query` success body. REST `GET /{unit}` remains an
+array of rows (different surface).
+
+Request body stays `{"q":"<dsl>"}`.
+
+### Pack JSON
 
 | Field | Rule |
 |-------|------|
 | `root` | Root unit **table** name (`ddl::table`), ascii lower. |
 | `bags` | Object map; keys are bag names; values are arrays. |
-| unit bag key | Table name of that unit (`student`, `class`). |
+| unit bag key | Table name of that unit (`student`). |
 | bond bag key | `{root_table}.{bond}` as declared on the root unit (`student.classes`). |
 | missing key | Only bags that this tree produces appear. No placeholder nulls. |
 | empty bag | Present as `[]` when the tree selected that bag and the set is empty. |
 
 Root bag is **always** present (may be `[]`). Bond bags appear only for each
-`link` on the tree. Target unit bags appear only under the hydrate rule (see
-decision blockers).
+`link` on the tree.
+
+### Hydrate (H0)
+
+`link` produces the **bond bag only**. No target unit bag is added by expand.
+
+Clients that need target rows issue a second top-level query, e.g.
+`from Class where id in ("3", "7")` (once multi-id / `in` on id is available
+for engine keys — until then, client may query targets by known keys via
+whatever scalar path exists, or load full live lists in cold start demos).
+
+> Note: business `in` is on field cells today; root/target **id** filtering may
+> need a small follow-up (`id` as engine key in where). That is an
+> implementation gap under H0, not a product fork (see below).
 
 ### Row item (unit bag)
 
@@ -60,13 +79,7 @@ Same projection as today's REST list row:
 }
 ```
 
-- `id`: engine key (`i64`).
-- business fields: strings (current cell encoding).
-- reign: `expires_at` / `created_at` / `updated_at` (null or number).
-
 ### Tie item (bond bag)
-
-Honest `Tie` projection:
 
 ```json
 {
@@ -81,32 +94,25 @@ Honest `Tie` projection:
 
 - `left`: root-side key (owner row id).
 - `right`: target-side key.
-- No embedded target fields. Client joins `right` → target unit bag `id`.
+- No embedded target fields.
 
 ### Non-root bag order (engine-fixed)
 
 | Bag | Stable order |
 |-----|----------------|
 | bond bag | `id` ascending |
-| target unit bag | `id` ascending |
 
 Not expressible in DSL. Root bag order follows root `order by` / default id.
 
 ### Core / Rust sketch (normative intent)
 
-Wire is the contract. Engine types should mirror it (names may track vocabulary):
-
-- `Pack { root: String, bags: … }`
-- unit bag → `Vec<Row>`
-- bond bag → `Vec<Tie>`
-- `query` / `ask` with `link` return `Pack` (exact Rust API is an impl detail
-  as long as wire matches).
+- `Pack { root, bags }` is the query result type on the HTTP path.
+- `Core::live` may keep returning `Vec<Row>` as sugar (single unit, no pack).
+- `Core::query` / HTTP `/query` always produce pack on success.
 
 ### Digest
 
-`digest` must include every `link` bond name in stable order so identity/cache
-cannot ignore expansion. Exact digest string is impl detail; omitting links is
-a bug.
+`digest` must include every `link` bond name in stable order.
 
 ## DSL shape (settled, expand path)
 
@@ -121,12 +127,10 @@ from <Unit>
 [after "<id>"]
 ```
 
-- `link <bond>`: `bond` is an ident naming a **forward** edge on the root unit.
-- Repeat `link` for multiple bonds (`link classes link …`). No `link a.b`.
-- Unknown bond → error. Bond on non-root → error (depth 1).
-- `order` / `limit` / `after` after any `link` still bind **only** the root.
-- Writing order/page tokens after a bond name as if paging the bond → parse
-  error (trailing / wrong subject), never silent ignore.
+- `link <bond>`: forward edge name on the root unit.
+- Repeat `link` for multiple bonds. Duplicate same bond → error.
+- Unknown bond → error. Nested bond path → error.
+- `order` / `limit` / `after` bind **only** the root.
 
 Example:
 
@@ -139,7 +143,7 @@ limit 10
 after "3"
 ```
 
-Example pack (hydrate assumed on for illustration only):
+Example pack under **H0**:
 
 ```json
 {
@@ -164,15 +168,6 @@ Example pack (hydrate assumed on for illustration only):
         "created_at": 1,
         "updated_at": 1
       }
-    ],
-    "class": [
-      {
-        "id": 3,
-        "title": "algo",
-        "expires_at": null,
-        "created_at": 1,
-        "updated_at": 1
-      }
     ]
   }
 }
@@ -186,91 +181,58 @@ Only the **root** unit of a tree (the `from` unit) may take:
 - `limit`
 - `after`
 
-Bond bags and target bags **must not** accept order/page in the DSL.
-
-Rationale: `limit` / `after` need exactly one page subject. Nested or per-edge
-page creates conflicting cursors and forces connection-shaped semantics that
-contradict flat bags and 4NF n2m. That path is rejected for keel.
-
-Root order defines the main bag sequence and thus `after`. Non-root bags use
-engine-fixed stable order above.
+Bond bags **must not** accept order/page in the DSL.
 
 ## Closure, not a second feed
 
-When a tree **link**s a bond, non-root bags are the **live closure** of the
-current root bag:
+When a tree **link**s a bond, bond bags are the **live closure** of the current
+root bag:
 
-- Root empty ⇒ linked bond bags (and any target bags) are `[]`.
+- Root empty ⇒ linked bond bags are `[]`.
 - Bond bag = live ties whose `left` is in the root id set (forward bond only).
-- Target bag = live target rows referenced by those ties (when hydrate is on).
 
-Closure is "complete for this root page", not "another independently paged
-feed". Deep graphs use **another top-level query** (`from` the next unit), not
-nested link chains in one tree.
+Closure is complete for this root page (subject to hard cap). Deep graphs use
+another top-level query, not nested links.
 
 ## Depth and direction
 
-- **Depth 1** per tree: root + direct bonds only. No `link` of a `link`.
-- **Forward bonds only** as declared on the root unit. No reverse generation.
-- Multiple `link`s on one root are allowed; each is depth-1 off the same root.
+- **Depth 1** per tree: root + direct bonds only.
+- **Forward bonds only**. No reverse generation.
+- Multiple distinct `link`s on one root are allowed.
 
-## Safety valve
+## Safety valve (settled seat: C0)
 
 If a closure would exceed an engine hard cap, the query **errors**. Silent
-truncation of bond/target bags is forbidden (false completeness).
+truncation is forbidden.
 
-Caps are engine policy, not user `limit` on non-root bags. Default numbers and
-config seat are not settled (see blockers).
+- **Seat**: engine constants (**C0**), not `keel.toml` for v1.
+- **Scope**: max live ties loaded per `link` bag in one request (exact number
+  is an impl constant; document in code + raise later if needed).
+- Caps are not user `limit` on bond bags.
 
-## Decision blockers (stop here)
+## Settled decisions
 
-These are product forks. Do not invent a default in code without an answer.
+| Id | Choice |
+|----|--------|
+| Response | **A** — always pack on `/query` |
+| Hydrate | **H0** — bond bags only; no target unit bag from `link` |
+| Cap seat | **C0** — engine constants; error on overflow |
 
-### 1. Response mode when there is no `link`
+## Deferred (not blockers for first `link` land)
 
-Today `/query` returns a **JSON array** of rows. Pack is an **object**.
-
-| Option | Behavior |
-|--------|----------|
-| **A. Always pack** | Every `/query` returns `{root, bags}`. Root-only query ⇒ `bags` has only the root unit bag. Breaking for current clients/smoke. |
-| **B. Dual** | No `link` ⇒ keep array (compat). Any `link` ⇒ pack object. Two shapes forever. |
-
-Shape of pack itself is settled above either way. **This blocker is only about
-compat vs one wire type.**
-
-### 2. Target unit hydrate
-
-When `link classes` runs, is the target unit bag included?
-
-| Option | Behavior |
-|--------|----------|
-| **H0** | Bond bag only. Client loads targets with a second `from Class where id in (…)`. |
-| **H1** | Always hydrate live targets for every `link` (bag key = target table). |
-| **H2** | Explicit only, e.g. `link classes into Class` / `link classes with Class` (keyword TBD once H2 wins). |
-
-Illustrative pack above assumed **H1**. Law allows any of H0–H2; pick one.
-
-### 3. Closure hard cap
-
-| Option | Behavior |
-|--------|----------|
-| **C0** | Fixed constants in engine (e.g. max ties per request). |
-| **C1** | `keel.toml` policy section. |
-| **C2** | Defer caps until a real blow-up; still error API must exist before silent truncate is possible. |
-
-Numbers and seat wait on this choice. **Error-on-overflow** is already law.
-
-### 4. Edge as where-predicate (not shape)
-
-`where classes …` as exists/filter on root is **out of shape scope**. May land
-later beside `link`. Does not change pack layout. **Not required to start
-implementing expand `link`.**
+- Edge-as-predicate in `where` (exists / filter root by bond).
+- Explicit hydrate syntax (former H2) if product later wants targets in-pack.
+- `keel.toml` cap policy (former C1).
+- `where id in (…)` on engine keys if cell-only `in` is insufficient for H0
+  follow-up loads (small engine extension, default path clear).
 
 ## Must not
 
 - Nested GraphQL-style response trees as the primary edge delivery.
-- Order/page on bond or target bags.
+- Order/page on bond bags.
 - Association REST routes.
 - Engine-invented reverse edges.
 - Silent partial closures.
 - Dual bag naming schemes (always table / `{table}.{bond}`).
+- Array success body on `/query` (always pack).
+- Target unit bags from `link` under H0.
