@@ -27,7 +27,13 @@ impl<S: Store> Core<S> {
     }
 
     pub fn live(&self, name: &str) -> Result<Vec<Row>, Error> {
-        self.store.live(&self.plan, name)
+        self.query(&format!("from {name}"))
+    }
+
+    pub fn query(&self, text: &str) -> Result<Vec<Row>, Error> {
+        let ask = crate::query::parse(text)?;
+        let name = crate::query::resolve(&self.plan, ask.unit())?;
+        self.store.live(&self.plan, &name)
     }
 
     pub fn end(&self, name: &str, key: i64) -> Result<(), Error> {

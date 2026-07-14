@@ -5,6 +5,7 @@ fn defaults() {
     let cfg = config::load(std::env::temp_dir().join("keel-missing-root-xyz"));
     assert_eq!(cfg.listen.host, "127.0.0.1");
     assert_eq!(cfg.listen.port, 3000);
+    assert!(cfg.listen.prefix.is_empty());
     assert_eq!(cfg.store.kind, Kind::Memory);
     assert!(cfg.store.path.is_empty());
     let store = cfg.open().expect("memory open");

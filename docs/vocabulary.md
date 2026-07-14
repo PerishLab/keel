@@ -58,3 +58,7 @@ so the shared meaning stays true.
 - `listen` — host/port section of runtime policy.
 - `store` — also the toml section naming where data lives (memory/file).
 - `kind` — store backend selector (`memory` | `file`).
+- `query` — text DSL entry for engine reads; also the `/query` HTTP route.
+- `ask` — parsed query intent (currently unit anchor + implicit live slice).
+- `parse` — turn query text into an ask.
+- `prefix` — HTTP api path prefix under listen.

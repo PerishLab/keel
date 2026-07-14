@@ -41,7 +41,7 @@ async fn main() {
             std::process::exit(1);
         }
     };
-    if let Err(err) = listen(core, &cfg.listen.host, cfg.listen.port).await {
+    if let Err(err) = listen(core, &cfg.listen.host, cfg.listen.port, &cfg.listen.prefix).await {
         eprintln!("keel-api: {err}");
         std::process::exit(1);
     }

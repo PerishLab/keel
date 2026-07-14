@@ -7,6 +7,7 @@ pub mod face;
 pub mod graph;
 pub mod life;
 pub mod plan;
+pub mod query;
 pub mod spec;
 pub mod store;
 
@@ -20,6 +21,7 @@ pub use face::Core;
 pub use graph::Graph;
 pub use keel_macro::resource;
 pub use life::{Ends, Row, Tie};
+pub use query::Ask;
 pub use spec::Resource;
 pub use store::Store;
 

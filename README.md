@@ -48,11 +48,24 @@ fn main() {
 
 | Method | Meaning |
 |--------|---------|
-| `put` / `live` / `end` | resource rows; `live` = effective slice |
-| `tie` / `ties` / `cut` | n2m edges; no reverse edges generated |
-| `serve` / `listen` | axum on `127.0.0.1:3000` by default (`http` feature) |
+| `put` / `live` / `end` | resource rows; `live` = `query("from Unit")` sugar |
+| `query("from Unit")` | text DSL read (default live slice); more operators later |
+| `tie` / `ties` / `cut` | n2m edges (Core only for now; not default REST) |
+| `serve` / `listen` | axum (`http` feature) |
 
-HTTP maps to the same face (`DELETE` → `end`, list → `live`, no pagination).
+### HTTP surface
+
+Native REST per resource (**no association queries**):
+
+| Method | Path | Engine |
+|--------|------|--------|
+| `GET` | `{prefix}/health` | liveness |
+| `GET` | `{prefix}/{unit}` | `live` |
+| `POST` | `{prefix}/{unit}` | `put` |
+| `DELETE` | `{prefix}/{unit}/{id}` | `end` |
+| `POST` | `{prefix}/query` | body `{"q":"from Student"}` → DSL |
+
+`listen.prefix` in `keel.toml` is the api prefix (default empty).
 
 ## Runtime config (`keel.toml`)
 
@@ -62,6 +75,8 @@ Repo-rooted, negentropy-style. Missing file uses the same defaults:
 [listen]
 host = "127.0.0.1"
 port = 3000
+prefix = ""
+# prefix = "/api"
 
 [store]
 kind = "memory"

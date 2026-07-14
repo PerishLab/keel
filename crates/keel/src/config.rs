@@ -17,6 +17,7 @@ pub struct Config {
 pub struct Listen {
     pub host: String,
     pub port: u16,
+    pub prefix: String,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -46,6 +47,7 @@ impl Default for Listen {
         Self {
             host: "127.0.0.1".into(),
             port: 3000,
+            prefix: String::new(),
         }
     }
 }
