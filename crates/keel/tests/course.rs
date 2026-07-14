@@ -95,6 +95,17 @@ fn select() {
     assert_eq!(pack.rows().len(), 2);
 
     let pack = core
+        .query(r#"from Student where courses some (grade = "A")"#)
+        .expect("some grade");
+    assert_eq!(pack.rows().len(), 1);
+    assert_eq!(pack.rows()[0].key(), ada);
+
+    let pack = core
+        .query(r#"from Student where courses some (code = "CS101")"#)
+        .expect("some code");
+    assert_eq!(pack.rows().len(), 2);
+
+    let pack = core
         .query(&format!(
             r#"from Course where id in ("{algo}", "{db}") order by code"#
         ))

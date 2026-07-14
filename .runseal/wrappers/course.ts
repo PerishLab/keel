@@ -174,6 +174,20 @@ try {
       throw new Error("roster mismatch");
     }
   });
+  await check("some grade and code", async () => {
+    const byGrade = await query(
+      'from Student where courses some (grade = "A")',
+    );
+    if (packRows(byGrade, "student").length !== 1) {
+      throw new Error("expected one A grade student");
+    }
+    const byCode = await query(
+      'from Student where courses some (code = "CS101")',
+    );
+    if (packRows(byCode, "student").length !== 2) {
+      throw new Error("expected two CS101 students");
+    }
+  });
 
   await check("end net course", async () => {
     const res = await fetch(`${base}/course/${netId}`, { method: "DELETE" });

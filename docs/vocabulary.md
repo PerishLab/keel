@@ -68,7 +68,7 @@ so the shared meaning stays true.
 - `run` — execute a tree against plan + store.
 - `digest` — normalized tree string for cache/identity later.
 - `pred` — one where clause (field or engine `id`, op, value).
-- `op` — predicate operator (`=` `!=` `<` `<=` `>` `>=` `in`).
+- `op` — predicate operator (`=` `!=` `<` `<=` `>` `>=` `in` `has` `some`).
 - `sort` — order clause on a tree (field + rank).
 - `rank` — sort direction (`asc` | `desc`).
 - `limit` — max rows returned after filter/sort/cursor.

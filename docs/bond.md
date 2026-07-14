@@ -85,14 +85,25 @@ Empty attrs on a field-less bond: body may be only `{ "right" }`.
 |----|--------|
 | M1 | **M1b** — `#[relation(Course, n2m, grade = string)]` |
 | W1 | **W1b** — attrs on `tie`; `set_tie` + HTTP PATCH on tie |
-| D3 | **P1** — `where courses has "<right-id>"` |
+| D3 | **P1+P2** — `has` + `some (field op val)` on bond or target |
 | D4 | **K1** — `link` omits ties whose right is not live |
 | D5 | **U1** — no DDL UNIQUE; engine rejects second live pair |
 | D2 | **R0** — no reverse; roster via P1 / scan |
 
+### P2 surface
+
+```text
+from Student where courses some (grade = "A")
+from Student where courses some (code = "CS101")
+from Student where courses some (id = "3")
+```
+
+- Outer field is bond name; inner is bond attr, target field, or `id` (right key).
+- Only live ties; target-field/`id` match requires live target (same spirit as K1).
+- Still filters **root** only; no order/page on bonds.
+
 ### Deferred
 
-- P2: `courses some (grade = "A")` / target field some
 - R3: shared-arc reverse entrance
 - K2/K3 cascade or reject on end
 - Enrollment unit promotion when association must be query root

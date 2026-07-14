@@ -22,6 +22,7 @@ pub enum Op {
     Ge,
     In,
     Has,
+    Some,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -35,6 +36,7 @@ pub struct Pred {
     field: String,
     op: Op,
     values: Vec<String>,
+    nest: Option<Box<Pred>>,
 }
 
 impl Pred {
@@ -52,6 +54,10 @@ impl Pred {
 
     pub fn values(&self) -> &[String] {
         &self.values
+    }
+
+    pub fn nest(&self) -> Option<&Pred> {
+        self.nest.as_deref()
     }
 }
 
@@ -356,14 +362,37 @@ fn take_pred(scan: &mut Scan<'_>) -> Result<Pred, Error> {
             field,
             op: Op::Has,
             values: vec![value],
+            nest: None,
         });
     }
+    if scan.opt("some") {
+        scan.ch('(')?;
+        let nest = take_cell(scan)?;
+        scan.ch(')')?;
+        return Ok(Pred {
+            field,
+            op: Op::Some,
+            values: Vec::new(),
+            nest: Some(Box::new(nest)),
+        });
+    }
+    take_cell_rest(scan, field)
+}
+
+fn take_cell(scan: &mut Scan<'_>) -> Result<Pred, Error> {
+    let field = scan.ident()?;
+    take_cell_rest(scan, field)
+}
+
+fn take_cell_rest(scan: &mut Scan<'_>, field: String) -> Result<Pred, Error> {
+    scan.ws();
     if scan.opt("in") {
         let values = take_list(scan)?;
         return Ok(Pred {
             field,
             op: Op::In,
             values,
+            nest: None,
         });
     }
     let op = scan.op()?;
@@ -373,6 +402,7 @@ fn take_pred(scan: &mut Scan<'_>) -> Result<Pred, Error> {
         field,
         op,
         values: vec![value],
+        nest: None,
     })
 }
 
@@ -415,6 +445,14 @@ fn write_pred(out: &mut String, pred: &Pred) {
         out.push('"');
         return;
     }
+    if pred.op() == Op::Some {
+        out.push_str("some (");
+        if let Some(nest) = pred.nest() {
+            write_pred(out, nest);
+        }
+        out.push(')');
+        return;
+    }
     out.push_str(mark(pred.op()));
     out.push_str(" \"");
     out.push_str(&escape(pred.value()));
@@ -431,6 +469,7 @@ fn mark(op: Op) -> &'static str {
         Op::Ge => ">=",
         Op::In => "in",
         Op::Has => "has",
+        Op::Some => "some",
     }
 }
 
@@ -481,21 +520,66 @@ fn check(plan: &Plan, name: &str, preds: &[Pred], sort: Option<&Sort>) -> Result
         .get(name)
         .ok_or_else(|| Error::Missing(name.into()))?;
     for pred in preds {
-        if pred.op() == Op::Has {
-            edge(unit, pred.field())?;
-            key_text(pred.value())?;
-            continue;
-        }
-        slot(unit, pred.field())?;
-        if pred.field() == ddl::KEY {
-            for value in pred.values() {
-                key_text(value)?;
-            }
-        }
+        check_pred(plan, unit, pred)?;
     }
     if let Some(sort) = sort {
         slot(unit, sort.field())?;
     }
+    Ok(())
+}
+
+fn check_pred(plan: &Plan, unit: &crate::plan::Unit, pred: &Pred) -> Result<(), Error> {
+    match pred.op() {
+        Op::Has => {
+            edge(unit, pred.field())?;
+            key_text(pred.value())?;
+            Ok(())
+        }
+        Op::Some => {
+            let bond = edge(unit, pred.field())?;
+            let nest = pred
+                .nest()
+                .ok_or_else(|| Error::Adapt("some needs inner".into()))?;
+            check_nest(plan, unit, &bond, nest)
+        }
+        _ => check_cell(unit, pred),
+    }
+}
+
+fn check_cell(unit: &crate::plan::Unit, pred: &Pred) -> Result<(), Error> {
+    slot(unit, pred.field())?;
+    if pred.field() != ddl::KEY {
+        return Ok(());
+    }
+    for value in pred.values() {
+        key_text(value)?;
+    }
+    Ok(())
+}
+
+fn check_nest(plan: &Plan, unit: &crate::plan::Unit, bond: &str, nest: &Pred) -> Result<(), Error> {
+    if matches!(nest.op(), Op::Has | Op::Some) {
+        return Err(Error::Adapt("nested bond pred denied".into()));
+    }
+    let edge = unit
+        .bonds()
+        .iter()
+        .find(|e| e.name() == bond)
+        .ok_or_else(|| Error::Adapt(format!("unknown bond {bond}")))?;
+    if nest.field() == ddl::KEY {
+        for value in nest.values() {
+            key_text(value)?;
+        }
+        return Ok(());
+    }
+    if edge.fields().iter().any(|s| s.name() == nest.field()) {
+        return Ok(());
+    }
+    let target = plan
+        .units()
+        .get(edge.target())
+        .ok_or_else(|| Error::Missing(edge.target().into()))?;
+    slot(target, nest.field())?;
     Ok(())
 }
 
@@ -516,23 +600,156 @@ fn hold(
     rows: &mut Vec<Row>,
     preds: &[Pred],
 ) -> Result<(), Error> {
+    let unit = plan
+        .units()
+        .get(owner)
+        .ok_or_else(|| Error::Missing(owner.into()))?;
     for pred in preds {
-        if pred.op() != Op::Has {
-            continue;
-        }
-        let bond = edge(
-            plan.units()
-                .get(owner)
-                .ok_or_else(|| Error::Missing(owner.into()))?,
-            pred.field(),
-        )?;
-        let right = key_text(pred.value())?;
-        rows.retain(|row| match store.ties(plan, owner, &bond, row.key()) {
-            Ok(ties) => ties.iter().any(|tie| tie.right() == right),
-            Err(_) => false,
-        });
+        hold_one(plan, store, unit, owner, rows, pred)?;
     }
     Ok(())
+}
+
+fn hold_one(
+    plan: &Plan,
+    store: &impl Store,
+    unit: &crate::plan::Unit,
+    owner: &str,
+    rows: &mut Vec<Row>,
+    pred: &Pred,
+) -> Result<(), Error> {
+    match pred.op() {
+        Op::Has => hold_has(plan, store, unit, owner, rows, pred),
+        Op::Some => hold_some(plan, store, unit, owner, rows, pred),
+        _ => Ok(()),
+    }
+}
+
+fn hold_has(
+    plan: &Plan,
+    store: &impl Store,
+    unit: &crate::plan::Unit,
+    owner: &str,
+    rows: &mut Vec<Row>,
+    pred: &Pred,
+) -> Result<(), Error> {
+    let bond = edge(unit, pred.field())?;
+    let right = key_text(pred.value())?;
+    rows.retain(|row| has_right(store, plan, owner, &bond, row.key(), right));
+    Ok(())
+}
+
+fn has_right(
+    store: &impl Store,
+    plan: &Plan,
+    owner: &str,
+    bond: &str,
+    left: i64,
+    right: i64,
+) -> bool {
+    match store.ties(plan, owner, bond, left) {
+        Ok(ties) => ties.iter().any(|tie| tie.right() == right),
+        Err(_) => false,
+    }
+}
+
+fn hold_some(
+    plan: &Plan,
+    store: &impl Store,
+    unit: &crate::plan::Unit,
+    owner: &str,
+    rows: &mut Vec<Row>,
+    pred: &Pred,
+) -> Result<(), Error> {
+    let bond = edge(unit, pred.field())?;
+    let nest = pred
+        .nest()
+        .ok_or_else(|| Error::Adapt("some needs inner".into()))?;
+    let target = unit
+        .bonds()
+        .iter()
+        .find(|e| e.name() == bond)
+        .map(|e| e.target().to_string())
+        .ok_or_else(|| Error::Adapt(format!("unknown bond {bond}")))?;
+    rows.retain(|row| {
+        some_hit(plan, store, owner, &bond, &target, row.key(), nest).unwrap_or(false)
+    });
+    Ok(())
+}
+
+fn some_hit(
+    plan: &Plan,
+    store: &impl Store,
+    owner: &str,
+    bond: &str,
+    target: &str,
+    left: i64,
+    nest: &Pred,
+) -> Result<bool, Error> {
+    let ties = store.ties(plan, owner, bond, left)?;
+    let on_bond = bond_slot(plan, owner, bond, nest.field());
+    for tie in ties {
+        if nest.field() == ddl::KEY {
+            if hit_key(tie.right(), nest) {
+                return Ok(true);
+            }
+            continue;
+        }
+        if on_bond {
+            if hit_map(tie.cells(), nest) {
+                return Ok(true);
+            }
+            continue;
+        }
+        if target_hit(store, plan, target, tie.right(), nest)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn bond_slot(plan: &Plan, owner: &str, bond: &str, field: &str) -> bool {
+    plan.units()
+        .get(owner)
+        .and_then(|u| u.bonds().iter().find(|e| e.name() == bond))
+        .is_some_and(|e| e.fields().iter().any(|s| s.name() == field))
+}
+
+fn target_hit(
+    store: &impl Store,
+    plan: &Plan,
+    target: &str,
+    key: i64,
+    nest: &Pred,
+) -> Result<bool, Error> {
+    if !store.live_has(plan, target, key)? {
+        return Ok(false);
+    }
+    match find_live(store, plan, target, key)? {
+        Some(row) => Ok(hit(&row, nest)),
+        None => Ok(false),
+    }
+}
+
+fn find_live(store: &impl Store, plan: &Plan, name: &str, key: i64) -> Result<Option<Row>, Error> {
+    let rows = store.live(plan, name)?;
+    Ok(rows.into_iter().find(|row| row.key() == key))
+}
+
+fn hit_map(cells: &BTreeMap<String, String>, pred: &Pred) -> bool {
+    let Some(got) = cells.get(pred.field()) else {
+        return false;
+    };
+    match pred.op() {
+        Op::Eq => got == pred.value(),
+        Op::Ne => got != pred.value(),
+        Op::Lt => got.as_str() < pred.value(),
+        Op::Le => got.as_str() <= pred.value(),
+        Op::Gt => got.as_str() > pred.value(),
+        Op::Ge => got.as_str() >= pred.value(),
+        Op::In => pred.values().iter().any(|want| want == got),
+        Op::Has | Op::Some => false,
+    }
 }
 
 fn key_text(text: &str) -> Result<i64, Error> {
@@ -545,25 +762,13 @@ fn pass(row: &Row, preds: &[Pred]) -> bool {
 }
 
 fn hit(row: &Row, pred: &Pred) -> bool {
-    if pred.op() == Op::Has {
+    if matches!(pred.op(), Op::Has | Op::Some) {
         return true;
     }
     if pred.field() == ddl::KEY {
         return hit_key(row.key(), pred);
     }
-    let Some(got) = row.cells().get(pred.field()) else {
-        return false;
-    };
-    match pred.op() {
-        Op::Eq => got == pred.value(),
-        Op::Ne => got != pred.value(),
-        Op::Lt => got.as_str() < pred.value(),
-        Op::Le => got.as_str() <= pred.value(),
-        Op::Gt => got.as_str() > pred.value(),
-        Op::Ge => got.as_str() >= pred.value(),
-        Op::In => pred.values().iter().any(|want| want == got),
-        Op::Has => true,
-    }
+    hit_map(row.cells(), pred)
 }
 
 fn hit_key(key: i64, pred: &Pred) -> bool {
@@ -578,7 +783,7 @@ fn hit_key(key: i64, pred: &Pred) -> bool {
             .values()
             .iter()
             .any(|want| key_text(want).is_ok_and(|n| n == key)),
-        Op::Has => false,
+        Op::Has | Op::Some => false,
     }
 }
 

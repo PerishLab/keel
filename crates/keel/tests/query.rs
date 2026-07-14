@@ -53,6 +53,15 @@ fn parse() {
     assert_eq!(tree.links(), &["classes".to_string()]);
     assert_eq!(query::digest(&tree), "from student slice live link classes");
 
+    let tree = query::parse(r#"from Student where courses some (grade = "A")"#).expect("some");
+    assert_eq!(tree.preds()[0].op(), Op::Some);
+    assert_eq!(tree.preds()[0].field(), "courses");
+    assert_eq!(tree.preds()[0].nest().expect("nest").field(), "grade");
+    assert_eq!(
+        query::digest(&tree),
+        r#"from student slice live where courses some (grade = "A")"#
+    );
+
     let tree = query::parse(
         r#"from Student where nickname = "ada" link classes order by nickname limit 2 after "1""#,
     )
