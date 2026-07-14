@@ -1,0 +1,11 @@
+# Runtime policy for keel processes (negentropy-style: repo-rooted, defaults safe).
+# Missing or empty file => same defaults as below.
+
+[listen]
+host = "127.0.0.1"
+port = 3000
+
+[store]
+kind = "memory"
+# kind = "file"
+# path = ".local/keel.sqlite"

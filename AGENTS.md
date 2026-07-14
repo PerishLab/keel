@@ -8,8 +8,11 @@ engine projections, not business authoring surfaces.
 
 - **Business**: `#[resource]`, `#[field]`, `#[relation]`, `Graph::plug`, `bind`.
 - **Engine face (`Core`)**: `put` / `live` / `end` / `tie` / `ties` / `cut`.
-- **HTTP (axum)**: localhost listen; maps to Core; no pagination/query DSL yet.
-- **Sidecar**: `sidecar.toml` manages `keel-api` for local multi-process hygiene.
+- **Runtime policy**: repo-rooted `keel.toml` (`[listen]`, `[store]`); load via
+  `config::load(root)`; missing file => defaults (memory store, 127.0.0.1:3000).
+- **HTTP (axum)**: maps to Core; host/port from config; no pagination/query DSL.
+- **Sidecar**: `sidecar.toml` manages `keel-api` process; health should match
+  `[listen]` in `keel.toml` (do not dual-author ports).
 - No reverse relation generation. No capability/auth/identity yet.
 - No field validation yet (later on Store trait).
 
@@ -38,6 +41,7 @@ engine projections, not business authoring surfaces.
 - `crates/keel/` — engine library
 - `crates/macro/` — proc macros
 - `crates/api/` — demo HTTP binary for sidecar
+- `keel.toml` — runtime policy (listen/store)
 - `sidecar.toml` — local process plan
 - `docs/` — vocabulary
 - `.runseal/` / `.forgejo/` — guard and CI

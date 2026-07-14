@@ -64,6 +64,7 @@ for (
     "vocabulary.toml",
     "docs/vocabulary.md",
     "runseal.toml",
+    "keel.toml",
     "AGENTS.md",
     "README.md",
     "crates/keel/Cargo.toml",

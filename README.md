@@ -54,6 +54,31 @@ fn main() {
 
 HTTP maps to the same face (`DELETE` → `end`, list → `live`, no pagination).
 
+## Runtime config (`keel.toml`)
+
+Repo-rooted, negentropy-style. Missing file uses the same defaults:
+
+```toml
+[listen]
+host = "127.0.0.1"
+port = 3000
+
+[store]
+kind = "memory"
+# kind = "file"
+# path = ".local/keel.sqlite"
+```
+
+```rust
+let cfg = keel::config::load(".");
+let store = cfg.open()?;
+let core = bind(graph, store)?;
+// listen(core.share(), &cfg.listen.host, cfg.listen.port).await?;
+```
+
+`keel-api [ROOT]` loads `ROOT/keel.toml` (default `ROOT=.`). CLI does not
+re-express policy keys — change the file.
+
 ## Local process (sidecar)
 
 ```sh
@@ -63,7 +88,7 @@ sidecar start --config sidecar.toml
 sidecar stop --config sidecar.toml
 ```
 
-`keel-api` is a demo binary (Student/Class + memory sqlite + axum).
+`keel-api` is a demo binary (Student/Class + store/listen from keel.toml).
 
 ## Operating
 

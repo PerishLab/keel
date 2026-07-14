@@ -54,3 +54,7 @@ so the shared meaning stays true.
 - `store` — trait for engine row/edge lifecycle backends.
 - `serve` / `listen` — axum entrypoints projecting Core over HTTP.
 - `share` — wrap Core in Arc for concurrent HTTP handlers.
+- `config` — repo-rooted runtime policy load (`keel.toml`).
+- `listen` — host/port section of runtime policy.
+- `store` — also the toml section naming where data lives (memory/file).
+- `kind` — store backend selector (`memory` | `file`).
