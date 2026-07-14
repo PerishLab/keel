@@ -68,6 +68,10 @@ so the shared meaning stays true.
 - `digest` — normalized tree string for cache/identity later.
 - `pred` — one where clause (field, op, value).
 - `op` — predicate operator (currently only eq).
+- `sort` — order clause on a tree (field + rank).
+- `rank` — sort direction (`asc` | `desc`).
+- `limit` — max rows returned after filter/sort/cursor.
+- `after` — id cursor: rows strictly after that key in ordered result.
 - `prefix` — HTTP api path prefix under listen.
 - `smoke` — L2 process verification of REST + /query.
 - `verify` — cold-start verification boundary document.

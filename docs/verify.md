@@ -15,7 +15,7 @@ start is done; failures mean cold start is not closed.
 
 - Business-only resource DSL; reign columns engine-owned
 - sqlite wire + put/live/end + tie/ties/cut on Core
-- `live` == `query("from Unit")` sugar; optional `where field = "…"`
+- `live` == `query("from Unit")` sugar; optional `where` / `order by` / `limit` / `after`
 - `keel.toml` load defaults + file store open
 - REST: health, unit list/create/delete; **no** association routes
 - `POST {prefix}/query` with `{"q":"from Unit"}`
@@ -23,10 +23,10 @@ start is done; failures mean cold start is not closed.
 
 ## Must not require (out)
 
-- where/order/page/nested GraphQL-ish selection
+- nested GraphQL-ish selection / edge navigation in DSL
 - association REST, reverse edges, reverse-query privilege
 - field validation, capability, identity, postgres
-- pagination/cache performance
+- pagination/cache performance; multi-field order; keyset beyond id cursor
 - end cascading ties, business unique policy
 - dynamic model load, public bind on 0.0.0.0
 

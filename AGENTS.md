@@ -12,7 +12,7 @@ engine projections, not business authoring surfaces.
   `config::load(root)`; missing file => defaults (memory store, 127.0.0.1:3000).
 - **HTTP (axum)**: native REST per resource (no association reads); global
   `POST {prefix}/query` with text DSL (`{"q":"from Unit"}`); host/port/prefix
-  from `keel.toml`. Pagination/filter operators later inside DSL only.
+  from `keel.toml`. Filter/order/page live inside DSL only (not REST query params).
 - **Sidecar**: `sidecar.toml` manages `keel-api` process; health should match
   `[listen]` in `keel.toml` (do not dual-author ports).
 - No reverse relation generation. No capability/auth/identity yet.
@@ -23,7 +23,7 @@ engine projections, not business authoring surfaces.
 1. Pure data + sqlite DDL (done)
 2. Row + n2m lifecycle (done)
 3. Core face + axum + sidecar + verify (done)
-4. Query AST (`from` + live slice); grow primitives next
+4. Query AST (`from` + live + where + order/page); edge nav later
 5. Capability → identity → real estate scenarios
 
 ## Laws

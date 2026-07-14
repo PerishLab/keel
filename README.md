@@ -50,7 +50,7 @@ fn main() {
 |--------|---------|
 | `put` / `live` / `end` | resource rows; `live` builds AST then runs |
 | `query` / `ask` | text → AST → run; `ask` takes `Tree` directly |
-| AST | `from` + `slice: live` + `where field = "…"` (`and` chains); more later |
+| AST | `from` + live + `where` + `order by` + `limit` + `after` id cursor |
 | `tie` / `ties` / `cut` | n2m edges (Core only for now; not default REST) |
 | `serve` / `listen` | axum (`http` feature) |
 

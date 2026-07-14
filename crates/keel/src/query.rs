@@ -14,6 +14,12 @@ pub enum Op {
     Eq,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum Rank {
+    Asc,
+    Desc,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Pred {
     field: String,
@@ -36,10 +42,29 @@ impl Pred {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Sort {
+    field: String,
+    rank: Rank,
+}
+
+impl Sort {
+    pub fn field(&self) -> &str {
+        &self.field
+    }
+
+    pub fn rank(&self) -> Rank {
+        self.rank
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Tree {
     from: String,
     slice: Slice,
     preds: Vec<Pred>,
+    sort: Option<Sort>,
+    limit: Option<usize>,
+    after: Option<i64>,
 }
 
 impl Tree {
@@ -54,6 +79,18 @@ impl Tree {
     pub fn preds(&self) -> &[Pred] {
         &self.preds
     }
+
+    pub fn sort(&self) -> Option<&Sort> {
+        self.sort.as_ref()
+    }
+
+    pub fn limit(&self) -> Option<usize> {
+        self.limit
+    }
+
+    pub fn after(&self) -> Option<i64> {
+        self.after
+    }
 }
 
 pub type Ask = Tree;
@@ -63,6 +100,9 @@ pub fn form(unit: &str) -> Tree {
         from: unit.to_string(),
         slice: Slice::Live,
         preds: Vec::new(),
+        sort: None,
+        limit: None,
+        after: None,
     }
 }
 
@@ -91,6 +131,9 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
             }
         }
     }
+    let sort = take_sort(&mut scan)?;
+    let limit = take_limit(&mut scan)?;
+    let after = take_after(&mut scan)?;
     scan.ws();
     if !scan.done() {
         return Err(Error::Adapt("query has trailing tokens".into()));
@@ -99,6 +142,9 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
         from: unit,
         slice: Slice::Live,
         preds,
+        sort,
+        limit,
+        after,
     })
 }
 
@@ -113,13 +159,15 @@ pub fn resolve(plan: &Plan, unit: &str) -> Result<String, Error> {
 
 pub fn run(plan: &Plan, store: &impl Store, tree: &Tree) -> Result<Vec<Row>, Error> {
     let name = resolve(plan, tree.from())?;
-    check(plan, &name, tree.preds())?;
+    check(plan, &name, tree.preds(), tree.sort())?;
     let mut rows = match tree.slice() {
         Slice::Live => store.live(plan, &name)?,
     };
     if !tree.preds().is_empty() {
         rows.retain(|row| pass(row, tree.preds()));
     }
+    order(&mut rows, tree.sort());
+    page(&mut rows, tree.after(), tree.limit());
     Ok(rows)
 }
 
@@ -140,10 +188,69 @@ pub fn digest(tree: &Tree) -> String {
         out.push_str(&escape(pred.value()));
         out.push('"');
     }
+    if let Some(sort) = tree.sort() {
+        out.push_str(" order by ");
+        out.push_str(sort.field());
+        out.push(' ');
+        out.push_str(match sort.rank() {
+            Rank::Asc => "asc",
+            Rank::Desc => "desc",
+        });
+    }
+    if let Some(n) = tree.limit() {
+        out.push_str(" limit ");
+        out.push_str(&n.to_string());
+    }
+    if let Some(id) = tree.after() {
+        out.push_str(" after \"");
+        out.push_str(&id.to_string());
+        out.push('"');
+    }
     out
 }
 
-fn check(plan: &Plan, name: &str, preds: &[Pred]) -> Result<(), Error> {
+fn take_sort(scan: &mut Scan<'_>) -> Result<Option<Sort>, Error> {
+    scan.ws();
+    if !scan.opt("order") {
+        return Ok(None);
+    }
+    scan.kw("by")?;
+    let field = scan.ident()?;
+    let mut rank = Rank::Asc;
+    scan.ws();
+    if scan.opt("desc") {
+        rank = Rank::Desc;
+    } else {
+        let _ = scan.opt("asc");
+    }
+    Ok(Some(Sort { field, rank }))
+}
+
+fn take_limit(scan: &mut Scan<'_>) -> Result<Option<usize>, Error> {
+    scan.ws();
+    if !scan.opt("limit") {
+        return Ok(None);
+    }
+    let n = scan.num()?;
+    if n == 0 {
+        return Err(Error::Adapt("limit must be positive".into()));
+    }
+    Ok(Some(n))
+}
+
+fn take_after(scan: &mut Scan<'_>) -> Result<Option<i64>, Error> {
+    scan.ws();
+    if !scan.opt("after") {
+        return Ok(None);
+    }
+    let text = scan.quoted()?;
+    let id = text
+        .parse::<i64>()
+        .map_err(|_| Error::Adapt("after needs integer id".into()))?;
+    Ok(Some(id))
+}
+
+fn check(plan: &Plan, name: &str, preds: &[Pred], sort: Option<&Sort>) -> Result<(), Error> {
     let unit = plan
         .units()
         .get(name)
@@ -153,6 +260,11 @@ fn check(plan: &Plan, name: &str, preds: &[Pred]) -> Result<(), Error> {
             return Err(Error::Adapt(format!("unknown field {}", pred.field())));
         }
     }
+    if let Some(sort) = sort
+        && !unit.fields().iter().any(|slot| slot.name() == sort.field())
+    {
+        return Err(Error::Adapt(format!("unknown field {}", sort.field())));
+    }
     Ok(())
 }
 
@@ -160,6 +272,54 @@ fn pass(row: &Row, preds: &[Pred]) -> bool {
     preds.iter().all(|pred| match pred.op() {
         Op::Eq => row.cells().get(pred.field()).map(String::as_str) == Some(pred.value()),
     })
+}
+
+fn order(rows: &mut [Row], sort: Option<&Sort>) {
+    match sort {
+        None => rows.sort_by_key(|row| row.key()),
+        Some(sort) => {
+            let field = sort.field().to_string();
+            let desc = sort.rank() == Rank::Desc;
+            rows.sort_by(|a, b| by(a, b, &field, desc));
+        }
+    }
+}
+
+fn by(a: &Row, b: &Row, field: &str, desc: bool) -> std::cmp::Ordering {
+    let left = cell(a, field);
+    let right = cell(b, field);
+    let primary = grade(&left, &right, desc);
+    primary.then_with(|| a.key().cmp(&b.key()))
+}
+
+fn grade(left: &str, right: &str, desc: bool) -> std::cmp::Ordering {
+    if desc {
+        right.cmp(left)
+    } else {
+        left.cmp(right)
+    }
+}
+
+fn page(rows: &mut Vec<Row>, after: Option<i64>, limit: Option<usize>) {
+    if let Some(id) = after {
+        past(rows, id);
+    }
+    if let Some(n) = limit {
+        rows.truncate(n);
+    }
+}
+
+fn past(rows: &mut Vec<Row>, id: i64) {
+    match rows.iter().position(|row| row.key() == id) {
+        Some(i) => {
+            rows.drain(0..=i);
+        }
+        None => rows.clear(),
+    }
+}
+
+fn cell(row: &Row, field: &str) -> String {
+    row.cells().get(field).cloned().unwrap_or_default()
 }
 
 fn escape(value: &str) -> String {
@@ -240,6 +400,27 @@ impl<'a> Scan<'a> {
         let name = rest[..end].to_string();
         self.at += end;
         Ok(name)
+    }
+
+    fn num(&mut self) -> Result<usize, Error> {
+        self.ws();
+        let rest = self.rest();
+        let mut end = 0;
+        for c in rest.chars() {
+            if c.is_ascii_digit() {
+                end += c.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if end == 0 {
+            return Err(Error::Adapt("expected number".into()));
+        }
+        let n = rest[..end]
+            .parse::<usize>()
+            .map_err(|_| Error::Adapt("bad number".into()))?;
+        self.at += end;
+        Ok(n)
     }
 
     fn ch(&mut self, want: char) -> Result<(), Error> {
