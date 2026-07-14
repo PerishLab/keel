@@ -15,7 +15,7 @@ start is done; failures mean cold start is not closed.
 
 - Business-only resource DSL; reign columns engine-owned
 - sqlite wire + put/live/end + tie/ties/cut on Core
-- `live` == `query("from Unit")` sugar
+- `live` == `query("from Unit")` sugar; optional `where field = "…"`
 - `keel.toml` load defaults + file store open
 - REST: health, unit list/create/delete; **no** association routes
 - `POST {prefix}/query` with `{"q":"from Unit"}`

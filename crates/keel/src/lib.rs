@@ -21,7 +21,7 @@ pub use face::Core;
 pub use graph::Graph;
 pub use keel_macro::resource;
 pub use life::{Ends, Row, Tie};
-pub use query::{Ask, Slice, Tree};
+pub use query::{Ask, Op, Pred, Slice, Tree};
 pub use spec::Resource;
 pub use store::Store;
 

@@ -66,6 +66,8 @@ so the shared meaning stays true.
 - `parse` — turn query text into a tree.
 - `run` — execute a tree against plan + store.
 - `digest` — normalized tree string for cache/identity later.
+- `pred` — one where clause (field, op, value).
+- `op` — predicate operator (currently only eq).
 - `prefix` — HTTP api path prefix under listen.
 - `smoke` — L2 process verification of REST + /query.
 - `verify` — cold-start verification boundary document.

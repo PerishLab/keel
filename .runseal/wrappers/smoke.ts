@@ -89,6 +89,23 @@ try {
       throw new Error("expected query rows");
     }
   });
+  await check("POST /query where", async () => {
+    const res = await fetch(`${base}/query`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ q: 'from Student where nickname = "ada"' }),
+    });
+    if (!res.ok) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    if (!Array.isArray(body) || body.length !== 1) {
+      throw new Error("expected one filtered row");
+    }
+    if (body[0].nickname !== "ada") {
+      throw new Error("expected ada");
+    }
+  });
   await check("no bond REST", async () => {
     const res = await fetch(`${base}/student/1/classes`);
     if (res.status !== 404) {
