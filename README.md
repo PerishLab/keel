@@ -11,12 +11,14 @@ Canonical source: [PerishLab/keel](https://git.perish.top/PerishLab/keel).
 
 ```rust
 use keel::adapt::db::Sqlite;
-use keel::atom::{string, url};
+use keel::atom::string;
 use keel::resource;
 use keel::{Graph, bind};
 
 #[resource]
-struct Class {
+struct Course {
+    #[field(string)]
+    code: string,
     #[field(string)]
     title: string,
 }
@@ -24,22 +26,19 @@ struct Class {
 #[resource]
 struct Student {
     #[field(string)]
-    nickname: string,
-    #[field(url)]
-    avatar: url,
-    #[relation(Class, n2m)]
-    classes: Class,
+    no: string,
+    #[field(string)]
+    name: string,
+    #[relation(Course, n2m)]
+    courses: Course,
 }
 
 fn main() {
     let mut graph = Graph::new();
-    graph.plug::<Class>().plug::<Student>();
+    graph.plug::<Course>().plug::<Student>();
     let core = bind(graph, Sqlite::memory()).expect("bind");
     let _id = core
-        .put(
-            "Student",
-            &[("nickname", "ada"), ("avatar", "https://a.example/a")],
-        )
+        .put("Student", &[("no", "S01"), ("name", "ada")])
         .expect("put");
 }
 ```
@@ -109,15 +108,18 @@ sidecar start --config sidecar.toml
 sidecar stop --config sidecar.toml
 ```
 
-`keel-api` is a demo binary (Student/Class + store/listen from keel.toml).
+`keel-api` is a demo binary (Student/Course selection + store/listen from keel.toml).
 
 ## Operating
 
 ```sh
 runseal :init
-runseal :guard    # unit tests + cold-start HTTP smoke
-runseal :smoke    # L2 only: boot keel-api, REST + /query
+runseal :guard    # unit tests + smoke + course scenario
+runseal :smoke    # thin L2
+runseal :course   # classic enroll/drop/schedule L2
 cargo run -p keel-api --locked
 ```
+
+Scenario notes: `docs/scenario.md`.
 
 Cold-start verification boundary: `docs/verify.md`.

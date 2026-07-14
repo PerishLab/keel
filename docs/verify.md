@@ -7,8 +7,8 @@ start is done; failures mean cold start is not closed.
 
 | Layer | What | Gate |
 |-------|------|------|
-| L1 | unit tests (smoke/life/bond/miss/config/query) | CI + `runseal :guard` |
-| L2 | process smoke (`keel-api` REST + `/query`) | `runseal :smoke` (also from `:guard`) |
+| L1 | unit tests (smoke/life/bond/course/config/query) | CI + `runseal :guard` |
+| L2 | process smoke + course scenario | `runseal :smoke` / `:course` (from `:guard`) |
 | L3 | static discipline (fmt/clippy/deno/negentropy) | `runseal :guard` |
 
 ## Must pass (in)
@@ -34,8 +34,9 @@ start is done; failures mean cold start is not closed.
 ## Commands
 
 ```sh
-runseal :guard    # L1 + L3 + L2
-runseal :smoke    # L2 only
+runseal :guard    # L1 + L3 + L2 smoke + course
+runseal :smoke    # thin L2
+runseal :course   # student/course scenario L2
 ```
 
 ## Pass rule

@@ -79,4 +79,5 @@ so the shared meaning stays true.
 - `root` — pack field and tree `from` unit; sole subject of order/page.
 - `prefix` — HTTP api path prefix under listen.
 - `smoke` — L2 process verification of REST + /query.
+- `course` — classic student/course selection scenario gate (`:course`).
 - `verify` — cold-start verification boundary document.

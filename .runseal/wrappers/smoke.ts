@@ -48,25 +48,13 @@ const child = new Deno.Command("cargo", {
 let failed = false;
 try {
   await ready(`${base}/health`, 40);
-  let adaId = 0;
-  await check("POST /student", async () => {
-    const res = await fetch(`${base}/student`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        nickname: "ada",
-        avatar: "https://a.example/a",
-      }),
-    });
-    if (res.status !== 201) {
-      throw new Error(`status ${res.status}`);
-    }
-    const body = await res.json();
-    if (typeof body.id !== "number") {
-      throw new Error("missing id");
-    }
-    adaId = body.id;
+
+  const course = await postJson("/course", {
+    code: "CS101",
+    title: "algo",
   });
+  const student = await postJson("/student", { no: "S01", name: "ada" });
+
   await check("GET /student", async () => {
     const res = await fetch(`${base}/student`);
     if (!res.ok) {
@@ -77,250 +65,123 @@ try {
       throw new Error("expected rows");
     }
   });
+
   await check("GET /student/:id", async () => {
-    const res = await fetch(`${base}/student/${adaId}`);
+    const res = await fetch(`${base}/student/${student.id}`);
     if (!res.ok) {
       throw new Error(`status ${res.status}`);
     }
     const body = await res.json();
-    if (body.id !== adaId || body.nickname !== "ada") {
-      throw new Error("expected ada by id");
-    }
-  });
-  await check("POST /query", async () => {
-    const res = await fetch(`${base}/query`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ q: "from Student" }),
-    });
-    if (!res.ok) {
-      throw new Error(`status ${res.status}`);
-    }
-    const body = await res.json();
-    const rows = packRows(body, "student");
-    if (rows.length < 1) {
-      throw new Error("expected query rows");
-    }
-  });
-  await check("POST /query where", async () => {
-    const res = await fetch(`${base}/query`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ q: 'from Student where nickname = "ada"' }),
-    });
-    if (!res.ok) {
-      throw new Error(`status ${res.status}`);
-    }
-    const body = await res.json();
-    const rows = packRows(body, "student");
-    if (rows.length !== 1) {
-      throw new Error("expected one filtered row");
-    }
-    if (rows[0].nickname !== "ada") {
+    if (body.name !== "ada") {
       throw new Error("expected ada");
     }
   });
-  let bobId = 0;
-  await check("POST /student bob", async () => {
-    const res = await fetch(`${base}/student`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        nickname: "bob",
-        avatar: "https://b.example/b",
-      }),
-    });
-    if (res.status !== 201) {
-      throw new Error(`status ${res.status}`);
+
+  await check("POST /query", async () => {
+    const pack = await query("from Student");
+    if (packRows(pack, "student").length < 1) {
+      throw new Error("expected query rows");
     }
-    const body = await res.json();
-    bobId = body.id;
   });
+
+  await check("POST /query where", async () => {
+    const pack = await query('from Student where no = "S01"');
+    const rows = packRows(pack, "student");
+    if (rows.length !== 1 || rows[0].name !== "ada") {
+      throw new Error("expected filtered ada");
+    }
+  });
+
+  const other = await postJson("/student", { no: "S02", name: "bob" });
+
   await check("POST /query scalar", async () => {
-    const res = await fetch(`${base}/query`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        q: 'from Student where nickname != "ada" and nickname in ("bob", "zoe")',
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(`status ${res.status}`);
-    }
-    const body = await res.json();
-    const rows = packRows(body, "student");
-    if (rows.length !== 1) {
-      throw new Error("expected one scalar row");
-    }
-    if (rows[0].nickname !== "bob") {
-      throw new Error("expected bob from scalar ops");
+    const pack = await query(
+      'from Student where name != "ada" and name in ("bob", "zoe")',
+    );
+    const rows = packRows(pack, "student");
+    if (rows.length !== 1 || rows[0].name !== "bob") {
+      throw new Error("expected bob");
     }
   });
+
   await check("POST /query order limit", async () => {
-    const res = await fetch(`${base}/query`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        q: "from Student order by nickname desc limit 1",
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(`status ${res.status}`);
-    }
-    const body = await res.json();
-    const rows = packRows(body, "student");
-    if (rows.length !== 1) {
-      throw new Error("expected one ordered row");
-    }
-    if (rows[0].nickname !== "bob") {
-      throw new Error("expected bob first by desc");
+    const pack = await query("from Student order by name desc limit 1");
+    const rows = packRows(pack, "student");
+    if (rows.length !== 1 || rows[0].name !== "bob") {
+      throw new Error("expected bob first");
     }
   });
+
   await check("POST /query after", async () => {
-    const res = await fetch(`${base}/query`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        q: `from Student order by nickname desc limit 1 after "${bobId}"`,
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(`status ${res.status}`);
-    }
-    const body = await res.json();
-    const rows = packRows(body, "student");
-    if (rows.length !== 1) {
-      throw new Error("expected one cursor row");
-    }
-    if (rows[0].nickname !== "ada") {
-      throw new Error("expected ada after bob cursor");
+    const pack = await query(
+      `from Student order by name desc limit 1 after "${other.id}"`,
+    );
+    const rows = packRows(pack, "student");
+    if (rows.length !== 1 || rows[0].name !== "ada") {
+      throw new Error("expected ada after bob");
     }
   });
-  await check("POST /query link", async () => {
-    const res = await fetch(`${base}/query`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ q: "from Student link classes" }),
-    });
-    if (!res.ok) {
-      throw new Error(`status ${res.status}`);
-    }
-    const body = await res.json();
-    if (body.root !== "student") {
-      throw new Error("expected root student");
-    }
-    const rows = packRows(body, "student");
-    if (rows.length < 1) {
-      throw new Error("expected root rows");
-    }
-    if (!Array.isArray(body.bags["student.classes"])) {
-      throw new Error("expected bond bag");
-    }
-    if (body.bags.class !== undefined) {
-      throw new Error("H0 must not hydrate class bag");
-    }
-  });
-  await check("POST /query id", async () => {
-    const res = await fetch(`${base}/query`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        q: `from Student where id in ("${adaId}", "${bobId}") order by id`,
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(`status ${res.status}`);
-    }
-    const body = await res.json();
-    const rows = packRows(body, "student");
-    if (rows.length !== 2) {
-      throw new Error("expected two id rows");
-    }
-    if (rows[0].id !== adaId || rows[1].id !== bobId) {
-      throw new Error("expected id order");
-    }
-  });
-  await check("PATCH /student/:id", async () => {
-    const res = await fetch(`${base}/student/${adaId}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ nickname: "ada2" }),
-    });
-    if (!res.ok) {
-      throw new Error(`status ${res.status}`);
-    }
-    const body = await res.json();
-    if (body.nickname !== "ada2") {
-      throw new Error("expected patched nickname");
-    }
-    if (body.avatar !== "https://a.example/a") {
-      throw new Error("expected avatar kept");
-    }
-  });
-  let classId = 0;
-  let tieId = 0;
-  await check("POST /class", async () => {
-    const res = await fetch(`${base}/class`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: "math" }),
-    });
-    if (res.status !== 201) {
-      throw new Error(`status ${res.status}`);
-    }
-    const body = await res.json();
-    classId = body.id;
-  });
+
   await check("POST edge tie", async () => {
-    const res = await fetch(`${base}/student/${adaId}/classes`, {
+    const res = await fetch(`${base}/student/${student.id}/courses`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ right: classId }),
+      body: JSON.stringify({ right: course.id }),
     });
     if (res.status !== 201) {
       throw new Error(`status ${res.status}`);
     }
-    const body = await res.json();
-    if (typeof body.id !== "number") {
-      throw new Error("missing tie id");
-    }
-    tieId = body.id;
   });
-  await check("POST /query link after tie", async () => {
-    const res = await fetch(`${base}/query`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        q: `from Student where id = "${adaId}" link classes`,
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(`status ${res.status}`);
-    }
-    const body = await res.json();
-    const bonds = body.bags["student.classes"];
-    if (!Array.isArray(bonds) || bonds.length !== 1) {
+
+  await check("POST /query link", async () => {
+    const pack = await query(
+      `from Student where id = "${student.id}" link courses`,
+    );
+    const bags = pack.bags as Record<string, unknown>;
+    const ties = bags["student.courses"];
+    if (!Array.isArray(ties) || ties.length !== 1) {
       throw new Error("expected one bond");
     }
-    if (bonds[0].left !== adaId || bonds[0].right !== classId) {
-      throw new Error("expected tie ends");
+    const first = ties[0] as Record<string, unknown>;
+    if (first.right !== course.id) {
+      throw new Error("expected course right");
+    }
+    if (bags.course !== undefined) {
+      throw new Error("H0 must not hydrate course bag");
     }
   });
-  await check("DELETE edge cut", async () => {
-    const res = await fetch(
-      `${base}/student/${adaId}/classes/${tieId}`,
-      { method: "DELETE" },
+
+  await check("POST /query id", async () => {
+    const pack = await query(
+      `from Student where id in ("${student.id}", "${other.id}") order by id`,
     );
-    if (res.status !== 204) {
+    if (packRows(pack, "student").length !== 2) {
+      throw new Error("expected two id rows");
+    }
+  });
+
+  await check("PATCH /student/:id", async () => {
+    const res = await fetch(`${base}/student/${student.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "ada2" }),
+    });
+    if (!res.ok) {
       throw new Error(`status ${res.status}`);
     }
+    const body = await res.json();
+    if (body.name !== "ada2" || body.no !== "S01") {
+      throw new Error("patch failed");
+    }
   });
+
   await check("no bond REST read", async () => {
-    const res = await fetch(`${base}/student/${adaId}/classes`);
+    const res = await fetch(`${base}/student/${student.id}/courses`);
     if (res.status !== 404) {
       throw new Error(`expected 404, got ${res.status}`);
     }
   });
+
   io.print("smoke: clean");
 } catch (err) {
   failed = true;
@@ -348,6 +209,52 @@ if (failed) {
   Deno.exit(1);
 }
 
+async function postJson(
+  path: string,
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  io.print(`==> POST ${path}`);
+  const res = await fetch(`${base}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (res.status !== 201) {
+    throw new Error(`POST ${path} status ${res.status}`);
+  }
+  return await res.json();
+}
+
+async function query(q: string): Promise<Record<string, unknown>> {
+  const res = await fetch(`${base}/query`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ q }),
+  });
+  if (!res.ok) {
+    throw new Error(`query status ${res.status}`);
+  }
+  return await res.json();
+}
+
+function packRows(
+  body: Record<string, unknown>,
+  unit: string,
+): Array<Record<string, unknown>> {
+  if (typeof body.root !== "string") {
+    throw new Error("pack missing root");
+  }
+  const bags = body.bags as Record<string, unknown> | undefined;
+  if (!bags || typeof bags !== "object") {
+    throw new Error("pack missing bags");
+  }
+  const rows = bags[unit];
+  if (!Array.isArray(rows)) {
+    throw new Error(`missing unit bag ${unit}`);
+  }
+  return rows as Array<Record<string, unknown>>;
+}
+
 async function ready(url: string, tries: number): Promise<void> {
   for (let i = 0; i < tries; i++) {
     try {
@@ -361,21 +268,6 @@ async function ready(url: string, tries: number): Promise<void> {
     await sleep(250);
   }
   throw new Error(`timeout waiting for ${url}`);
-}
-
-function packRows(body: Record<string, unknown>, unit: string): Array<Record<string, unknown>> {
-  if (typeof body.root !== "string") {
-    throw new Error("pack missing root");
-  }
-  const bags = body.bags as Record<string, unknown> | undefined;
-  if (!bags || typeof bags !== "object") {
-    throw new Error("pack missing bags");
-  }
-  const rows = bags[unit];
-  if (!Array.isArray(rows)) {
-    throw new Error(`missing unit bag ${unit}`);
-  }
-  return rows as Array<Record<string, unknown>>;
 }
 
 async function check(label: string, run: () => Promise<void>): Promise<void> {

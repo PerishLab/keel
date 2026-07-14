@@ -62,6 +62,7 @@ Cold-start contract: `docs/verify.md` (L1 unit / L2 smoke / L3 static).
 runseal :init
 runseal :guard
 runseal :smoke
+runseal :course
 cargo run -p keel-api --locked
 sidecar start --config sidecar.toml
 ```

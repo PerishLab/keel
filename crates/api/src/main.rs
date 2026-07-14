@@ -1,4 +1,4 @@
-use keel::atom::{string, url};
+use keel::atom::string;
 use keel::config;
 use keel::resource;
 use keel::{Graph, bind, listen};
@@ -6,7 +6,9 @@ use std::env;
 use std::path::Path;
 
 #[resource]
-struct Class {
+struct Course {
+    #[field(string)]
+    code: string,
     #[field(string)]
     title: string,
 }
@@ -14,11 +16,11 @@ struct Class {
 #[resource]
 struct Student {
     #[field(string)]
-    nickname: string,
-    #[field(url)]
-    avatar: url,
-    #[relation(Class, n2m)]
-    classes: Class,
+    no: string,
+    #[field(string)]
+    name: string,
+    #[relation(Course, n2m)]
+    courses: Course,
 }
 
 #[tokio::main]
@@ -33,7 +35,7 @@ async fn main() {
         }
     };
     let mut graph = Graph::new();
-    graph.plug::<Class>().plug::<Student>();
+    graph.plug::<Course>().plug::<Student>();
     let core = match bind(graph, store) {
         Ok(core) => core.share(),
         Err(err) => {
