@@ -1,20 +1,55 @@
 # keel
 
-Personal-style data model description library (Rust).
+Data model description engine. Business code defines **resources, fields, and
+relations only**. Control fields and control capabilities (expire, create,
+update, query, migration, …) stay inside the engine and are never opened to
+callers.
 
-Canonical source: [PerishLab/keel](https://git.perish.top/PerishLab/keel) on
-`git.perish.top`.
+Canonical source: [PerishLab/keel](https://git.perish.top/PerishLab/keel).
 
-## Status
+## Cold start
 
-Cold-start scaffold only. The model surface is not designed yet.
+Pure data layer: model graph → sealed reign → http/db adapt ports. No
+capability, auth, or identity product surface yet.
+
+```rust
+use keel::atom::{string, url};
+use keel::resource;
+use keel::{Graph, bind};
+
+#[resource]
+struct Class {
+    #[field(string)]
+    title: string,
+}
+
+#[resource]
+struct Student {
+    #[field(string)]
+    nickname: string,
+    #[field(url)]
+    avatar: url,
+    #[relation(Class, n2m)]
+    classes: Class,
+}
+
+fn main() {
+    let mut graph = Graph::new();
+    graph.plug::<Class>().plug::<Student>();
+    let _core = bind(
+        graph,
+        keel::adapt::http::Utopia,
+        keel::adapt::db::Postgres,
+    )
+    .expect("bind");
+}
+```
 
 ## Shape
 
-- `crates/keel` — library crate
-- `negentropy.toml` / `vocabulary.toml` — constitution
-- `runseal.toml` / `.runseal/` — operator plane (`:init`, `:guard`, `:land`)
-- `.forgejo/workflows/guard.yml` — CI gate on Forgejo Actions
+- `crates/keel` — graph, plan, sealed reign, adapt ports
+- `crates/macro` — `#[resource]` / `#[field]` / `#[relation]`
+- control plane (reign) is engine-only: expires, created, updated always applied in plan
 
 ## Operating
 
@@ -22,6 +57,3 @@ Cold-start scaffold only. The model surface is not designed yet.
 runseal :init
 runseal :guard
 ```
-
-Land a topic branch with `runseal :land` (push → PR → await `guard.yml` →
-squash-merge).

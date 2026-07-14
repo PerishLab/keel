@@ -1,40 +1,47 @@
 # Agents
 
-`keel` is a personal-style data model description library. This repository is
-guarded by the house suite: `negentropy` for structure, `runseal` for operator
-flow, Forgejo for source and CI.
+`keel` is a data model description engine. Business callers define models and
+relations only. The engine owns every control field and control capability.
 
 ## Product boundary
 
-- Library-first. Publish a Rust crate that describes data models in a house
-  style; consumers own serialization, storage, and product semantics.
-- No process control plane. `sidecar` is out of scope for this repo until a
-  multi-process local runtime appears.
-- No release pipeline yet. R2/`manage.sh`/release workflows land when publish is
-  decided.
+- **Business surface**: `#[resource]`, business `#[field]`, `#[relation]`,
+  `Graph::plug`, `bind` with adapt ports.
+- **Engine surface (not for business)**: reign (expires/created/updated),
+  create/update/query/migration, capability, auth, identity.
+- Adapt modules (`adapt::http`, `adapt::db`) are for adaptor authors wiring a
+  plan, not for domain authors expressing control.
+- Long-term suite role: fourth piece beside negentropy, runseal, sidecar.
+  Real auth.perish.top stress comes only after pure data + adaptors mature.
+- No sidecar product topology in this repo until multi-process need appears.
+
+## Growth order
+
+1. Pure data layer (current)
+2. Mature http/db adaptors
+3. Capability
+4. Identity
+5. Real estate scenarios
 
 ## Laws
 
 - Single word, block depth <= 4, path depth <= 4, comments denied by default.
-- Vocabulary deltas live in `docs/vocabulary.md`; compounds only in
-  `vocabulary.toml` with rationale.
+- Vocabulary deltas live in `docs/vocabulary.md`.
 - Boundary exemptions live in `negentropy.toml`.
 
 ## Operating
 
-- Never commit on `main`; the pre-commit hook refuses it. Branch, then commit.
-- `runseal :guard` must pass before landing.
-- `runseal :land` is the only landing path (Forgejo PR + guard + squash-merge).
-- Repo-local operator flows are TypeScript under `.runseal/wrappers`. Do not add
-  Python or uv for operator flows.
+- Never commit on `main`; branch, then commit.
+- `runseal :guard` before land; `runseal :land` is the only landing path.
+- Operator flows are TypeScript under `.runseal/wrappers` only.
 
 ## Directory map
 
-- `crates/keel/` — library source
-- `docs/` — durable design and vocabulary notes
-- `.runseal/` — Deno wrappers, hooks, pinned `negentropy.version`
-- `.forgejo/` — Actions workflows
-- `.local/` — gitignored private resources (secrets, ssh, tmp)
+- `crates/keel/` — engine library
+- `crates/macro/` — proc macros
+- `docs/` — vocabulary and design notes
+- `.runseal/` — guard/init/land
+- `.forgejo/` — Actions
 
 ## Common commands
 

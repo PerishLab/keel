@@ -11,4 +11,21 @@ so the shared meaning stays true.
 
 ## Current deltas
 
-- `keel` — the library crate; the load-bearing data model description surface.
+- `keel` — the library crate; data model description engine.
+- `atom` — business field type marker (`string`, `url`) and its `Kind`.
+- `bond` — relation cardinality marker (`n2m`) and its `Kind`.
+- `spec` — sealed business resource shape before plan expansion.
+- `graph` — set of plugged resource specs.
+- `plan` — engine expansion of a graph for adaptors.
+- `reign` — engine-owned control fields (expires, created, updated); never a business field.
+- `unit` — one planned resource inside a plan.
+- `slot` — one planned business field.
+- `edge` — one planned relation.
+- `core` — bound runtime handle after adapt wire; no business create/update/query.
+- `bind` — attach graph to http and db adapt ports.
+- `wire` — adaptor applies a plan; not a business verb.
+- `plug` — insert one resource form into a graph.
+- `seal` — finish a spec builder; business shape freezes.
+- `adapt` — adaptor port namespace (http, db).
+- `lift` — raise a graph or spec into the next engine form.
+- `link` — macro-side relation attribute parse.

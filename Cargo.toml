@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/keel"]
+members = ["crates/keel", "crates/macro"]
 
 [workspace.package]
 version = "0.1.0"
@@ -10,3 +10,7 @@ repository = "https://git.perish.top/PerishLab/keel"
 
 [workspace.dependencies]
 keel = { path = "crates/keel" }
+keel-macro = { path = "crates/macro" }
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }

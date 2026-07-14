@@ -68,6 +68,8 @@ for (
     "README.md",
     "crates/keel/Cargo.toml",
     "crates/keel/src/lib.rs",
+    "crates/macro/Cargo.toml",
+    "crates/macro/src/lib.rs",
     ".runseal/deno.json",
     ".runseal/deno.lock",
     ".runseal/negentropy.version",
