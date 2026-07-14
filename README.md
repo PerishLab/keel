@@ -52,6 +52,7 @@ fn main() {
 | `query` / `ask` | text → AST → run; `ask` takes `Tree` directly |
 | AST | `from` + live + scalar `where` (`=` `!=` `<` `<=` `>` `>=` `in`) + order/page |
 | `tie` / `ties` / `cut` | n2m edges (Core only for now; not default REST) |
+| edge law | flat multi-bag pack; root-only order/page — `docs/edge.md` |
 | `serve` / `listen` | axum (`http` feature) |
 
 ### HTTP surface

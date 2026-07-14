@@ -15,6 +15,8 @@ engine projections, not business authoring surfaces.
   from `keel.toml`. Filter/order/page live inside DSL only (not REST query params).
 - **Sidecar**: `sidecar.toml` manages `keel-api` process; health should match
   `[listen]` in `keel.toml` (do not dual-author ports).
+- **Edge reads** (when implemented): flat multi-bag pack; root-only order/page;
+  law in `docs/edge.md`. No association REST. No reverse edges.
 - No reverse relation generation. No capability/auth/identity yet.
 - No field validation yet (later on Store trait).
 
@@ -23,7 +25,7 @@ engine projections, not business authoring surfaces.
 1. Pure data + sqlite DDL (done)
 2. Row + n2m lifecycle (done)
 3. Core face + axum + sidecar + verify (done)
-4. Query AST (`from` + live + where + order/page); edge nav later
+4. Query AST scalar + order/page (done); edge nav under `docs/edge.md`
 5. Capability → identity → real estate scenarios
 
 ## Laws
@@ -31,6 +33,7 @@ engine projections, not business authoring surfaces.
 - Single word, block depth <= 4, path depth <= 4, comments denied by default.
 - Vocabulary deltas in `docs/vocabulary.md`.
 - Boundaries in `negentropy.toml`.
+- Edge navigation: `docs/edge.md` (flat bags; root-only order/page).
 
 ## Operating
 
@@ -45,7 +48,7 @@ engine projections, not business authoring surfaces.
 - `crates/api/` — demo HTTP binary for sidecar
 - `keel.toml` — runtime policy (listen/store)
 - `sidecar.toml` — local process plan
-- `docs/` — vocabulary
+- `docs/` — vocabulary, verify, edge law
 - `.runseal/` / `.forgejo/` — guard and CI
 
 ## Verification

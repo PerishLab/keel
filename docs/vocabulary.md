@@ -72,6 +72,10 @@ so the shared meaning stays true.
 - `rank` — sort direction (`asc` | `desc`).
 - `limit` — max rows returned after filter/sort/cursor.
 - `after` — id cursor: rows strictly after that key in ordered result.
+- `link` — tree clause that expands one forward bond into flat bags (planned).
+- `bag` — one named flat collection inside a query pack.
+- `pack` — multi-bag query result; clients assemble structure by id.
+- `root` — the `from` unit of a tree; sole subject of order/page.
 - `prefix` — HTTP api path prefix under listen.
 - `smoke` — L2 process verification of REST + /query.
 - `verify` — cold-start verification boundary document.

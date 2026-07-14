@@ -23,8 +23,10 @@ start is done; failures mean cold start is not closed.
 
 ## Must not require (out)
 
-- nested GraphQL-ish selection / edge navigation in DSL
+- edge navigation in DSL yet (law already settled in `docs/edge.md`)
+- nested GraphQL document responses as edge delivery
 - association REST, reverse edges, reverse-query privilege
+- order/page on non-root bags (forbidden when edge lands)
 - field validation, capability, identity, postgres
 - pagination/cache performance; multi-field order; keyset beyond id cursor
 - end cascading ties, business unique policy
