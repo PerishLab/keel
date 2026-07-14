@@ -48,6 +48,7 @@ const child = new Deno.Command("cargo", {
 let failed = false;
 try {
   await ready(`${base}/health`, 40);
+  let adaId = 0;
   await check("POST /student", async () => {
     const res = await fetch(`${base}/student`, {
       method: "POST",
@@ -64,6 +65,7 @@ try {
     if (typeof body.id !== "number") {
       throw new Error("missing id");
     }
+    adaId = body.id;
   });
   await check("GET /student", async () => {
     const res = await fetch(`${base}/student`);
@@ -73,6 +75,16 @@ try {
     const body = await res.json();
     if (!Array.isArray(body) || body.length < 1) {
       throw new Error("expected rows");
+    }
+  });
+  await check("GET /student/:id", async () => {
+    const res = await fetch(`${base}/student/${adaId}`);
+    if (!res.ok) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    if (body.id !== adaId || body.nickname !== "ada") {
+      throw new Error("expected ada by id");
     }
   });
   await check("POST /query", async () => {
@@ -206,6 +218,26 @@ try {
     }
     if (body.bags.class !== undefined) {
       throw new Error("H0 must not hydrate class bag");
+    }
+  });
+  await check("POST /query id", async () => {
+    const res = await fetch(`${base}/query`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        q: `from Student where id in ("${adaId}", "${bobId}") order by id`,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    const rows = packRows(body, "student");
+    if (rows.length !== 2) {
+      throw new Error("expected two id rows");
+    }
+    if (rows[0].id !== adaId || rows[1].id !== bobId) {
+      throw new Error("expected id order");
     }
   });
   await check("no bond REST", async () => {

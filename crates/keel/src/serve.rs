@@ -4,7 +4,7 @@ use crate::store::Store;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::{delete, get, post};
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -29,7 +29,7 @@ pub async fn listen<S: Store + 'static>(
         .route("/health", get(health))
         .route("/query", post(run::<S>))
         .route("/{unit}", get(list::<S>).post(create::<S>))
-        .route("/{unit}/{id}", delete(remove::<S>))
+        .route("/{unit}/{id}", get(one::<S>).delete(remove::<S>))
         .with_state(core);
     let prefix = prefix.trim_end_matches('/');
     let app = if prefix.is_empty() {
@@ -94,6 +94,22 @@ async fn create<S: Store>(
         .collect();
     let key = core.put(&name, &pairs).map_err(Fault::from)?;
     Ok((StatusCode::CREATED, Json(json!({ "id": key }))))
+}
+
+async fn one<S: Store>(
+    State(core): State<Arc<Core<S>>>,
+    Path((unit, id)): Path<(String, i64)>,
+) -> Result<Json<Value>, Fault> {
+    let name = unit_name(core.as_ref(), &unit)?;
+    let q = format!(r#"from {name} where id = "{id}""#);
+    let pack = core.query(&q).map_err(Fault::from)?;
+    match pack.rows().first() {
+        Some(row) => Ok(Json(row_json(row))),
+        None => Err(Fault {
+            status: StatusCode::NOT_FOUND,
+            note: format!("missing row {id}"),
+        }),
+    }
 }
 
 async fn remove<S: Store>(

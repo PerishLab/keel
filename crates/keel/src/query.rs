@@ -225,8 +225,13 @@ pub fn run(plan: &Plan, store: &impl Store, tree: &Tree) -> Result<Pack, Error> 
     let root = ddl::table(&name);
     let mut bags = BTreeMap::new();
     bags.insert(root.clone(), Bag::Unit(rows));
+    let unit = plan
+        .units()
+        .get(&name)
+        .ok_or_else(|| Error::Missing(name.clone()))?;
     for bond in tree.links() {
-        let ties = pull(plan, store, &name, bond, &keys)?;
+        let bond = edge(unit, bond)?;
+        let ties = pull(plan, store, &name, &bond, &keys)?;
         let key = format!("{root}.{bond}");
         bags.insert(key, Bag::Bond(ties));
     }
@@ -279,7 +284,10 @@ fn take_links(scan: &mut Scan<'_>) -> Result<Vec<String>, Error> {
             break;
         }
         let bond = scan.ident()?;
-        if links.iter().any(|have| have == &bond) {
+        if links
+            .iter()
+            .any(|have: &String| have.eq_ignore_ascii_case(&bond))
+        {
             return Err(Error::Adapt(format!("duplicate link {bond}")));
         }
         links.push(bond);
@@ -293,11 +301,17 @@ fn check_links(plan: &Plan, name: &str, links: &[String]) -> Result<(), Error> {
         .get(name)
         .ok_or_else(|| Error::Missing(name.into()))?;
     for bond in links {
-        if !unit.bonds().iter().any(|edge| edge.name() == bond) {
-            return Err(Error::Adapt(format!("unknown bond {bond}")));
-        }
+        edge(unit, bond)?;
     }
     Ok(())
+}
+
+fn edge(unit: &crate::plan::Unit, bond: &str) -> Result<String, Error> {
+    unit.bonds()
+        .iter()
+        .find(|edge| edge.name().eq_ignore_ascii_case(bond))
+        .map(|edge| edge.name().to_string())
+        .ok_or_else(|| Error::Adapt(format!("unknown bond {bond}")))
 }
 
 fn pull(
@@ -440,16 +454,32 @@ fn check(plan: &Plan, name: &str, preds: &[Pred], sort: Option<&Sort>) -> Result
         .get(name)
         .ok_or_else(|| Error::Missing(name.into()))?;
     for pred in preds {
-        if !unit.fields().iter().any(|slot| slot.name() == pred.field()) {
-            return Err(Error::Adapt(format!("unknown field {}", pred.field())));
+        slot(unit, pred.field())?;
+        if pred.field() == ddl::KEY {
+            for value in pred.values() {
+                key_text(value)?;
+            }
         }
     }
-    if let Some(sort) = sort
-        && !unit.fields().iter().any(|slot| slot.name() == sort.field())
-    {
-        return Err(Error::Adapt(format!("unknown field {}", sort.field())));
+    if let Some(sort) = sort {
+        slot(unit, sort.field())?;
     }
     Ok(())
+}
+
+fn slot(unit: &crate::plan::Unit, field: &str) -> Result<(), Error> {
+    if field == ddl::KEY {
+        return Ok(());
+    }
+    if unit.fields().iter().any(|slot| slot.name() == field) {
+        return Ok(());
+    }
+    Err(Error::Adapt(format!("unknown field {field}")))
+}
+
+fn key_text(text: &str) -> Result<i64, Error> {
+    text.parse::<i64>()
+        .map_err(|_| Error::Adapt("id needs integer".into()))
 }
 
 fn pass(row: &Row, preds: &[Pred]) -> bool {
@@ -457,6 +487,9 @@ fn pass(row: &Row, preds: &[Pred]) -> bool {
 }
 
 fn hit(row: &Row, pred: &Pred) -> bool {
+    if pred.field() == ddl::KEY {
+        return hit_key(row.key(), pred);
+    }
     let Some(got) = row.cells().get(pred.field()) else {
         return false;
     };
@@ -471,15 +504,39 @@ fn hit(row: &Row, pred: &Pred) -> bool {
     }
 }
 
+fn hit_key(key: i64, pred: &Pred) -> bool {
+    match pred.op() {
+        Op::Eq => key_text(pred.value()).is_ok_and(|want| want == key),
+        Op::Ne => key_text(pred.value()).is_ok_and(|want| want != key),
+        Op::Lt => key_text(pred.value()).is_ok_and(|want| key < want),
+        Op::Le => key_text(pred.value()).is_ok_and(|want| key <= want),
+        Op::Gt => key_text(pred.value()).is_ok_and(|want| key > want),
+        Op::Ge => key_text(pred.value()).is_ok_and(|want| key >= want),
+        Op::In => pred
+            .values()
+            .iter()
+            .any(|want| key_text(want).is_ok_and(|n| n == key)),
+    }
+}
+
 fn order(rows: &mut [Row], sort: Option<&Sort>) {
     match sort {
         None => rows.sort_by_key(|row| row.key()),
+        Some(sort) if sort.field() == ddl::KEY => {
+            let desc = sort.rank() == Rank::Desc;
+            rows.sort_by(|a, b| rank_key(a, b, desc));
+        }
         Some(sort) => {
             let field = sort.field().to_string();
             let desc = sort.rank() == Rank::Desc;
             rows.sort_by(|a, b| by(a, b, &field, desc));
         }
     }
+}
+
+fn rank_key(a: &Row, b: &Row, desc: bool) -> std::cmp::Ordering {
+    let primary = a.key().cmp(&b.key());
+    if desc { primary.reverse() } else { primary }
 }
 
 fn by(a: &Row, b: &Row, field: &str, desc: bool) -> std::cmp::Ordering {

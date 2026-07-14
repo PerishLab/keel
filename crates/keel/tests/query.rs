@@ -181,8 +181,37 @@ fn run() {
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(pack.bond("student.classes").expect("bag").len(), 1);
 
+    let pack = core
+        .query(&format!(r#"from Student where id = "{ada}""#))
+        .expect("id eq");
+    assert_eq!(pack.rows().len(), 1);
+    assert_eq!(pack.rows()[0].key(), ada);
+
+    let pack = core
+        .query(&format!(r#"from Student where id in ("{ada}", "{cy}")"#))
+        .expect("id in");
+    assert_eq!(pack.rows().len(), 2);
+
+    let pack = core
+        .query(&format!(r#"from Class where id = "{math}""#))
+        .expect("target");
+    assert_eq!(pack.rows().len(), 1);
+    assert_eq!(
+        pack.rows()[0].cells().get("title").map(String::as_str),
+        Some("math")
+    );
+
+    let pack = core
+        .query("from Student order by id desc")
+        .expect("id order");
+    assert_eq!(pack.rows()[0].key(), cy);
+
+    let pack = core.query("from Student LINK Classes").expect("case");
+    assert!(pack.bond("student.classes").is_some());
+
+    assert!(core.query(r#"from Student where id = "x""#).is_err());
     assert!(core.query("from Student link missing").is_err());
     assert!(core.query(r#"from Student where missing = "x""#).is_err());
     assert!(core.query("from Ghost").is_err());
-    let _ = (bob, cy);
+    let _ = bob;
 }

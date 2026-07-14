@@ -16,9 +16,9 @@ start is done; failures mean cold start is not closed.
 - Business-only resource DSL; reign columns engine-owned
 - sqlite wire + put/live/end + tie/ties/cut on Core
 - `live` == root rows of `query("from Unit")` pack; scalar `where` + order/page
-- `POST /query` always returns pack `{root,bags}`; optional `link` → bond bags (H0)
-- `keel.toml` load defaults + file store open
-- REST: health, unit list/create/delete; **no** association routes
+- `where id` / `order by id` on engine key; `id in ("…")` for H0 follow-up loads
+- `POST /query` always pack `{root,bags}`; optional `link` → bond bags (H0)
+- REST: health, list/create/get-one/delete; **no** association routes
 - guard green without docker daemon
 
 ## Must not require (out)

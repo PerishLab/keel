@@ -63,9 +63,10 @@ Native REST per resource (**no association queries**):
 |--------|------|--------|
 | `GET` | `{prefix}/health` | liveness |
 | `GET` | `{prefix}/{unit}` | `live` |
+| `GET` | `{prefix}/{unit}/{id}` | one live row by id |
 | `POST` | `{prefix}/{unit}` | `put` |
 | `DELETE` | `{prefix}/{unit}/{id}` | `end` |
-| `POST` | `{prefix}/query` | body `{"q":"from Student"}` → DSL |
+| `POST` | `{prefix}/query` | body `{"q":…}` → always pack |
 
 `listen.prefix` in `keel.toml` is the api prefix (default empty).
 

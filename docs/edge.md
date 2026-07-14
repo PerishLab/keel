@@ -56,13 +56,7 @@ Root bag is **always** present (may be `[]`). Bond bags appear only for each
 `link` produces the **bond bag only**. No target unit bag is added by expand.
 
 Clients that need target rows issue a second top-level query, e.g.
-`from Class where id in ("3", "7")` (once multi-id / `in` on id is available
-for engine keys — until then, client may query targets by known keys via
-whatever scalar path exists, or load full live lists in cold start demos).
-
-> Note: business `in` is on field cells today; root/target **id** filtering may
-> need a small follow-up (`id` as engine key in where). That is an
-> implementation gap under H0, not a product fork (see below).
+`from Class where id in ("3", "7")` using engine-key `id` preds.
 
 ### Row item (unit bag)
 
@@ -223,9 +217,6 @@ truncation is forbidden.
 - Edge-as-predicate in `where` (exists / filter root by bond).
 - Explicit hydrate syntax (former H2) if product later wants targets in-pack.
 - `keel.toml` cap policy (former C1).
-- `where id in (…)` on engine keys if cell-only `in` is insufficient for H0
-  follow-up loads (small engine extension, default path clear).
-
 ## Must not
 
 - Nested GraphQL-style response trees as the primary edge delivery.
