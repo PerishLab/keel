@@ -93,7 +93,9 @@ for (
     ".runseal/wrappers/guard.ts",
     ".runseal/wrappers/init.ts",
     ".runseal/wrappers/land.ts",
+    ".runseal/wrappers/smoke.ts",
     ".forgejo/workflows/guard.yml",
+    "docs/verify.md",
   ]
 ) {
   await Check.path(root, entry);

@@ -109,6 +109,9 @@ sidecar stop --config sidecar.toml
 
 ```sh
 runseal :init
-runseal :guard
+runseal :guard    # unit tests + cold-start HTTP smoke
+runseal :smoke    # L2 only: boot keel-api, REST + /query
 cargo run -p keel-api --locked
 ```
+
+Cold-start verification boundary: `docs/verify.md`.

@@ -48,11 +48,17 @@ engine projections, not business authoring surfaces.
 - `docs/` — vocabulary
 - `.runseal/` / `.forgejo/` — guard and CI
 
+## Verification
+
+Cold-start contract: `docs/verify.md` (L1 unit / L2 smoke / L3 static).
+`:guard` runs L1+L3 and then `:smoke` (L2).
+
 ## Common commands
 
 ```sh
 runseal :init
 runseal :guard
+runseal :smoke
 cargo run -p keel-api --locked
 sidecar start --config sidecar.toml
 ```

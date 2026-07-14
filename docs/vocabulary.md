@@ -62,3 +62,5 @@ so the shared meaning stays true.
 - `ask` — parsed query intent (currently unit anchor + implicit live slice).
 - `parse` — turn query text into an ask.
 - `prefix` — HTTP api path prefix under listen.
+- `smoke` — L2 process verification of REST + /query.
+- `verify` — cold-start verification boundary document.

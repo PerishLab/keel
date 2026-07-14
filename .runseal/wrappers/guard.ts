@@ -47,10 +47,28 @@ await bin("deno").run([
   ".runseal/wrappers/guard.ts",
   ".runseal/wrappers/init.ts",
   ".runseal/wrappers/land.ts",
+  ".runseal/wrappers/smoke.ts",
 ]);
 
 io.print("==> negentropy");
 await negentropy.verify();
 await bin("negentropy").run(["--strict", "."]);
+
+io.print("==> smoke");
+const root = await bin("git").text(["rev-parse", "--show-toplevel"]);
+await bin("deno").run([
+  "run",
+  "--allow-read",
+  "--allow-write",
+  "--allow-env",
+  "--allow-net",
+  "--allow-run",
+  "--config",
+  ".runseal/deno.json",
+  "--lock",
+  ".runseal/deno.lock",
+  "--frozen=true",
+  ".runseal/wrappers/smoke.ts",
+], { cwd: root });
 
 io.print("guard: clean");
