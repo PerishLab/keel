@@ -18,8 +18,9 @@ relations only. The engine owns every control field and control capability.
 ## Growth order
 
 1. Pure data layer + sqlite DDL wire (done)
-2. Engine-internal row lifecycle put/live/end (current)
-3. Mature http adapt + other stores later
+2. Engine-internal row + n2m lifecycle (done)
+3. Http path table from plan (minimal; no server protocol yet)
+4. Next needs product decisions (see session notes)
 3. Capability
 4. Identity
 5. Real estate scenarios

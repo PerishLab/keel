@@ -1,6 +1,6 @@
 use crate::adapt::Error;
 use crate::ddl;
-use crate::life::{self, Row};
+use crate::life::{self, Ends, Row, Tie};
 use crate::plan::Plan;
 use rusqlite::Connection;
 use std::sync::Mutex;
@@ -65,19 +65,37 @@ impl Sqlite {
     pub fn put(&self, plan: &Plan, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
         let guard = self.conn.lock().map_err(lock)?;
         let conn = guard.as_ref().ok_or_else(unwired)?;
-        life::put(conn, plan, name, fields)
+        life::Work::new(conn).put(plan, name, fields)
     }
 
     pub fn live(&self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error> {
         let guard = self.conn.lock().map_err(lock)?;
         let conn = guard.as_ref().ok_or_else(unwired)?;
-        life::live(conn, plan, name)
+        life::Work::new(conn).live(plan, name)
     }
 
     pub fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error> {
         let guard = self.conn.lock().map_err(lock)?;
         let conn = guard.as_ref().ok_or_else(unwired)?;
-        life::end(conn, plan, name, key)
+        life::Work::new(conn).end(plan, name, key)
+    }
+
+    pub fn tie(&self, plan: &Plan, owner: &str, bond: &str, ends: Ends) -> Result<i64, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).tie(plan, owner, bond, ends)
+    }
+
+    pub fn ties(&self, plan: &Plan, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).ties(plan, owner, bond, left)
+    }
+
+    pub fn cut(&self, plan: &Plan, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).cut(plan, owner, bond, key)
     }
 
     fn open(&self) -> Result<Connection, Error> {

@@ -43,3 +43,10 @@ so the shared meaning stays true.
 - `end` — stamp expires_at to now; row leaves the live slice.
 - `row` — one engine-read record (key, cells, reign times).
 - `cell` — one business field value inside a row.
+- `tie` — create one n2m edge with reign stamps.
+- `ties` — live n2m edges from one owner key.
+- `cut` — end one n2m edge via expires_at.
+- `work` — connection-scoped engine lifecycle operator.
+- `path` — one plan-derived http route descriptor.
+- `side` — foreign-key column name for a resource (`student_id`).
+- `ends` — left/right key pair for a n2m tie.

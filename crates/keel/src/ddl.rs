@@ -15,6 +15,10 @@ pub fn join(owner: &str, bond: &str) -> String {
     format!("{}_{}", table(owner), table(bond))
 }
 
+pub fn side(name: &str) -> String {
+    format!("{}_id", table(name))
+}
+
 pub fn script(plan: &Plan) -> Vec<String> {
     let mut out = Vec::new();
     out.push("PRAGMA foreign_keys = ON;".into());
@@ -45,8 +49,8 @@ fn form(node: &Unit) -> String {
 fn arc(node: &Unit, bond: &str, target: &str, kind: bond::Kind) -> String {
     match kind {
         bond::Kind::N2m => {
-            let left = format!("{}_id", table(node.name()));
-            let right = format!("{}_id", table(target));
+            let left = side(node.name());
+            let right = side(target);
             let mut cols = vec![
                 format!("{KEY} INTEGER PRIMARY KEY NOT NULL"),
                 format!("{left} INTEGER NOT NULL"),

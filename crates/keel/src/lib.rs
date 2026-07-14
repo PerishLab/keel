@@ -10,13 +10,13 @@ pub mod spec;
 pub use atom::{string, url};
 pub use graph::Graph;
 pub use keel_macro::resource;
-pub use life::Row;
+pub use life::{Ends, Row, Tie};
 pub use plan::Core;
 pub use spec::Resource;
 
 pub fn bind(
     graph: Graph,
-    http: impl adapt::Http,
+    http: &impl adapt::Http,
     db: &impl adapt::Db,
 ) -> Result<Core, adapt::Error> {
     let plan = plan::Plan::lift(&graph)?;

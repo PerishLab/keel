@@ -24,7 +24,8 @@ fn wire() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
     let db = keel::adapt::db::Sqlite::memory();
-    let core = bind(graph, keel::adapt::http::Utopia, &db).expect("bind");
+    let http = keel::adapt::http::Utopia::new();
+    let core = bind(graph, &http, &db).expect("bind");
     let plan = core.plan();
     let student = plan.units().get("Student").expect("Student");
     assert_eq!(student.fields().len(), 2);
@@ -41,6 +42,9 @@ fn wire() {
     assert!(cols.iter().any(|c| c == ddl::EXPIRES));
     assert!(cols.iter().any(|c| c == ddl::CREATED));
     assert!(cols.iter().any(|c| c == ddl::UPDATED));
+    let paths = http.paths().expect("paths");
+    assert!(paths.iter().any(|p| p.route() == "/class"));
+    assert!(paths.iter().any(|p| p.route() == "/student"));
 }
 
 #[test]
@@ -48,7 +52,8 @@ fn life() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
     let db = keel::adapt::db::Sqlite::memory();
-    let core = bind(graph, keel::adapt::http::Utopia, &db).expect("bind");
+    let http = keel::adapt::http::Utopia::new();
+    let core = bind(graph, &http, &db).expect("bind");
     let plan = core.plan();
 
     let a = db
@@ -92,6 +97,63 @@ fn life() {
 }
 
 #[test]
+fn bond() {
+    let mut graph = Graph::new();
+    graph.plug::<Class>().plug::<Student>();
+    let db = keel::adapt::db::Sqlite::memory();
+    let http = keel::adapt::http::Utopia::new();
+    let core = bind(graph, &http, &db).expect("bind");
+    let plan = core.plan();
+
+    let student = db
+        .put(
+            plan,
+            "Student",
+            &[("nickname", "ada"), ("avatar", "https://a.example/a")],
+        )
+        .expect("student");
+    let math = db.put(plan, "Class", &[("title", "math")]).expect("math");
+    let art = db.put(plan, "Class", &[("title", "art")]).expect("art");
+
+    let t1 = db
+        .tie(
+            plan,
+            "Student",
+            "classes",
+            keel::Ends {
+                left: student,
+                right: math,
+            },
+        )
+        .expect("tie math");
+    let t2 = db
+        .tie(
+            plan,
+            "Student",
+            "classes",
+            keel::Ends {
+                left: student,
+                right: art,
+            },
+        )
+        .expect("tie art");
+    assert_ne!(t1, t2);
+
+    let ties = db.ties(plan, "Student", "classes", student).expect("ties");
+    assert_eq!(ties.len(), 2);
+    assert!(ties.iter().all(|tie| tie.left() == student));
+    assert!(ties.iter().any(|tie| tie.right() == math));
+    assert!(ties.iter().any(|tie| tie.right() == art));
+
+    db.cut(plan, "Student", "classes", t1).expect("cut math");
+    let ties = db
+        .ties(plan, "Student", "classes", student)
+        .expect("ties after cut");
+    assert_eq!(ties.len(), 1);
+    assert_eq!(ties[0].right(), art);
+}
+
+#[test]
 fn miss() {
     #[resource]
     struct Lone {
@@ -102,6 +164,7 @@ fn miss() {
     let mut graph = Graph::new();
     graph.plug::<Lone>();
     let db = keel::adapt::db::Sqlite::memory();
-    let err = bind(graph, keel::adapt::http::Utopia, &db).expect_err("missing");
+    let http = keel::adapt::http::Utopia::new();
+    let err = bind(graph, &http, &db).expect_err("missing");
     assert!(matches!(err, keel::adapt::Error::Missing(_)));
 }

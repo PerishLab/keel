@@ -41,7 +41,8 @@ fn main() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
     let db = keel::adapt::db::Sqlite::memory();
-    let _core = bind(graph, keel::adapt::http::Utopia, &db).expect("bind");
+    let http = keel::adapt::http::Utopia::new();
+    let _core = bind(graph, &http, &db).expect("bind");
 }
 ```
 
@@ -49,11 +50,11 @@ fn main() {
 resource tables, n2m join tables, and reign columns (`id`, `expires_at`,
 `created_at`, `updated_at`).
 
-Engine-internal row lifecycle (adapt surface, not business API):
+Engine-internal lifecycle (adapt surface, not business API):
 
-- `put` — insert business cells; engine stamps created/updated, expires null
-- `live` — rows in the effective slice (`expires_at` null or in the future)
-- `end` — set `expires_at` to now (soft end via reign, not a business delete field)
+- `put` / `live` / `end` — resource rows and effective time slice
+- `tie` / `ties` / `cut` — n2m edges with the same reign rules
+- `Utopia::paths` — plan-derived route table (`/student`, …); no real server yet
 
 No business create/update/query/migration API.
 
