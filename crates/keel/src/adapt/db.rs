@@ -5,9 +5,9 @@ pub trait Db {
     fn wire(&self, plan: &Plan) -> Result<(), Error>;
 }
 
-pub struct Postgres;
+pub struct Sqlite;
 
-impl Db for Postgres {
+impl Db for Sqlite {
     fn wire(&self, plan: &Plan) -> Result<(), Error> {
         if plan.units().is_empty() {
             return Err(Error::Adapt("db plan is empty".into()));

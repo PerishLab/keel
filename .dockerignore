@@ -1,6 +1,0 @@
-target
-.task
-.local
-.git
-**/*.md
-!README.md

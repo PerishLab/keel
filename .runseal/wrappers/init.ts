@@ -90,9 +90,6 @@ for (
     ".runseal/wrappers/init.ts",
     ".runseal/wrappers/land.ts",
     ".forgejo/workflows/guard.yml",
-    "docker-compose.yml",
-    "Dockerfile",
-    "docs/data.md",
   ]
 ) {
   await Check.path(root, entry);

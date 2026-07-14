@@ -12,6 +12,10 @@ Canonical source: [PerishLab/keel](https://git.perish.top/PerishLab/keel).
 Pure data layer: model graph → sealed reign → http/db adapt ports. No
 capability, auth, or identity product surface yet.
 
+The first db adapt is **sqlite** (in-process, closed loop). Other stores
+(e.g. postgres) are later, independent adapt implementations — not cold-start
+infrastructure.
+
 ```rust
 use keel::atom::{string, url};
 use keel::resource;
@@ -39,7 +43,7 @@ fn main() {
     let _core = bind(
         graph,
         keel::adapt::http::Utopia,
-        keel::adapt::db::Postgres,
+        keel::adapt::db::Sqlite,
     )
     .expect("bind");
 }
@@ -50,16 +54,7 @@ fn main() {
 - `crates/keel` — graph, plan, sealed reign, adapt ports
 - `crates/macro` — `#[resource]` / `#[field]` / `#[relation]`
 - control plane (reign) is engine-only: expires, created, updated always applied in plan
-
-## Local postgres
-
-```sh
-docker compose up -d postgres
-# postgres://keel:keel@127.0.0.1:5432/keel
-```
-
-See `docs/data.md`. The db adapt still wires plans only; drivers and schema
-apply land after this baseline is up.
+- `adapt::db::Sqlite` — cold-start db port (wire still plan-level; file/memory engine next)
 
 ## Operating
 

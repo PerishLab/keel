@@ -22,7 +22,7 @@ struct Student {
 fn wire() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let core = bind(graph, keel::adapt::http::Utopia, keel::adapt::db::Postgres).expect("bind");
+    let core = bind(graph, keel::adapt::http::Utopia, keel::adapt::db::Sqlite).expect("bind");
     let plan = core.plan();
     let student = plan.units().get("Student").expect("Student");
     assert_eq!(student.fields().len(), 2);
@@ -42,7 +42,6 @@ fn miss() {
 
     let mut graph = Graph::new();
     graph.plug::<Lone>();
-    let err =
-        bind(graph, keel::adapt::http::Utopia, keel::adapt::db::Postgres).expect_err("missing");
+    let err = bind(graph, keel::adapt::http::Utopia, keel::adapt::db::Sqlite).expect_err("missing");
     assert!(matches!(err, keel::adapt::Error::Missing(_)));
 }

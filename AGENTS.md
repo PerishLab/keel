@@ -18,10 +18,13 @@ relations only. The engine owns every control field and control capability.
 ## Growth order
 
 1. Pure data layer (current)
-2. Mature http/db adaptors
+2. Mature adaptors — sqlite first (closed loop); other stores later
 3. Capability
 4. Identity
 5. Real estate scenarios
+
+No docker/postgres baseline in this repo for cold start. Db is an adapt port;
+sqlite is the first implementation surface.
 
 ## Laws
 
@@ -40,7 +43,6 @@ relations only. The engine owns every control field and control capability.
 - `crates/keel/` — engine library
 - `crates/macro/` — proc macros
 - `docs/` — vocabulary and design notes
-- `docker-compose.yml` / `Dockerfile` — local postgres + tool image (official images)
 - `.runseal/` — guard/init/land
 - `.forgejo/` — Actions
 
