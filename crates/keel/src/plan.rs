@@ -37,11 +37,6 @@ pub struct Reign {
     updated: bool,
 }
 
-#[derive(Clone, Debug)]
-pub struct Core {
-    plan: Plan,
-}
-
 impl Plan {
     pub(crate) fn lift(graph: &Graph) -> Result<Self, crate::adapt::Error> {
         let mut units = BTreeMap::new();
@@ -150,15 +145,5 @@ impl Reign {
 
     pub fn updated(&self) -> bool {
         self.updated
-    }
-}
-
-impl Core {
-    pub(crate) fn lift(plan: Plan) -> Self {
-        Self { plan }
-    }
-
-    pub fn plan(&self) -> &Plan {
-        &self.plan
     }
 }

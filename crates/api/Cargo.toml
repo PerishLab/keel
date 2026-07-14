@@ -1,0 +1,16 @@
+[package]
+name = "keel-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Keel demo HTTP process for local sidecar management"
+publish = false
+
+[[bin]]
+name = "keel-api"
+path = "src/main.rs"
+
+[dependencies]
+keel = { workspace = true, features = ["http"] }
+tokio = { workspace = true }

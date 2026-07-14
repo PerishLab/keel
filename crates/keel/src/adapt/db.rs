@@ -2,12 +2,9 @@ use crate::adapt::Error;
 use crate::ddl;
 use crate::life::{self, Ends, Row, Tie};
 use crate::plan::Plan;
+use crate::store::Store;
 use rusqlite::Connection;
 use std::sync::Mutex;
-
-pub trait Db {
-    fn wire(&self, plan: &Plan) -> Result<(), Error>;
-}
 
 enum Place {
     Memory,
@@ -34,70 +31,6 @@ impl Sqlite {
         }
     }
 
-    pub fn has(&self, name: &str) -> Result<bool, Error> {
-        let guard = self.conn.lock().map_err(lock)?;
-        let conn = guard.as_ref().ok_or_else(unwired)?;
-        let table = ddl::table(name);
-        let mut stmt = conn
-            .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1")
-            .map_err(sql)?;
-        let found = stmt.exists([table.as_str()]).map_err(sql)?;
-        Ok(found)
-    }
-
-    pub fn cols(&self, name: &str) -> Result<Vec<String>, Error> {
-        let guard = self.conn.lock().map_err(lock)?;
-        let conn = guard.as_ref().ok_or_else(unwired)?;
-        let table = ddl::table(name);
-        let mut stmt = conn
-            .prepare(&format!("PRAGMA table_info({table})"))
-            .map_err(sql)?;
-        let rows = stmt
-            .query_map([], |row| row.get::<_, String>(1))
-            .map_err(sql)?;
-        let mut out = Vec::new();
-        for row in rows {
-            out.push(row.map_err(sql)?);
-        }
-        Ok(out)
-    }
-
-    pub fn put(&self, plan: &Plan, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
-        let guard = self.conn.lock().map_err(lock)?;
-        let conn = guard.as_ref().ok_or_else(unwired)?;
-        life::Work::new(conn).put(plan, name, fields)
-    }
-
-    pub fn live(&self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error> {
-        let guard = self.conn.lock().map_err(lock)?;
-        let conn = guard.as_ref().ok_or_else(unwired)?;
-        life::Work::new(conn).live(plan, name)
-    }
-
-    pub fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error> {
-        let guard = self.conn.lock().map_err(lock)?;
-        let conn = guard.as_ref().ok_or_else(unwired)?;
-        life::Work::new(conn).end(plan, name, key)
-    }
-
-    pub fn tie(&self, plan: &Plan, owner: &str, bond: &str, ends: Ends) -> Result<i64, Error> {
-        let guard = self.conn.lock().map_err(lock)?;
-        let conn = guard.as_ref().ok_or_else(unwired)?;
-        life::Work::new(conn).tie(plan, owner, bond, ends)
-    }
-
-    pub fn ties(&self, plan: &Plan, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
-        let guard = self.conn.lock().map_err(lock)?;
-        let conn = guard.as_ref().ok_or_else(unwired)?;
-        life::Work::new(conn).ties(plan, owner, bond, left)
-    }
-
-    pub fn cut(&self, plan: &Plan, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
-        let guard = self.conn.lock().map_err(lock)?;
-        let conn = guard.as_ref().ok_or_else(unwired)?;
-        life::Work::new(conn).cut(plan, owner, bond, key)
-    }
-
     fn open(&self) -> Result<Connection, Error> {
         match &self.place {
             Place::Memory => Connection::open_in_memory().map_err(sql),
@@ -106,7 +39,7 @@ impl Sqlite {
     }
 }
 
-impl Db for Sqlite {
+impl Store for Sqlite {
     fn wire(&self, plan: &Plan) -> Result<(), Error> {
         if plan.units().is_empty() {
             return Err(Error::Adapt("db plan is empty".into()));
@@ -124,6 +57,70 @@ impl Db for Sqlite {
         let mut guard = self.conn.lock().map_err(lock)?;
         *guard = Some(conn);
         Ok(())
+    }
+
+    fn put(&self, plan: &Plan, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).put(plan, name, fields)
+    }
+
+    fn live(&self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).live(plan, name)
+    }
+
+    fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).end(plan, name, key)
+    }
+
+    fn tie(&self, plan: &Plan, owner: &str, bond: &str, ends: Ends) -> Result<i64, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).tie(plan, owner, bond, ends)
+    }
+
+    fn ties(&self, plan: &Plan, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).ties(plan, owner, bond, left)
+    }
+
+    fn cut(&self, plan: &Plan, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).cut(plan, owner, bond, key)
+    }
+
+    fn has(&self, name: &str) -> Result<bool, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        let table = ddl::table(name);
+        let mut stmt = conn
+            .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1")
+            .map_err(sql)?;
+        let found = stmt.exists([table.as_str()]).map_err(sql)?;
+        Ok(found)
+    }
+
+    fn cols(&self, name: &str) -> Result<Vec<String>, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        let table = ddl::table(name);
+        let mut stmt = conn
+            .prepare(&format!("PRAGMA table_info({table})"))
+            .map_err(sql)?;
+        let rows = stmt
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(sql)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(sql)?);
+        }
+        Ok(out)
     }
 }
 

@@ -50,3 +50,7 @@ so the shared meaning stays true.
 - `path` — one plan-derived http route descriptor.
 - `side` — foreign-key column name for a resource (`student_id`).
 - `ends` — left/right key pair for a n2m tie.
+- `face` — Core module: unified engine facade over plan + store.
+- `store` — trait for engine row/edge lifecycle backends.
+- `serve` / `listen` — axum entrypoints projecting Core over HTTP.
+- `share` — wrap Core in Arc for concurrent HTTP handlers.

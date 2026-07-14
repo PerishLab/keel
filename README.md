@@ -1,22 +1,16 @@
 # keel
 
 Data model description engine. Business code defines **resources, fields, and
-relations only**. Control fields and control capabilities (expire, create,
-update, query, migration, …) stay inside the engine and are never opened to
-callers.
+relations only**. Control fields and control capabilities stay inside the
+engine. HTTP and store adaptors project the engine surface — they are not a
+business authoring API.
 
 Canonical source: [PerishLab/keel](https://git.perish.top/PerishLab/keel).
 
 ## Cold start
 
-Pure data layer: model graph → sealed reign → http/db adapt ports. No
-capability, auth, or identity product surface yet.
-
-The first db adapt is **sqlite** (in-process, closed loop). Other stores
-(e.g. postgres) are later, independent adapt implementations — not cold-start
-infrastructure.
-
 ```rust
+use keel::adapt::db::Sqlite;
 use keel::atom::{string, url};
 use keel::resource;
 use keel::{Graph, bind};
@@ -40,34 +34,41 @@ struct Student {
 fn main() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let db = keel::adapt::db::Sqlite::memory();
-    let http = keel::adapt::http::Utopia::new();
-    let _core = bind(graph, &http, &db).expect("bind");
+    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let _id = core
+        .put(
+            "Student",
+            &[("nickname", "ada"), ("avatar", "https://a.example/a")],
+        )
+        .expect("put");
 }
 ```
 
-`Sqlite::wire` opens an in-memory (or file) database and applies engine DDL:
-resource tables, n2m join tables, and reign columns (`id`, `expires_at`,
-`created_at`, `updated_at`).
+## Engine face (`Core`)
 
-Engine-internal lifecycle (adapt surface, not business API):
+| Method | Meaning |
+|--------|---------|
+| `put` / `live` / `end` | resource rows; `live` = effective slice |
+| `tie` / `ties` / `cut` | n2m edges; no reverse edges generated |
+| `serve` / `listen` | axum on `127.0.0.1:3000` by default (`http` feature) |
 
-- `put` / `live` / `end` — resource rows and effective time slice
-- `tie` / `ties` / `cut` — n2m edges with the same reign rules
-- `Utopia::paths` — plan-derived route table (`/student`, …); no real server yet
+HTTP maps to the same face (`DELETE` → `end`, list → `live`, no pagination).
 
-No business create/update/query/migration API.
+## Local process (sidecar)
 
-## Shape
+```sh
+# requires sidecar CLI installed
+sidecar start --config sidecar.toml
+# health: http://127.0.0.1:3000/health
+sidecar stop --config sidecar.toml
+```
 
-- `crates/keel` — graph, plan, ddl, sealed reign, adapt ports
-- `crates/macro` — `#[resource]` / `#[field]` / `#[relation]`
-- control plane (reign) is engine-only and always present in DDL
-- `adapt::db::Sqlite` — closed-loop db adapt (`memory` / `file`)
+`keel-api` is a demo binary (Student/Class + memory sqlite + axum).
 
 ## Operating
 
 ```sh
 runseal :init
 runseal :guard
+cargo run -p keel-api --locked
 ```

@@ -1,8 +1,9 @@
 pub mod db;
 pub mod http;
 
-pub use db::Db;
-pub use http::Http;
+use crate::store::Store;
+
+pub use db::Sqlite;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Error {
@@ -20,3 +21,9 @@ impl std::fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+pub fn bind<S: Store>(graph: crate::graph::Graph, store: S) -> Result<crate::face::Core<S>, Error> {
+    let plan = crate::plan::Plan::lift(&graph)?;
+    store.wire(&plan)?;
+    Ok(crate::face::Core::new(plan, store))
+}

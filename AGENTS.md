@@ -1,58 +1,52 @@
 # Agents
 
 `keel` is a data model description engine. Business callers define models and
-relations only. The engine owns every control field and control capability.
+relations only. The engine owns control fields and lifecycle. HTTP/store are
+engine projections, not business authoring surfaces.
 
 ## Product boundary
 
-- **Business surface**: `#[resource]`, business `#[field]`, `#[relation]`,
-  `Graph::plug`, `bind` with adapt ports.
-- **Engine surface (not for business)**: reign (expires/created/updated),
-  create/update/query/migration, capability, auth, identity.
-- Adapt modules (`adapt::http`, `adapt::db`) are for adaptor authors wiring a
-  plan, not for domain authors expressing control.
-- Long-term suite role: fourth piece beside negentropy, runseal, sidecar.
-  Real auth.perish.top stress comes only after pure data + adaptors mature.
-- No sidecar product topology in this repo until multi-process need appears.
+- **Business**: `#[resource]`, `#[field]`, `#[relation]`, `Graph::plug`, `bind`.
+- **Engine face (`Core`)**: `put` / `live` / `end` / `tie` / `ties` / `cut`.
+- **HTTP (axum)**: localhost listen; maps to Core; no pagination/query DSL yet.
+- **Sidecar**: `sidecar.toml` manages `keel-api` for local multi-process hygiene.
+- No reverse relation generation. No capability/auth/identity yet.
+- No field validation yet (later on Store trait).
 
 ## Growth order
 
-1. Pure data layer + sqlite DDL wire (done)
-2. Engine-internal row + n2m lifecycle (done)
-3. Http path table from plan (minimal; no server protocol yet)
-4. Next needs product decisions (see session notes)
-3. Capability
-4. Identity
-5. Real estate scenarios
-
-No docker/postgres baseline in this repo for cold start. Db is an adapt port;
-sqlite is the first implementation surface.
+1. Pure data + sqlite DDL (done)
+2. Row + n2m lifecycle (done)
+3. Core face + axum + sidecar (current)
+4. HTTP details (pagination, query DSL, cache) — undecided
+5. Capability → identity → real estate scenarios
 
 ## Laws
 
 - Single word, block depth <= 4, path depth <= 4, comments denied by default.
-- Vocabulary deltas live in `docs/vocabulary.md`.
-- Boundary exemptions live in `negentropy.toml`.
+- Vocabulary deltas in `docs/vocabulary.md`.
+- Boundaries in `negentropy.toml`.
 
 ## Operating
 
 - Never commit on `main`; branch, then commit.
-- `runseal :guard` before land; `runseal :land` is the only landing path.
-- Operator flows are TypeScript under `.runseal/wrappers` only.
+- `runseal :guard` before land; `runseal :land` only landing path.
+- Operator flows: `.runseal/wrappers` TypeScript only.
 
 ## Directory map
 
 - `crates/keel/` — engine library
 - `crates/macro/` — proc macros
-- `docs/` — vocabulary and design notes
-- `.runseal/` — guard/init/land
-- `.forgejo/` — Actions
+- `crates/api/` — demo HTTP binary for sidecar
+- `sidecar.toml` — local process plan
+- `docs/` — vocabulary
+- `.runseal/` / `.forgejo/` — guard and CI
 
 ## Common commands
 
 ```sh
 runseal :init
 runseal :guard
-cargo test --workspace
-negentropy --strict .
+cargo run -p keel-api --locked
+sidecar start --config sidecar.toml
 ```
