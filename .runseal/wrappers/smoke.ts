@@ -106,6 +106,60 @@ try {
       throw new Error("expected ada");
     }
   });
+  let bobId = 0;
+  await check("POST /student bob", async () => {
+    const res = await fetch(`${base}/student`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        nickname: "bob",
+        avatar: "https://b.example/b",
+      }),
+    });
+    if (res.status !== 201) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    bobId = body.id;
+  });
+  await check("POST /query order limit", async () => {
+    const res = await fetch(`${base}/query`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        q: "from Student order by nickname desc limit 1",
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    if (!Array.isArray(body) || body.length !== 1) {
+      throw new Error("expected one ordered row");
+    }
+    if (body[0].nickname !== "bob") {
+      throw new Error("expected bob first by desc");
+    }
+  });
+  await check("POST /query after", async () => {
+    const res = await fetch(`${base}/query`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        q: `from Student order by nickname desc limit 1 after "${bobId}"`,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`status ${res.status}`);
+    }
+    const body = await res.json();
+    if (!Array.isArray(body) || body.length !== 1) {
+      throw new Error("expected one cursor row");
+    }
+    if (body[0].nickname !== "ada") {
+      throw new Error("expected ada after bob cursor");
+    }
+  });
   await check("no bond REST", async () => {
     const res = await fetch(`${base}/student/1/classes`);
     if (res.status !== 404) {
