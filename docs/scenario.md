@@ -34,13 +34,13 @@ Enrollment is pure n2m: live ties only (no grade / term on the edge).
 
 ## Gaps found (not fixed in this pass)
 
-| Gap | Impact | Notes |
-|-----|--------|-------|
-| No edge business fields | Cannot store grade / enrolled_at on the join | Need edge attrs or Enrollment unit later |
-| No reverse bond auto | "Who takes CS101?" needs student-side scan or an explicit reverse bond | Law: no reverse generation |
-| No edge `where` predicate | Cannot `from Student where courses has CS101` | Filter only after expand/scan |
-| Ended course still in ties | Soft-end Course does not cascade-cut ties | Live Class hydrate may miss ended targets; ties can point at non-live rows |
-| No capacity / unique enroll | Double enroll of same pair not rejected at engine | Policy later |
+| Gap | Impact | Direction |
+|-----|--------|-----------|
+| No edge business fields | No grade / term on enroll | **Settled: bond attrs** (`docs/bond.md`) |
+| No reverse bond auto | Roster needs scan or P1 filter | R0 for now; not auto reverse |
+| No edge `where` predicate | Cannot filter students by course | Open: P1/P2 in `docs/bond.md` |
+| Ended course still in ties | bond bag vs hydrate length skew | Open: K* in `docs/bond.md` |
+| Re-enroll after cut | UNIQUE(left,right) vs soft-cut | Open: U* in `docs/bond.md` |
 
 ### Cascading note
 

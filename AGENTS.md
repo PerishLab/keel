@@ -15,8 +15,8 @@ engine projections, not business authoring surfaces.
   from `keel.toml`. Filter/order/page/link only inside DSL.
 - **Sidecar**: `sidecar.toml` manages `keel-api` process; health should match
   `[listen]` in `keel.toml` (do not dual-author ports).
-- **Edge reads** (when implemented): always-pack `/query`; `link` → bond bags
-  only (H0); root-only order/page; law in `docs/edge.md`.
+- **Edge**: always-pack `/query`; `link` → bond bags (H0); root-only order/page
+  (`docs/edge.md`). Association business data = **bond attrs** (`docs/bond.md`).
 - No reverse relation generation. No capability/auth/identity yet.
 - No field validation yet (later on Store trait).
 

@@ -218,12 +218,14 @@ truncation is forbidden.
 | Response | **A** — always pack on `/query` |
 | Hydrate | **H0** — bond bags only; no target unit bag from `link` |
 | Cap seat | **C0** — engine constants; error on overflow |
+| Association data | **Bond attrs** on n2m join — see `docs/bond.md` |
 
-## Deferred (not blockers for first `link` land)
+## Open (see `docs/bond.md`)
 
-- Edge-as-predicate in `where` (exists / filter root by bond).
-- Explicit hydrate syntax (former H2) if product later wants targets in-pack.
-- `keel.toml` cap policy (former C1).
+- Macro grammar for bond fields; write/set on ties.
+- Edge `where` (P1/P2); end vs ties (K*); live-unique re-enroll (U*).
+- Reverse/roster remains R0 until shared-arc mirror is designed.
+
 ## Must not
 
 - Nested GraphQL-style response trees as the primary edge delivery.

@@ -80,4 +80,5 @@ so the shared meaning stays true.
 - `prefix` — HTTP api path prefix under listen.
 - `smoke` — L2 process verification of REST + /query.
 - `course` — classic student/course selection scenario gate (`:course`).
+- `bond` — also: n2m association may carry business field attrs on the join.
 - `verify` — cold-start verification boundary document.
