@@ -59,8 +59,13 @@ so the shared meaning stays true.
 - `store` — also the toml section naming where data lives (memory/file).
 - `kind` — store backend selector (`memory` | `file`).
 - `query` — text DSL entry for engine reads; also the `/query` HTTP route.
-- `ask` — parsed query intent (currently unit anchor + implicit live slice).
-- `parse` — turn query text into an ask.
+- `tree` — query AST (from + slice); execution only runs trees.
+- `slice` — time-slice primitive on a tree (currently only live).
+- `form` — build a tree for one unit without parsing text.
+- `ask` — run a tree on Core; also type alias for Tree.
+- `parse` — turn query text into a tree.
+- `run` — execute a tree against plan + store.
+- `digest` — normalized tree string for cache/identity later.
 - `prefix` — HTTP api path prefix under listen.
 - `smoke` — L2 process verification of REST + /query.
 - `verify` — cold-start verification boundary document.

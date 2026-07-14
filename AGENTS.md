@@ -22,8 +22,8 @@ engine projections, not business authoring surfaces.
 
 1. Pure data + sqlite DDL (done)
 2. Row + n2m lifecycle (done)
-3. Core face + axum + sidecar (current)
-4. HTTP details (pagination, query DSL, cache) — undecided
+3. Core face + axum + sidecar + verify (done)
+4. Query AST (`from` + live slice); grow primitives next
 5. Capability → identity → real estate scenarios
 
 ## Laws

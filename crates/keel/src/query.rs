@@ -1,19 +1,40 @@
 use crate::adapt::Error;
 use crate::ddl;
+use crate::life::Row;
 use crate::plan::Plan;
+use crate::store::Store;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Ask {
-    unit: String,
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum Slice {
+    Live,
 }
 
-impl Ask {
-    pub fn unit(&self) -> &str {
-        &self.unit
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Tree {
+    from: String,
+    slice: Slice,
+}
+
+impl Tree {
+    pub fn from(&self) -> &str {
+        &self.from
+    }
+
+    pub fn slice(&self) -> Slice {
+        self.slice
     }
 }
 
-pub fn parse(text: &str) -> Result<Ask, Error> {
+pub type Ask = Tree;
+
+pub fn form(unit: &str) -> Tree {
+    Tree {
+        from: unit.to_string(),
+        slice: Slice::Live,
+    }
+}
+
+pub fn parse(text: &str) -> Result<Tree, Error> {
     let text = text.trim();
     if text.is_empty() {
         return Err(Error::Adapt("empty query".into()));
@@ -31,9 +52,7 @@ pub fn parse(text: &str) -> Result<Ask, Error> {
     if parts.next().is_some() {
         return Err(Error::Adapt("query has trailing tokens".into()));
     }
-    Ok(Ask {
-        unit: unit.to_string(),
-    })
+    Ok(form(unit))
 }
 
 pub fn resolve(plan: &Plan, unit: &str) -> Result<String, Error> {
@@ -43,4 +62,18 @@ pub fn resolve(plan: &Plan, unit: &str) -> Result<String, Error> {
         .find(|node| ddl::table(node.name()) == want)
         .map(|node| node.name().to_string())
         .ok_or_else(|| Error::Missing(unit.into()))
+}
+
+pub fn run(plan: &Plan, store: &impl Store, tree: &Tree) -> Result<Vec<Row>, Error> {
+    let name = resolve(plan, tree.from())?;
+    match tree.slice() {
+        Slice::Live => store.live(plan, &name),
+    }
+}
+
+pub fn digest(tree: &Tree) -> String {
+    let unit = ddl::table(tree.from());
+    match tree.slice() {
+        Slice::Live => format!("from {unit} slice live"),
+    }
 }

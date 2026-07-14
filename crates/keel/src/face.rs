@@ -1,6 +1,7 @@
 use crate::adapt::Error;
 use crate::life::{Ends, Row, Tie};
 use crate::plan::Plan;
+use crate::query::{self, Tree};
 use crate::store::Store;
 use std::sync::Arc;
 
@@ -27,13 +28,16 @@ impl<S: Store> Core<S> {
     }
 
     pub fn live(&self, name: &str) -> Result<Vec<Row>, Error> {
-        self.query(&format!("from {name}"))
+        self.ask(&query::form(name))
     }
 
     pub fn query(&self, text: &str) -> Result<Vec<Row>, Error> {
-        let ask = crate::query::parse(text)?;
-        let name = crate::query::resolve(&self.plan, ask.unit())?;
-        self.store.live(&self.plan, &name)
+        let tree = query::parse(text)?;
+        self.ask(&tree)
+    }
+
+    pub fn ask(&self, tree: &Tree) -> Result<Vec<Row>, Error> {
+        query::run(&self.plan, &self.store, tree)
     }
 
     pub fn end(&self, name: &str, key: i64) -> Result<(), Error> {

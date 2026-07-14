@@ -48,8 +48,9 @@ fn main() {
 
 | Method | Meaning |
 |--------|---------|
-| `put` / `live` / `end` | resource rows; `live` = `query("from Unit")` sugar |
-| `query("from Unit")` | text DSL read (default live slice); more operators later |
+| `put` / `live` / `end` | resource rows; `live` builds AST then runs |
+| `query` / `ask` | text → AST → run; `ask` takes `Tree` directly |
+| AST | `from` + `slice: live` only for now; GraphQL-ish shape later |
 | `tie` / `ties` / `cut` | n2m edges (Core only for now; not default REST) |
 | `serve` / `listen` | axum (`http` feature) |
 
