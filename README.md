@@ -47,7 +47,15 @@ fn main() {
 
 `Sqlite::wire` opens an in-memory (or file) database and applies engine DDL:
 resource tables, n2m join tables, and reign columns (`id`, `expires_at`,
-`created_at`, `updated_at`). No business create/query API.
+`created_at`, `updated_at`).
+
+Engine-internal row lifecycle (adapt surface, not business API):
+
+- `put` — insert business cells; engine stamps created/updated, expires null
+- `live` — rows in the effective slice (`expires_at` null or in the future)
+- `end` — set `expires_at` to now (soft end via reign, not a business delete field)
+
+No business create/update/query/migration API.
 
 ## Shape
 

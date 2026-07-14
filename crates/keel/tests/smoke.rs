@@ -44,6 +44,54 @@ fn wire() {
 }
 
 #[test]
+fn life() {
+    let mut graph = Graph::new();
+    graph.plug::<Class>().plug::<Student>();
+    let db = keel::adapt::db::Sqlite::memory();
+    let core = bind(graph, keel::adapt::http::Utopia, &db).expect("bind");
+    let plan = core.plan();
+
+    let a = db
+        .put(
+            plan,
+            "Student",
+            &[("nickname", "ada"), ("avatar", "https://a.example/a")],
+        )
+        .expect("put a");
+    let b = db
+        .put(
+            plan,
+            "Student",
+            &[("nickname", "bob"), ("avatar", "https://b.example/b")],
+        )
+        .expect("put b");
+    assert_ne!(a, b);
+
+    let rows = db.live(plan, "Student").expect("live");
+    assert_eq!(rows.len(), 2);
+    assert!(rows.iter().all(|row| row.expires().is_none()));
+    assert!(rows.iter().all(|row| row.created() > 0));
+    assert_eq!(
+        rows.iter()
+            .find(|row| row.key() == a)
+            .expect("a")
+            .cells()
+            .get("nickname")
+            .map(String::as_str),
+        Some("ada")
+    );
+
+    db.end(plan, "Student", a).expect("end a");
+    let rows = db.live(plan, "Student").expect("live after end");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].key(), b);
+    assert_eq!(
+        rows[0].cells().get("nickname").map(String::as_str),
+        Some("bob")
+    );
+}
+
+#[test]
 fn miss() {
     #[resource]
     struct Lone {

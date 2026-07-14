@@ -1,5 +1,6 @@
 use crate::adapt::Error;
 use crate::ddl;
+use crate::life::{self, Row};
 use crate::plan::Plan;
 use rusqlite::Connection;
 use std::sync::Mutex;
@@ -59,6 +60,24 @@ impl Sqlite {
             out.push(row.map_err(sql)?);
         }
         Ok(out)
+    }
+
+    pub fn put(&self, plan: &Plan, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::put(conn, plan, name, fields)
+    }
+
+    pub fn live(&self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::live(conn, plan, name)
+    }
+
+    pub fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::end(conn, plan, name, key)
     }
 
     fn open(&self) -> Result<Connection, Error> {

@@ -3,12 +3,14 @@ pub mod atom;
 pub mod bond;
 pub mod ddl;
 pub mod graph;
+pub mod life;
 pub mod plan;
 pub mod spec;
 
 pub use atom::{string, url};
 pub use graph::Graph;
 pub use keel_macro::resource;
+pub use life::Row;
 pub use plan::Core;
 pub use spec::Resource;
 

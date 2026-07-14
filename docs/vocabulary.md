@@ -37,3 +37,9 @@ so the shared meaning stays true.
 - `form` — DDL for one resource unit table.
 - `arc` — DDL for one relation join table.
 - `stamp` — append reign control columns onto a DDL column list.
+- `life` — engine-internal row lifecycle (put / live / end).
+- `put` — engine insert of business cells with reign stamps.
+- `live` — rows in the effective time slice.
+- `end` — stamp expires_at to now; row leaves the live slice.
+- `row` — one engine-read record (key, cells, reign times).
+- `cell` — one business field value inside a row.
