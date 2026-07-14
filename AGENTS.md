@@ -40,6 +40,7 @@ relations only. The engine owns every control field and control capability.
 - `crates/keel/` — engine library
 - `crates/macro/` — proc macros
 - `docs/` — vocabulary and design notes
+- `docker-compose.yml` / `Dockerfile` — local postgres + tool image (official images)
 - `.runseal/` — guard/init/land
 - `.forgejo/` — Actions
 

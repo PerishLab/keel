@@ -29,3 +29,4 @@ so the shared meaning stays true.
 - `adapt` — adaptor port namespace (http, db).
 - `lift` — raise a graph or spec into the next engine form.
 - `link` — macro-side relation attribute parse.
+- `data` — local data-plane notes (`docs/data.md`) and compose postgres baseline.

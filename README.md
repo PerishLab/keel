@@ -51,6 +51,16 @@ fn main() {
 - `crates/macro` — `#[resource]` / `#[field]` / `#[relation]`
 - control plane (reign) is engine-only: expires, created, updated always applied in plan
 
+## Local postgres
+
+```sh
+docker compose up -d postgres
+# postgres://keel:keel@127.0.0.1:5432/keel
+```
+
+See `docs/data.md`. The db adapt still wires plans only; drivers and schema
+apply land after this baseline is up.
+
 ## Operating
 
 ```sh
