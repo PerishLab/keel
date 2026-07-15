@@ -132,10 +132,24 @@ fn select() {
     )
     .expect("re-enroll");
 
-    core.end("Course", db).expect("end db");
+    assert!(core.end("Course", db).is_err());
+
     let pack = core
         .query(r#"from Student where no = "S01" link courses"#)
-        .expect("k1");
+        .expect("linked");
+    let re = pack
+        .bond("student.courses")
+        .expect("ties")
+        .iter()
+        .find(|t| t.right() == db)
+        .expect("db tie")
+        .key();
+    core.cut("Student", "courses", re).expect("drop re");
+    core.end("Course", db).expect("end db");
+
+    let pack = core
+        .query(r#"from Student where no = "S01" link courses"#)
+        .expect("after end");
     assert_eq!(pack.bond("student.courses").expect("ties").len(), 1);
     assert_eq!(pack.bond("student.courses").expect("ties")[0].right(), algo);
 

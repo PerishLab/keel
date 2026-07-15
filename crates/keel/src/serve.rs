@@ -327,6 +327,14 @@ impl From<Error> for Fault {
                 status: StatusCode::NOT_FOUND,
                 note,
             },
+            Error::Adapt(note) if note.starts_with("missing tie") => Self {
+                status: StatusCode::NOT_FOUND,
+                note,
+            },
+            Error::Adapt(note) if note.starts_with("live ties remain") => Self {
+                status: StatusCode::CONFLICT,
+                note,
+            },
             Error::Adapt(note) => Self {
                 status: StatusCode::BAD_REQUEST,
                 note,

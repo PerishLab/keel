@@ -189,13 +189,37 @@ try {
     }
   });
 
-  await check("end net course", async () => {
-    const res = await fetch(`${base}/course/${netId}`, { method: "DELETE" });
-    if (res.status !== 204) {
-      throw new Error(`status ${res.status}`);
+  await check("end net blocked then ok", async () => {
+    const blocked = await fetch(`${base}/course/${netId}`, {
+      method: "DELETE",
+    });
+    if (blocked.status !== 409) {
+      throw new Error(`expected 409, got ${blocked.status}`);
     }
-    const pack = await query("from Course order by code");
-    if (packRows(pack, "course").length !== 2) {
+    const pack = await query(
+      `from Student where id = "${adaId}" link courses`,
+    );
+    const netTie = bondBag(pack, "student.courses").find(
+      (t) => num(t.right) === netId,
+    );
+    if (!netTie) {
+      throw new Error("missing net tie");
+    }
+    const cut = await fetch(
+      `${base}/student/${adaId}/courses/${num(netTie.id)}`,
+      { method: "DELETE" },
+    );
+    if (cut.status !== 204) {
+      throw new Error(`cut status ${cut.status}`);
+    }
+    const ended = await fetch(`${base}/course/${netId}`, {
+      method: "DELETE",
+    });
+    if (ended.status !== 204) {
+      throw new Error(`end status ${ended.status}`);
+    }
+    const courses = await query("from Course order by code");
+    if (packRows(courses, "course").length !== 2) {
       throw new Error("expected 2 live courses");
     }
   });

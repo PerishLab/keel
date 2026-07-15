@@ -153,6 +153,9 @@ impl<'a> Work<'a> {
 
     pub fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error> {
         let unit = find(plan, name)?;
+        if self.live_refs(plan, unit.name(), key)? {
+            return Err(Error::Adapt("live ties remain".into()));
+        }
         let tick = now();
         let text = format!(
             "UPDATE {} SET {} = ?1, {} = ?1 WHERE {} = ?2",
@@ -166,6 +169,31 @@ impl<'a> Work<'a> {
             return Err(Error::Adapt(format!("missing row {key}")));
         }
         Ok(())
+    }
+
+    fn live_refs(&self, plan: &Plan, target: &str, key: i64) -> Result<bool, Error> {
+        let tick = now();
+        let want = target.to_string();
+        for unit in plan.units().values() {
+            for edge in unit.bonds() {
+                if edge.target() != want {
+                    continue;
+                }
+                let right = ddl::side(edge.target());
+                let text = format!(
+                    "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
+                    ddl::join(unit.name(), edge.name()),
+                    right,
+                    ddl::EXPIRES,
+                    ddl::EXPIRES
+                );
+                let mut stmt = self.conn.prepare(&text).map_err(fail)?;
+                if stmt.exists(params![key, tick]).map_err(fail)? {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
     }
 
     pub fn set(

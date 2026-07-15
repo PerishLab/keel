@@ -39,7 +39,7 @@ Enrollment is pure n2m: live ties only (no grade / term on the edge).
 | No edge business fields | No grade / term on enroll | **Settled: bond attrs** (`docs/bond.md`) |
 | No reverse bond auto | Roster needs scan or P1 filter | R0 for now; not auto reverse |
 | No edge `where` predicate | Cannot filter students by course | Open: P1/P2 in `docs/bond.md` |
-| Ended course still in ties | bond bag vs hydrate length skew | Open: K* in `docs/bond.md` |
+| Ended course with live ties | must cut then end (409) | **K3** + **K1** in `docs/bond.md` |
 | Re-enroll after cut | UNIQUE(left,right) vs soft-cut | Open: U* in `docs/bond.md` |
 
 ### Cascading note
