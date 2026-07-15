@@ -153,7 +153,7 @@ impl<'a> Work<'a> {
 
     pub fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error> {
         let unit = find(plan, name)?;
-        if self.live_refs(plan, unit.name(), key)? {
+        if self.live_in(plan, unit.name(), key)? || self.live_out(unit, key)? {
             return Err(Error::Adapt("live ties remain".into()));
         }
         let tick = now();
@@ -171,12 +171,11 @@ impl<'a> Work<'a> {
         Ok(())
     }
 
-    fn live_refs(&self, plan: &Plan, target: &str, key: i64) -> Result<bool, Error> {
+    fn live_in(&self, plan: &Plan, target: &str, key: i64) -> Result<bool, Error> {
         let tick = now();
-        let want = target.to_string();
         for unit in plan.units().values() {
             for edge in unit.bonds() {
-                if edge.target() != want {
+                if edge.target() != target {
                     continue;
                 }
                 let right = ddl::side(edge.target());
@@ -191,6 +190,25 @@ impl<'a> Work<'a> {
                 if stmt.exists(params![key, tick]).map_err(fail)? {
                     return Ok(true);
                 }
+            }
+        }
+        Ok(false)
+    }
+
+    fn live_out(&self, unit: &Unit, key: i64) -> Result<bool, Error> {
+        let tick = now();
+        for edge in unit.bonds() {
+            let left = ddl::side(unit.name());
+            let text = format!(
+                "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
+                ddl::join(unit.name(), edge.name()),
+                left,
+                ddl::EXPIRES,
+                ddl::EXPIRES
+            );
+            let mut stmt = self.conn.prepare(&text).map_err(fail)?;
+            if stmt.exists(params![key, tick]).map_err(fail)? {
+                return Ok(true);
             }
         }
         Ok(false)
@@ -254,6 +272,12 @@ impl<'a> Work<'a> {
             return Err(Error::Adapt("bond is not n2m".into()));
         }
         bond_part(edge, fields)?;
+        if !self.live_has(plan, unit.name(), ends.left)? {
+            return Err(Error::Adapt("left not live".into()));
+        }
+        if !self.live_has(plan, edge.target(), ends.right)? {
+            return Err(Error::Adapt("right not live".into()));
+        }
         if self.live_pair(plan, owner, bond, ends.left, ends.right)? {
             return Err(Error::Adapt("live pair exists".into()));
         }
@@ -310,6 +334,13 @@ impl<'a> Work<'a> {
         if fields.is_empty() {
             return Err(Error::Adapt("empty set".into()));
         }
+        let ends = self.tie_ends(plan, owner, bond, key)?;
+        if !self.live_has(plan, unit.name(), ends.left)? {
+            return Err(Error::Adapt("left not live".into()));
+        }
+        if !self.live_has(plan, edge.target(), ends.right)? {
+            return Err(Error::Adapt("right not live".into()));
+        }
         let tick = now();
         let mut text = format!("UPDATE {} SET ", ddl::join(unit.name(), edge.name()));
         let mut vals: Vec<rusqlite::types::Value> = Vec::new();
@@ -344,6 +375,32 @@ impl<'a> Work<'a> {
             return Err(Error::Adapt(format!("missing tie {key}")));
         }
         Ok(())
+    }
+
+    fn tie_ends(&self, plan: &Plan, owner: &str, bond: &str, key: i64) -> Result<Ends, Error> {
+        let (unit, edge) = edge(plan, owner, bond)?;
+        let tick = now();
+        let src = ddl::side(unit.name());
+        let dst = ddl::side(edge.target());
+        let text = format!(
+            "SELECT {}, {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2)",
+            src,
+            dst,
+            ddl::join(unit.name(), edge.name()),
+            ddl::KEY,
+            ddl::EXPIRES,
+            ddl::EXPIRES
+        );
+        let mut stmt = self.conn.prepare(&text).map_err(fail)?;
+        let mut rows = stmt.query(params![key, tick]).map_err(fail)?;
+        let row = rows
+            .next()
+            .map_err(fail)?
+            .ok_or_else(|| Error::Adapt(format!("missing tie {key}")))?;
+        Ok(Ends {
+            left: row.get(0).map_err(fail)?,
+            right: row.get(1).map_err(fail)?,
+        })
     }
 
     pub fn ties(&self, plan: &Plan, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {

@@ -335,6 +335,14 @@ impl From<Error> for Fault {
                 status: StatusCode::CONFLICT,
                 note,
             },
+            Error::Adapt(note) if note.starts_with("left not live") => Self {
+                status: StatusCode::BAD_REQUEST,
+                note,
+            },
+            Error::Adapt(note) if note.starts_with("right not live") => Self {
+                status: StatusCode::BAD_REQUEST,
+                note,
+            },
             Error::Adapt(note) => Self {
                 status: StatusCode::BAD_REQUEST,
                 note,

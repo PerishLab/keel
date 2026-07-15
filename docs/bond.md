@@ -86,7 +86,7 @@ Empty attrs on a field-less bond: body may be only `{ "right" }`.
 | M1 | **M1b** — `#[relation(Course, n2m, grade = string)]` |
 | W1 | **W1b** — attrs on `tie`; `set_tie` + HTTP PATCH on tie |
 | D3 | **P1+P2** — `has` + `some (field op val)` on bond or target |
-| D4 | **K1+K3** — link hides dead targets; `end` rejects while live ties remain |
+| D4 | **K1+K3** — link hides dead targets; `end` rejects while live ties remain (in **or** out) |
 | D5 | **U1** — no DDL UNIQUE; engine rejects second live pair |
 | D2 | **R0** — no reverse; roster via P1 / scan |
 
@@ -104,10 +104,16 @@ from Student where courses some (id = "3")
 
 ### K3 surface
 
-`end` on a unit fails with `live ties remain` when any live n2m row still
-points at it as **right**. Cut those ties first, then end. HTTP maps this to
-**409 Conflict**. Outbound ties from the ended unit are not checked. K1 remains
-for read filtering.
+`end` on a unit fails with `live ties remain` when any live n2m still references
+it as **right (inbound)** or **left (outbound)**. Cut those ties first, then
+end. HTTP maps this to **409 Conflict**. K1 remains for read filtering.
+
+### Live ends on tie (A)
+
+`tie` and `set_tie` require both endpoints live:
+
+- `left not live` / `right not live` (HTTP **400**)
+- aligns write path with K1 (no new edges to retired rows)
 
 ### Deferred
 

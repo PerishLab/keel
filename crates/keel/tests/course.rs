@@ -156,4 +156,32 @@ fn select() {
     let pack = core.query("from Course").expect("live courses");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(pack.rows()[0].key(), algo);
+
+    assert!(
+        core.tie(
+            "Student",
+            "courses",
+            Ends {
+                left: ada,
+                right: db,
+            },
+            &[("grade", "X")],
+        )
+        .is_err()
+    );
+    assert!(core.end("Student", ada).is_err());
+    assert!(core.end("Course", algo).is_err());
+    let pack = core
+        .query(r#"from Student where no = "S01" link courses"#)
+        .expect("last");
+    let last = pack.bond("student.courses").expect("ties")[0].key();
+    core.cut("Student", "courses", last).expect("cut last");
+    assert!(core.end("Course", algo).is_err());
+    let pack = core
+        .query(r#"from Student where no = "S02" link courses"#)
+        .expect("bob ties");
+    let bob_tie = pack.bond("student.courses").expect("ties")[0].key();
+    core.cut("Student", "courses", bob_tie).expect("cut bob");
+    core.end("Course", algo).expect("end algo");
+    core.end("Student", ada).expect("end ada");
 }
