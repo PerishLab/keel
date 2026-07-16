@@ -350,3 +350,43 @@ fn descend() {
         .expect("close");
     assert_eq!(core.of(bob).live("Issue").expect("live").len(), 0);
 }
+
+#[test]
+fn confine() {
+    let mut graph = Graph::new();
+    graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
+    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let sudo = core.sudo();
+    let ada = sudo.put("Actor", &[("login", "ada")]).expect("ada");
+    let bob = sudo.put("Actor", &[("login", "bob")]).expect("bob");
+    sudo.put(
+        "@grant",
+        &[
+            ("who", "all"),
+            ("verb", "put"),
+            ("unit", "Repo"),
+            ("scope", r#"pred visibility = "public""#),
+        ],
+    )
+    .expect("seed");
+    let open = sudo
+        .put(
+            "Repo",
+            &[
+                ("name", "open"),
+                ("visibility", "public"),
+                ("owner", &ada.to_string()),
+            ],
+        )
+        .expect("open");
+
+    let out = core.of(bob).put(
+        "Issue",
+        &[
+            ("title", "x"),
+            ("repo", &open.to_string()),
+            ("author", &bob.to_string()),
+        ],
+    );
+    assert!(out.is_err());
+}

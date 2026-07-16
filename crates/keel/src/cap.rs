@@ -183,6 +183,9 @@ fn held<S: Store>(
         if anchor == unit {
             return Ok(pred_hit(unit, pred, who, mark));
         }
+        if verb != "see" {
+            return Ok(false);
+        }
         return descend(plan, store, place, &anchor, pred, who, chain);
     }
     Ok(false)

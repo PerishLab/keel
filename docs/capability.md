@@ -152,12 +152,15 @@ suffices.
 - Read-path visibility never needs path predicates; the chain walk is
   engine-internal. Pred scopes with a `many2one` hop remain legal only in
   **write** position (one hop).
-- **Pred scopes cover the subtree** (C-16): a pred grant on a unit covers
-  every descendant whose root chain passes through a row matching the pred
-  — evaluated against that ancestor row. `see Repo pred visibility =
-  "public"` thus makes every issue, comment, and pull of a public repo
-  visible, and retracts the moment the repo turns private. Symmetric with
-  row-scope subtree coverage; closes the public-content visibility gap.
+- **Pred scopes cover the subtree for `see` only** (C-16): a `see` pred
+  grant covers every descendant whose root chain passes through a row
+  matching the pred — evaluated against that ancestor row. `see Repo pred
+  visibility = "public"` thus makes every issue, comment, and pull of a
+  public repo visible, and retracts the moment the repo turns private.
+  **Write verbs never inherit pred coverage down the subtree** — a broad
+  create-pred (e.g. `put Actor pred kind = "org"`) must not become
+  write-anywhere; subtree writes require a row-scope grant (mint). Pred
+  scopes still cover writes when the pred matches the row itself.
 
 ## Check semantics
 
@@ -239,7 +242,7 @@ different unit with its own root chain. No field-level grants, ever.
 | C-12 | Visibility boundary = unit boundary |
 | C-14 | Mint to creator; identity-unit anon put mints to row |
 | C-15 | Uniform check across all six verbs, `put` included |
-| C-16 | Pred scopes cover the subtree via the matching ancestor row |
+| C-16 | `see` pred scopes cover the subtree via the matching ancestor; write preds never descend |
 | C-D | `gate` default credential package: caller space, enumerable grant authority, possession only at identity birth |
 
 ## Open

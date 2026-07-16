@@ -238,3 +238,4 @@ so the shared meaning stays true.
 - pred-subtree (C-16) — a pred grant flows down the root chain; `held` evaluates it against the matching ancestor row.
 - `bar` — gate suspension hook (`Gate::bar(field)`): refuses to resolve an operator whose identity row has the named bool field set true (settled gate law).
 - `resolve` / `barred` — gate: credential→id, then suspension check.
+- C-16 refinement — pred-subtree covers  only; write verbs never descend a pred (no broad-create write escalation).
