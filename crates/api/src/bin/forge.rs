@@ -19,7 +19,7 @@ struct Repo {
     name: string,
     #[field(string)]
     visibility: string,
-    #[relation(Actor, many2one)]
+    #[relation(Actor, many2one, root)]
     owner: Actor,
 }
 
@@ -31,7 +31,7 @@ struct Issue {
     index: int,
     #[field(bool)]
     closed: bool,
-    #[relation(Repo, many2one)]
+    #[relation(Repo, many2one, root)]
     repo: Repo,
     #[relation(Actor, many2one)]
     author: Actor,

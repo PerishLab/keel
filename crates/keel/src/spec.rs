@@ -35,6 +35,7 @@ pub struct Bond {
     target: String,
     fields: Vec<Field>,
     need: bool,
+    root: bool,
 }
 
 pub struct Builder {
@@ -103,6 +104,10 @@ impl Bond {
     pub fn need(&self) -> bool {
         self.need
     }
+
+    pub fn root(&self) -> bool {
+        self.root
+    }
 }
 
 impl Builder {
@@ -158,7 +163,7 @@ impl Builder {
         target: impl Into<String>,
         fields: &[(&str, atom::Kind)],
     ) -> Self {
-        self.join(name, kind, target, fields, true)
+        self.join(name, kind, target, fields, true, false)
     }
 
     pub fn free(
@@ -167,7 +172,16 @@ impl Builder {
         kind: bond::Kind,
         target: impl Into<String>,
     ) -> Self {
-        self.join(name, kind, target, &[], false)
+        self.join(name, kind, target, &[], false, false)
+    }
+
+    pub fn root(
+        self,
+        name: impl Into<String>,
+        kind: bond::Kind,
+        target: impl Into<String>,
+    ) -> Self {
+        self.join(name, kind, target, &[], true, true)
     }
 
     fn join(
@@ -177,6 +191,7 @@ impl Builder {
         target: impl Into<String>,
         fields: &[(&str, atom::Kind)],
         need: bool,
+        root: bool,
     ) -> Self {
         let fields = fields
             .iter()
@@ -193,6 +208,7 @@ impl Builder {
             target: target.into(),
             fields,
             need,
+            root,
         });
         self
     }

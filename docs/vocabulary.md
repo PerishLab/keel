@@ -126,3 +126,5 @@ so the shared meaning stays true.
   alone (`docs/edge.md`). Tree flag named `tally`.
 - `forge` — flagship scenario binary + `:forge` gate; one act per spec
   stage (`docs/spec.md`).
+- `root` — relation marker (C-M2): the one `many2one` that carries the
+  unit's root chain; at most one per unit; always required.

@@ -142,8 +142,9 @@ walked upward until it reaches the identity unit. A grant on a row covers the ro
 **and its entire subtree**. Checks walk the chain up; any covering grant
 suffices.
 
-- Chain designation is per-unit and total: one owning `many2one` per unit
-  (or none, making the row its own root). Grammar open (C-M2).
+- Chain designation (C-M2 settled): the bare `root` marker on one
+  `many2one` — `#[relation(Repo, many2one, root)]`. At most one per unit;
+  none makes the row its own root; `root` implies required (never `opt`).
 - Subtree coverage is what keeps policy quantified: authority is granted at
   the root (an org, a repo), never choreographed per descendant row.
 - Read-path visibility never needs path predicates; the chain walk is
@@ -211,6 +212,7 @@ different unit with its own root chain. No field-level grants, ever.
 | C-G | Genesis: super admin token, unique window, pre-identity, journaled |
 | C-L | Lockout: recoverable via window; guardrail courtesy, not law |
 | C-1 | Root chain + subtree grants |
+| C-M2 | Chain designation: bare `root` marker on one `many2one`; ≤1 per unit; implies required |
 | C-2 | `@me` — sole context variable in pred scopes |
 | C-3 | Write scopes: postcondition on `put`, pre+post on `set` |
 | C-4 | Attenuation; no deny; no amplification |
@@ -230,7 +232,6 @@ different unit with its own root chain. No field-level grants, ever.
 | Id | Question |
 |----|----------|
 | C-M1 | Membership-bond designation grammar for group operators |
-| C-M2 | Root-chain designation grammar on `#[relation]` |
 | C-9 | `batch`: composite multi-verb atomicity (org+team+member+grant) |
 | C-P | Injection cost; materialized root column as known mitigation |
 

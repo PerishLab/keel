@@ -13,7 +13,7 @@ struct Author {
 struct Post {
     #[field(string)]
     title: string,
-    #[relation(Author, many2one)]
+    #[relation(Author, many2one, root)]
     author: Author,
     #[relation(Author, many2one, opt)]
     editor: Author,

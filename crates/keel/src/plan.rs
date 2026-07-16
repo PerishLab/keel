@@ -32,6 +32,7 @@ pub struct Edge {
     target: String,
     fields: Vec<Slot>,
     need: bool,
+    root: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -92,8 +93,18 @@ impl Unit {
                     })
                     .collect(),
                 need: bond.need(),
+                root: bond.root(),
             })
             .collect();
+        let roots = bonds.iter().filter(|e| e.root).count();
+        if roots > 1 {
+            return Err(crate::adapt::Error::Adapt("unit has two roots".into()));
+        }
+        if bonds.iter().any(|e| e.root && !(e.kind.point() && e.need)) {
+            return Err(crate::adapt::Error::Adapt(
+                "root must be a required ref".into(),
+            ));
+        }
         for slot in &fields {
             let scope = match slot.only() {
                 Only::Per(scope) => Some(scope.as_str()),
@@ -127,6 +138,10 @@ impl Unit {
 
     pub fn bonds(&self) -> &[Edge] {
         &self.bonds
+    }
+
+    pub fn root(&self) -> Option<&Edge> {
+        self.bonds.iter().find(|e| e.root)
     }
 
     pub fn reign(&self) -> &Reign {
@@ -171,6 +186,10 @@ impl Edge {
 
     pub fn need(&self) -> bool {
         self.need
+    }
+
+    pub fn root(&self) -> bool {
+        self.root
     }
 }
 
