@@ -170,5 +170,5 @@ so the shared meaning stays true.
   mini-genesis), login (svc put Session + lease TTL), logout (operator end).
 - `bearer` / `crumb` — authorization token / session cookie readers.
 - `deny` — gate fault mapping (401/403/404/400).
-- `make` / `gear` — macro-only files excluded from the negentropy scan
-  (scanner cannot parse macro_rules regions; debt: unexclude when it can).
+- `make` / `gear` — macro-only files; scan excludes retired at negentropy
+  v0.4.0 (macro items parse; templates under law).

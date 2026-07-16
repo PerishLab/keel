@@ -5,8 +5,6 @@ include = [
 ]
 exclude = [
   "**/target/**",
-  "crates/gate/src/make.rs",
-  "crates/api/src/bin/forge/gear.rs",
 ]
 
 [module]
