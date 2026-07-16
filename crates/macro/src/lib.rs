@@ -182,11 +182,11 @@ fn rest(attr: &Attribute) -> syn::Result<Punctuated<Expr, Token![,]>> {
 }
 
 fn shape(attr: &Attribute, kind: &Ident, slots: &[(String, Ident)], need: bool) -> syn::Result<()> {
-    if kind == "Many2one" && !slots.is_empty() {
-        return Err(syn::Error::new_spanned(attr, "many2one takes no fields"));
+    if kind != "Many2many" && !slots.is_empty() {
+        return Err(syn::Error::new_spanned(attr, "only many2many takes fields"));
     }
     if kind == "Many2many" && !need {
-        return Err(syn::Error::new_spanned(attr, "opt is many2one only"));
+        return Err(syn::Error::new_spanned(attr, "opt is for single refs only"));
     }
     Ok(())
 }
@@ -208,6 +208,7 @@ fn card_of(card: &Ident) -> syn::Result<Ident> {
     match card.to_string().as_str() {
         "many2many" => Ok(Ident::new("Many2many", card.span())),
         "many2one" => Ok(Ident::new("Many2one", card.span())),
+        "one2one" => Ok(Ident::new("One2one", card.span())),
         other => Err(syn::Error::new(
             card.span(),
             format!("unknown relation kind: {other}"),

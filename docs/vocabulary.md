@@ -101,3 +101,7 @@ so the shared meaning stays true.
 - `known` — field name is a slot or a ref of the unit.
 - `entry` — resolve one set column to storage column + casted value.
 - `free` — spec builder: declare an `opt` relation (need = false).
+- `one2one` — relation kind: many2one plus live-unique on the ref column;
+  second live holder rejected (`live ref exists`, 409).
+- `lone` — engine check: no other live row holds this one2one target.
+- `point` — also: Kind method, true for single-target kinds (many2one/one2one).

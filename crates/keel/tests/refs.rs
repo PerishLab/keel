@@ -19,6 +19,14 @@ struct Post {
     editor: Author,
 }
 
+#[resource]
+struct Card {
+    #[field(string)]
+    label: string,
+    #[relation(Author, one2one)]
+    owner: Author,
+}
+
 #[test]
 fn point() {
     let mut graph = Graph::new();
@@ -73,4 +81,35 @@ fn point() {
         core.tie("Post", "author", keel::Ends { left: 1, right: 1 }, &[])
             .is_err()
     );
+}
+
+#[test]
+fn lone() {
+    let mut graph = Graph::new();
+    graph.plug::<Author>().plug::<Card>();
+    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let ada = core.put("Author", &[("name", "ada")]).expect("ada");
+    let bob = core.put("Author", &[("name", "bob")]).expect("bob");
+
+    let one = core
+        .put("Card", &[("label", "gold"), ("owner", &ada.to_string())])
+        .expect("one");
+    assert!(
+        core.put("Card", &[("label", "dup"), ("owner", &ada.to_string())])
+            .is_err()
+    );
+    let two = core
+        .put("Card", &[("label", "iron"), ("owner", &bob.to_string())])
+        .expect("two");
+
+    assert!(
+        core.set("Card", two, &[("owner", &ada.to_string())])
+            .is_err()
+    );
+    core.set("Card", two, &[("owner", &bob.to_string())])
+        .expect("same owner ok");
+
+    core.end("Card", one).expect("end one");
+    core.set("Card", two, &[("owner", &ada.to_string())])
+        .expect("freed after end");
 }

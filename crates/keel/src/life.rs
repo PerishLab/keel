@@ -147,7 +147,7 @@ impl<'a> Work<'a> {
         }
         for edge in refs(unit) {
             let hit = pluck(fields, edge.name());
-            vals.push(self.point(plan, edge, hit)?);
+            vals.push(self.point(plan, unit, edge, hit, None)?);
         }
         vals.push(rusqlite::types::Value::Null);
         vals.push(rusqlite::types::Value::Integer(tick));
@@ -160,8 +160,10 @@ impl<'a> Work<'a> {
     fn point(
         &self,
         plan: &Plan,
+        unit: &Unit,
         edge: &Edge,
         value: &str,
+        myself: Option<i64>,
     ) -> Result<rusqlite::types::Value, Error> {
         if value.is_empty() {
             if edge.need() {
@@ -175,7 +177,30 @@ impl<'a> Work<'a> {
         if !self.live_has(plan, edge.target(), key)? {
             return Err(Error::Adapt("right not live".into()));
         }
+        if edge.kind() == bond::Kind::One2one {
+            self.lone(unit, edge, key, myself)?;
+        }
         Ok(rusqlite::types::Value::Integer(key))
+    }
+
+    fn lone(&self, unit: &Unit, edge: &Edge, key: i64, myself: Option<i64>) -> Result<(), Error> {
+        let tick = now();
+        let text = format!(
+            "SELECT 1 FROM {} WHERE {} = ?1 AND {} != ?2 AND ({} IS NULL OR {} > ?3) LIMIT 1",
+            ddl::table(unit.name()),
+            ddl::side(edge.name()),
+            ddl::KEY,
+            ddl::EXPIRES,
+            ddl::EXPIRES
+        );
+        let mut stmt = self.conn.prepare(&text).map_err(fail)?;
+        let taken = stmt
+            .exists(params![key, myself.unwrap_or(0), tick])
+            .map_err(fail)?;
+        if taken {
+            return Err(Error::Adapt("live ref exists".into()));
+        }
+        Ok(())
     }
 
     fn entry(
@@ -184,9 +209,11 @@ impl<'a> Work<'a> {
         unit: &Unit,
         col: &str,
         val: &str,
+        myself: i64,
     ) -> Result<(String, rusqlite::types::Value), Error> {
         if let Some(edge) = refs(unit).find(|e| e.name() == col) {
-            return Ok((ddl::side(edge.name()), self.point(plan, edge, val)?));
+            let cell = self.point(plan, unit, edge, val, Some(myself))?;
+            return Ok((ddl::side(edge.name()), cell));
         }
         Ok((col.to_string(), fit(unit.fields(), col, val)?))
     }
@@ -246,12 +273,13 @@ impl<'a> Work<'a> {
 
     fn live_from(&self, unit: &Unit, edge: &Edge, key: i64) -> Result<bool, Error> {
         let tick = now();
-        let (place, col) = match edge.kind() {
-            bond::Kind::Many2many => (
+        let (place, col) = if edge.kind().point() {
+            (ddl::table(unit.name()), ddl::side(edge.name()))
+        } else {
+            (
                 ddl::join(unit.name(), edge.name()),
                 ddl::side(edge.target()),
-            ),
-            bond::Kind::Many2one => (ddl::table(unit.name()), ddl::side(edge.name())),
+            )
         };
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
@@ -302,7 +330,7 @@ impl<'a> Work<'a> {
             if i > 0 {
                 text.push_str(", ");
             }
-            let (name, cell) = self.entry(plan, unit, col, val)?;
+            let (name, cell) = self.entry(plan, unit, col, val, key)?;
             text.push_str(&name);
             text.push_str(" = ?");
             text.push_str(&(i + 1).to_string());
@@ -605,9 +633,7 @@ fn edge<'a>(plan: &'a Plan, owner: &str, bond: &str) -> Result<(&'a Unit, &'a Ed
 }
 
 fn refs(unit: &Unit) -> impl Iterator<Item = &crate::plan::Edge> {
-    unit.bonds()
-        .iter()
-        .filter(|edge| edge.kind() == bond::Kind::Many2one)
+    unit.bonds().iter().filter(|edge| edge.kind().point())
 }
 
 fn pluck<'a>(fields: &[(&'a str, &'a str)], name: &str) -> &'a str {

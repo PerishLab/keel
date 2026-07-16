@@ -608,7 +608,7 @@ fn slot(unit: &crate::plan::Unit, field: &str) -> Result<atom::Kind, Error> {
     let point = unit
         .bonds()
         .iter()
-        .any(|e| e.kind() == crate::bond::Kind::Many2one && e.name() == field);
+        .any(|e| e.kind().point() && e.name() == field);
     if point {
         return Ok(atom::Kind::Int);
     }

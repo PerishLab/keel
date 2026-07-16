@@ -41,7 +41,7 @@ fn form(node: &Unit) -> String {
         cols.push(format!("{} {} NOT NULL", slot.name(), cast(slot.kind())));
     }
     for edge in node.bonds() {
-        if edge.kind() == bond::Kind::Many2one {
+        if edge.kind().point() {
             let null = if edge.need() { " NOT NULL" } else { "" };
             cols.push(format!("{} INTEGER{}", side(edge.name()), null));
         }
