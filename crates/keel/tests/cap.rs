@@ -280,5 +280,73 @@ fn cover() {
 
     assert_eq!(her.live("Issue").expect("live").len(), 2);
     assert_eq!(him.live("Issue").expect("live").len(), 2);
-    assert_eq!(core.anon().live("Issue").expect("live").len(), 0);
+    assert_eq!(core.anon().live("Issue").expect("live").len(), 2);
+}
+
+#[test]
+fn descend() {
+    let mut graph = Graph::new();
+    graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
+    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let sudo = core.sudo();
+    let ada = sudo.put("Actor", &[("login", "ada")]).expect("ada");
+    let bob = sudo.put("Actor", &[("login", "bob")]).expect("bob");
+    sudo.put(
+        "@grant",
+        &[
+            ("who", "all"),
+            ("verb", "see"),
+            ("unit", "Repo"),
+            ("scope", r#"pred visibility = "public""#),
+        ],
+    )
+    .expect("seed");
+
+    let shut = sudo
+        .put(
+            "Repo",
+            &[
+                ("name", "shut"),
+                ("visibility", "private"),
+                ("owner", &ada.to_string()),
+            ],
+        )
+        .expect("shut");
+    let open = sudo
+        .put(
+            "Repo",
+            &[
+                ("name", "open"),
+                ("visibility", "public"),
+                ("owner", &ada.to_string()),
+            ],
+        )
+        .expect("open");
+    sudo.put(
+        "Issue",
+        &[
+            ("title", "hidden"),
+            ("repo", &shut.to_string()),
+            ("author", &ada.to_string()),
+        ],
+    )
+    .expect("hidden");
+    let shown = sudo
+        .put(
+            "Issue",
+            &[
+                ("title", "shown"),
+                ("repo", &open.to_string()),
+                ("author", &ada.to_string()),
+            ],
+        )
+        .expect("shown");
+
+    let seen = core.of(bob).live("Issue").expect("live");
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0].key(), shown);
+
+    sudo.set("Repo", open, &[("visibility", "private")])
+        .expect("close");
+    assert_eq!(core.of(bob).live("Issue").expect("live").len(), 0);
 }

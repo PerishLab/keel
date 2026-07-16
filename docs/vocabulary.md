@@ -235,3 +235,4 @@ so the shared meaning stays true.
   gated put + presigned PUT url), `fetch` (GET /asset/{id}: gated see +
   302 to presigned GET url). `object` keys by asset id.
 - `like` — query op: case-insensitive substring on a text field (issue search).
+- pred-subtree (C-16) — a pred grant flows down the root chain; `held` evaluates it against the matching ancestor row.

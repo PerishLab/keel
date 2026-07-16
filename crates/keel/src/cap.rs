@@ -179,10 +179,39 @@ fn held<S: Store>(
         return Ok(chain.iter().any(|(u, k)| *u == anchor && *k == id));
     }
     if let Some(pred) = span.strip_prefix("pred ") {
-        if ddl::table(place) != unit {
-            return Ok(false);
+        let anchor = ddl::table(place);
+        if anchor == unit {
+            return Ok(pred_hit(unit, pred, who, mark));
         }
-        return Ok(pred_hit(unit, pred, who, mark));
+        return descend(plan, store, place, &anchor, pred, who, chain);
+    }
+    Ok(false)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn descend<S: Store>(
+    plan: &Plan,
+    store: &S,
+    place: &str,
+    anchor: &str,
+    pred: &str,
+    who: Who,
+    chain: &[(String, i64)],
+) -> Result<bool, Error> {
+    for (up, id) in chain {
+        if up != anchor {
+            continue;
+        }
+        let Some(row) = store.one(plan, place, *id)? else {
+            continue;
+        };
+        let seat = Mark {
+            key: Some(*id),
+            cells: row.cells(),
+        };
+        if pred_hit(anchor, pred, who, &seat) {
+            return Ok(true);
+        }
     }
     Ok(false)
 }
