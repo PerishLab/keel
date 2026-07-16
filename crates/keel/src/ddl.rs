@@ -32,6 +32,13 @@ pub fn joint(owner: &str, bond: &str) -> String {
     col(&join(owner, bond))
 }
 
+pub fn mate(owner: &str, bond: &str, target: &str) -> String {
+    if table(owner) == table(target) {
+        return side(bond);
+    }
+    side(target)
+}
+
 pub fn script(plan: &Plan) -> Vec<String> {
     let mut out = Vec::new();
     out.push("PRAGMA foreign_keys = ON;".into());
@@ -102,7 +109,7 @@ fn arc(node: &Unit, bond: &str, target: &str) -> String {
         .find(|edge| edge.name() == bond)
         .expect("bond");
     let left = col(&side(node.name()));
-    let right = col(&side(target));
+    let right = col(&mate(node.name(), bond, target));
     let mut cols = vec![
         format!("{KEY} INTEGER PRIMARY KEY NOT NULL"),
         format!("{left} INTEGER NOT NULL"),

@@ -182,8 +182,8 @@ so the shared meaning stays true.
 - `craft`/`shift`/`fell`/`knot`/`bend`/`snip` — who-attributed core verb
   bodies (put/set/end+lease/tie/set_tie/cut) shared by Core (sudo) and
   Face (operator); `lane` names a bond event path.
-- self-referential many2many — KNOWN GAP: join table collides both sides
-  as `{table}_id`; verify F6 was wrong for m2m; fix seat pending.
+- `mate` — right join column: `{target}_id`, or `{bond}_id` when the bond
+  is self-referential (fixes the `{table}_id` collision; F6 verified).
 - `heard` / `caught` — delivery-time coverage on flow: live targets check
   normally; dead targets (end, cut ties) need all-scope see (T-M4 v1).
 - `keel-relay` — the default webhook package crate (caller space):

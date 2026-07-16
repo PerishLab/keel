@@ -7,6 +7,8 @@ use keel::{Cell, Graph, bind};
 struct Author {
     #[field(string)]
     name: string,
+    #[relation(Author, many2many)]
+    follows: Author,
 }
 
 #[resource]
@@ -112,4 +114,40 @@ fn lone() {
     core.end("Card", one).expect("end one");
     core.set("Card", two, &[("owner", &ada.to_string())])
         .expect("freed after end");
+}
+
+#[test]
+fn mirror() {
+    let mut graph = Graph::new();
+    graph.plug::<Author>().plug::<Post>().plug::<Card>();
+    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let ada = core.put("Author", &[("name", "ada")]).expect("ada");
+    let bob = core.put("Author", &[("name", "bob")]).expect("bob");
+
+    let tie = core
+        .tie(
+            "Author",
+            "follows",
+            keel::Ends {
+                left: ada,
+                right: bob,
+            },
+            &[],
+        )
+        .expect("self tie");
+    let ties = core.ties("Author", "follows", ada).expect("ties");
+    assert_eq!(ties.len(), 1);
+    assert_eq!(ties[0].left(), ada);
+    assert_eq!(ties[0].right(), bob);
+
+    let pack = core
+        .query(&format!(r#"from Author where follows has "{bob}""#))
+        .expect("has");
+    assert_eq!(pack.rows().len(), 1);
+    assert_eq!(pack.rows()[0].key(), ada);
+
+    assert!(core.end("Author", bob).is_err());
+    assert!(core.end("Author", ada).is_err());
+    core.cut("Author", "follows", tie).expect("cut");
+    core.end("Author", bob).expect("end bob");
 }

@@ -462,7 +462,7 @@ impl<'a> Work<'a> {
         } else {
             (
                 ddl::joint(unit.name(), edge.name()),
-                ddl::col(&ddl::side(edge.target())),
+                ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target())),
             )
         };
         let text = format!(
@@ -579,7 +579,7 @@ impl<'a> Work<'a> {
         }
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
-        let dst = ddl::col(&ddl::side(edge.target()));
+        let dst = ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target()));
         let mut cols = vec![src, dst];
         for slot in edge.fields() {
             cols.push(ddl::col(slot.name()));
@@ -677,7 +677,7 @@ impl<'a> Work<'a> {
         let (unit, edge) = edge(plan, owner, bond)?;
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
-        let dst = ddl::col(&ddl::side(edge.target()));
+        let dst = ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target()));
         let text = format!(
             "SELECT {}, {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2)",
             src,
@@ -703,7 +703,7 @@ impl<'a> Work<'a> {
         let (unit, edge) = edge(plan, owner, bond)?;
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
-        let dst = ddl::col(&ddl::side(edge.target()));
+        let dst = ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target()));
         let mut cols = vec![
             ddl::KEY.to_string(),
             src,
@@ -776,7 +776,7 @@ impl<'a> Work<'a> {
         let (unit, edge) = edge(plan, owner, bond)?;
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
-        let dst = ddl::col(&ddl::side(edge.target()));
+        let dst = ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target()));
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} = ?2 AND ({} IS NULL OR {} > ?3) LIMIT 1",
             ddl::joint(unit.name(), edge.name()),
