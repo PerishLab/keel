@@ -5,6 +5,7 @@ include = [
 ]
 exclude = [
   "**/target/**",
+  "crates/blob/src/make.rs",
 ]
 
 [module]

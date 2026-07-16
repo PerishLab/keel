@@ -228,3 +228,9 @@ so the shared meaning stays true.
 - `pg` — the Postgres store (`adapt::pg`, `pg` feature): second Wire impl,
   proving store portability. `dollar`/`lift`/`lean`/`own` bridge Val <-> pg.
 - `grain` — ddl dialect (`Lite` | `Pg`): key column, int type, header.
+- `keel-blob` — the default object package (caller space): `blob!(Actor)`
+  ships an `Asset` metadata unit; upload/download are capability-gated
+  presigned S3 URLs. **Bytes never touch keel** — not even in transit.
+- `vault` / `shelf` — blob state + route merge. `stow` (POST /asset:
+  gated put + presigned PUT url), `fetch` (GET /asset/{id}: gated see +
+  302 to presigned GET url). `object` keys by asset id.
