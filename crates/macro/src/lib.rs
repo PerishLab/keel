@@ -84,8 +84,11 @@ fn one(
     let label = ident.to_string();
     let ty = &field.ty;
     let mark = quote! { #ty };
-    if let Some((atom, only)) = atom(&field.attrs)? {
-        let row = grow(&label, &atom, &only);
+    if let Some(made) = atom(&field.attrs)? {
+        let row = match made {
+            Made::Atom(atom, only) => grow(&label, &atom, &only),
+            Made::Serial(scope) => quote! { .serial(#label, #scope) },
+        };
         return Ok((mark, Some(row), None));
     }
     if let Some((card, target, slots, need)) = link(&field.attrs, &field.ty)? {
@@ -115,6 +118,11 @@ enum Only {
     Per(String),
 }
 
+enum Made {
+    Atom(Ident, Only),
+    Serial(String),
+}
+
 fn grow(label: &str, atom: &Ident, only: &Only) -> proc_macro2::TokenStream {
     match only {
         Only::Free => quote! { .field(#label, ::keel::atom::Kind::#atom) },
@@ -123,7 +131,7 @@ fn grow(label: &str, atom: &Ident, only: &Only) -> proc_macro2::TokenStream {
     }
 }
 
-fn atom(attrs: &[Attribute]) -> syn::Result<Option<(Ident, Only)>> {
+fn atom(attrs: &[Attribute]) -> syn::Result<Option<Made>> {
     for attr in attrs {
         if !attr.path().is_ident("field") {
             continue;
@@ -132,14 +140,31 @@ fn atom(attrs: &[Attribute]) -> syn::Result<Option<(Ident, Only)>> {
         if items.is_empty() {
             return Err(syn::Error::new_spanned(attr, "field takes one atom"));
         }
-        let kind = kind_of(&expr_ident(&items[0])?)?;
+        let first = expr_ident(&items[0])?;
+        if first == "serial" {
+            return Ok(Some(Made::Serial(tally(attr, &items)?)));
+        }
+        let kind = kind_of(&first)?;
         let mut only = Only::Free;
         for item in items.iter().skip(1) {
             only = only_of(attr, item)?;
         }
-        return Ok(Some((kind, only)));
+        return Ok(Some(Made::Atom(kind, only)));
     }
     Ok(None)
+}
+
+fn tally(attr: &Attribute, items: &Punctuated<Expr, Token![,]>) -> syn::Result<String> {
+    if items.len() != 2 {
+        return Err(syn::Error::new_spanned(attr, "serial needs scope = rel"));
+    }
+    let Expr::Assign(ExprAssign { left, right, .. }) = &items[1] else {
+        return Err(syn::Error::new_spanned(attr, "serial needs scope = rel"));
+    };
+    if expr_ident(left)? != "scope" {
+        return Err(syn::Error::new_spanned(attr, "serial needs scope = rel"));
+    }
+    Ok(expr_ident(right)?.to_string())
 }
 
 fn told(attr: &Attribute) -> syn::Result<Punctuated<Expr, Token![,]>> {

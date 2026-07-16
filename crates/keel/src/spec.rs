@@ -25,6 +25,7 @@ pub struct Field {
     name: String,
     kind: atom::Kind,
     only: Only,
+    serial: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -76,6 +77,10 @@ impl Field {
     pub fn only(&self) -> &Only {
         &self.only
     }
+
+    pub fn serial(&self) -> Option<&str> {
+        self.serial.as_deref()
+    }
 }
 
 impl Bond {
@@ -106,6 +111,7 @@ impl Builder {
             name: name.into(),
             kind,
             only: Only::Free,
+            serial: None,
         });
         self
     }
@@ -115,6 +121,7 @@ impl Builder {
             name: name.into(),
             kind,
             only: Only::All,
+            serial: None,
         });
         self
     }
@@ -129,6 +136,17 @@ impl Builder {
             name: name.into(),
             kind,
             only: Only::Per(scope.into()),
+            serial: None,
+        });
+        self
+    }
+
+    pub fn serial(mut self, name: impl Into<String>, scope: impl Into<String>) -> Self {
+        self.fields.push(Field {
+            name: name.into(),
+            kind: atom::Kind::Int,
+            only: Only::Free,
+            serial: Some(scope.into()),
         });
         self
     }
@@ -166,6 +184,7 @@ impl Builder {
                 name: (*n).to_string(),
                 kind: *k,
                 only: Only::Free,
+                serial: None,
             })
             .collect();
         self.bonds.push(Bond {

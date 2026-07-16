@@ -22,6 +22,7 @@ pub struct Slot {
     name: String,
     kind: atom::Kind,
     only: Only,
+    serial: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -70,6 +71,7 @@ impl Unit {
                 name: field.name().to_string(),
                 kind: field.kind(),
                 only: field.only().clone(),
+                serial: field.serial().map(str::to_string),
             })
             .collect();
         let bonds: Vec<Edge> = spec
@@ -86,19 +88,25 @@ impl Unit {
                         name: field.name().to_string(),
                         kind: field.kind(),
                         only: Only::Free,
+                        serial: None,
                     })
                     .collect(),
                 need: bond.need(),
             })
             .collect();
         for slot in &fields {
-            if let Only::Per(scope) = slot.only() {
-                let held = bonds.iter().any(|e| e.kind().point() && e.name() == *scope);
-                if !held {
-                    return Err(crate::adapt::Error::Adapt(format!(
-                        "unique scope {scope} is not a ref"
-                    )));
-                }
+            let scope = match slot.only() {
+                Only::Per(scope) => Some(scope.as_str()),
+                _ => slot.serial.as_deref(),
+            };
+            let Some(scope) = scope else {
+                continue;
+            };
+            let held = bonds.iter().any(|e| e.kind().point() && e.name() == scope);
+            if !held {
+                return Err(crate::adapt::Error::Adapt(format!(
+                    "unique scope {scope} is not a ref"
+                )));
             }
         }
         Ok(Self {
@@ -137,6 +145,10 @@ impl Slot {
 
     pub fn only(&self) -> &Only {
         &self.only
+    }
+
+    pub fn serial(&self) -> Option<&str> {
+        self.serial.as_deref()
     }
 }
 

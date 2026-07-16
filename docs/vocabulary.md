@@ -115,3 +115,10 @@ so the shared meaning stays true.
 - `lock` — DDL second lock: partial unique index over live rows.
 - `peek` — read one live row by key (engine-internal).
 - `seek` — find one caller field value by name, `None` when absent.
+- `serial` — engine-allocated per-scope monotonic int (`#[field(serial,
+  scope = rel)]`); caller writes rejected; never reused (U5).
+- `next` — allocate the next serial value inside the serialized write step.
+- `tally` — macro parse of the serial field form.
+- `col` / `seat` / `joint` — ddl: quoted SQL identifiers for business
+  columns, unit tables, join tables; single-word fields may collide with
+  SQL keywords (`index`, `order`), so generated SQL always quotes.

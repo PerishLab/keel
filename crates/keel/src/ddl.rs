@@ -20,6 +20,18 @@ pub fn side(name: &str) -> String {
     format!("{}_id", table(name))
 }
 
+pub fn col(name: &str) -> String {
+    format!("\"{name}\"")
+}
+
+pub fn seat(name: &str) -> String {
+    col(&table(name))
+}
+
+pub fn joint(owner: &str, bond: &str) -> String {
+    col(&join(owner, bond))
+}
+
 pub fn script(plan: &Plan) -> Vec<String> {
     let mut out = Vec::new();
     out.push("PRAGMA foreign_keys = ON;".into());
@@ -35,7 +47,7 @@ pub fn script(plan: &Plan) -> Vec<String> {
     }
     for node in plan.units().values() {
         for slot in node.fields() {
-            if *slot.only() != Only::Free {
+            if *slot.only() != Only::Free || slot.serial().is_some() {
                 out.push(lock(node, slot));
             }
         }
@@ -45,31 +57,40 @@ pub fn script(plan: &Plan) -> Vec<String> {
 
 fn lock(node: &Unit, slot: &Slot) -> String {
     let place = table(node.name());
-    let cols = match slot.only() {
-        Only::Per(rel) => format!("{}, {}", side(rel), slot.name()),
-        _ => slot.name().to_string(),
+    let scope = match slot.only() {
+        Only::Per(rel) => Some(rel.as_str()),
+        _ => slot.serial(),
+    };
+    let cols = match scope {
+        Some(rel) => format!("{}, {}", col(&side(rel)), col(slot.name())),
+        None => col(slot.name()),
     };
     format!(
-        "CREATE UNIQUE INDEX IF NOT EXISTS only_{place}_{} ON {place} ({cols}) WHERE {EXPIRES} IS NULL;",
-        slot.name()
+        "CREATE UNIQUE INDEX IF NOT EXISTS only_{place}_{} ON {} ({cols}) WHERE {EXPIRES} IS NULL;",
+        slot.name(),
+        col(&place)
     )
 }
 
 fn form(node: &Unit) -> String {
     let mut cols = vec![format!("{KEY} INTEGER PRIMARY KEY NOT NULL")];
     for slot in node.fields() {
-        cols.push(format!("{} {} NOT NULL", slot.name(), cast(slot.kind())));
+        cols.push(format!(
+            "{} {} NOT NULL",
+            col(slot.name()),
+            cast(slot.kind())
+        ));
     }
     for edge in node.bonds() {
         if edge.kind().point() {
             let null = if edge.need() { " NOT NULL" } else { "" };
-            cols.push(format!("{} INTEGER{}", side(edge.name()), null));
+            cols.push(format!("{} INTEGER{}", col(&side(edge.name())), null));
         }
     }
     stamp(node.reign(), &mut cols);
     format!(
         "CREATE TABLE IF NOT EXISTS {} ({});",
-        table(node.name()),
+        seat(node.name()),
         cols.join(", ")
     )
 }
@@ -80,20 +101,24 @@ fn arc(node: &Unit, bond: &str, target: &str) -> String {
         .iter()
         .find(|edge| edge.name() == bond)
         .expect("bond");
-    let left = side(node.name());
-    let right = side(target);
+    let left = col(&side(node.name()));
+    let right = col(&side(target));
     let mut cols = vec![
         format!("{KEY} INTEGER PRIMARY KEY NOT NULL"),
         format!("{left} INTEGER NOT NULL"),
         format!("{right} INTEGER NOT NULL"),
     ];
     for slot in edge.fields() {
-        cols.push(format!("{} {} NOT NULL", slot.name(), cast(slot.kind())));
+        cols.push(format!(
+            "{} {} NOT NULL",
+            col(slot.name()),
+            cast(slot.kind())
+        ));
     }
     stamp(node.reign(), &mut cols);
     format!(
         "CREATE TABLE IF NOT EXISTS {} ({});",
-        join(node.name(), bond),
+        joint(node.name(), bond),
         cols.join(", ")
     )
 }

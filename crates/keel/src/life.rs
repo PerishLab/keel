@@ -123,9 +123,9 @@ impl<'a> Work<'a> {
         let unit = find(plan, name)?;
         check(unit, fields)?;
         let tick = now();
-        let mut cols: Vec<String> = unit.fields().iter().map(|s| s.name().to_string()).collect();
+        let mut cols: Vec<String> = unit.fields().iter().map(|s| ddl::col(s.name())).collect();
         for edge in refs(unit) {
-            cols.push(ddl::side(edge.name()));
+            cols.push(ddl::col(&ddl::side(edge.name())));
         }
         cols.push(ddl::EXPIRES.into());
         cols.push(ddl::CREATED.into());
@@ -136,13 +136,17 @@ impl<'a> Work<'a> {
             .join(", ");
         let text = format!(
             "INSERT INTO {} ({}) VALUES ({})",
-            ddl::table(unit.name()),
+            ddl::seat(unit.name()),
             cols.join(", "),
             marks
         );
         let mut stmt = self.conn.prepare(&text).map_err(fail)?;
         let mut vals: Vec<rusqlite::types::Value> = Vec::new();
         for slot in unit.fields() {
+            if let Some(scope) = slot.serial() {
+                vals.push(self.next(unit, slot, scope, fields)?);
+                continue;
+            }
             let hit = pluck(fields, slot.name());
             vals.push(bind(slot, hit)?);
         }
@@ -187,8 +191,8 @@ impl<'a> Work<'a> {
         let me = myself.map(|(key, _)| key).unwrap_or(0);
         let mut text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} != ?2 AND ({} IS NULL OR {} > ?3)",
-            ddl::table(unit.name()),
-            slot.name(),
+            ddl::seat(unit.name()),
+            ddl::col(slot.name()),
             ddl::KEY,
             ddl::EXPIRES,
             ddl::EXPIRES
@@ -199,7 +203,7 @@ impl<'a> Work<'a> {
             rusqlite::types::Value::Integer(now()),
         ];
         if let Only::Per(rel) = slot.only() {
-            let col = ddl::side(rel);
+            let col = ddl::col(&ddl::side(rel));
             text.push_str(&format!(
                 " AND ({col} = ?4 OR (?4 IS NULL AND {col} IS NULL))"
             ));
@@ -242,12 +246,33 @@ impl<'a> Work<'a> {
         Ok(rusqlite::types::Value::Integer(key))
     }
 
+    fn next(
+        &self,
+        unit: &Unit,
+        slot: &Slot,
+        scope: &str,
+        fields: &[(&str, &str)],
+    ) -> Result<rusqlite::types::Value, Error> {
+        let col = ddl::col(&ddl::side(scope));
+        let text = format!(
+            "SELECT COALESCE(MAX({}), 0) + 1 FROM {} WHERE {col} = ?1 OR (?1 IS NULL AND {col} IS NULL)",
+            ddl::col(slot.name()),
+            ddl::seat(unit.name())
+        );
+        let mut stmt = self.conn.prepare(&text).map_err(fail)?;
+        let hold = anchor(fields, None, scope)?;
+        let key: i64 = stmt
+            .query_row(rusqlite::params![hold], |row| row.get(0))
+            .map_err(fail)?;
+        Ok(rusqlite::types::Value::Integer(key))
+    }
+
     fn lone(&self, unit: &Unit, edge: &Edge, key: i64, myself: Option<i64>) -> Result<(), Error> {
         let tick = now();
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} != ?2 AND ({} IS NULL OR {} > ?3) LIMIT 1",
-            ddl::table(unit.name()),
-            ddl::side(edge.name()),
+            ddl::seat(unit.name()),
+            ddl::col(&ddl::side(edge.name())),
             ddl::KEY,
             ddl::EXPIRES,
             ddl::EXPIRES
@@ -281,7 +306,7 @@ impl<'a> Work<'a> {
         let tick = now();
         let text = format!(
             "SELECT * FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2)",
-            ddl::table(unit.name()),
+            ddl::seat(unit.name()),
             ddl::KEY,
             ddl::EXPIRES,
             ddl::EXPIRES
@@ -299,7 +324,7 @@ impl<'a> Work<'a> {
         let tick = now();
         let text = format!(
             "SELECT * FROM {} WHERE {} IS NULL OR {} > ?1 ORDER BY {}",
-            ddl::table(unit.name()),
+            ddl::seat(unit.name()),
             ddl::EXPIRES,
             ddl::EXPIRES,
             ddl::KEY
@@ -321,7 +346,7 @@ impl<'a> Work<'a> {
         let tick = now();
         let text = format!(
             "UPDATE {} SET {} = ?1, {} = ?1 WHERE {} = ?2",
-            ddl::table(unit.name()),
+            ddl::seat(unit.name()),
             ddl::EXPIRES,
             ddl::UPDATED,
             ddl::KEY
@@ -350,11 +375,11 @@ impl<'a> Work<'a> {
     fn live_from(&self, unit: &Unit, edge: &Edge, key: i64) -> Result<bool, Error> {
         let tick = now();
         let (place, col) = if edge.kind().point() {
-            (ddl::table(unit.name()), ddl::side(edge.name()))
+            (ddl::seat(unit.name()), ddl::col(&ddl::side(edge.name())))
         } else {
             (
-                ddl::join(unit.name(), edge.name()),
-                ddl::side(edge.target()),
+                ddl::joint(unit.name(), edge.name()),
+                ddl::col(&ddl::side(edge.target())),
             )
         };
         let text = format!(
@@ -374,10 +399,10 @@ impl<'a> Work<'a> {
             if edge.kind() != bond::Kind::Many2many {
                 continue;
             }
-            let left = ddl::side(unit.name());
+            let left = ddl::col(&ddl::side(unit.name()));
             let text = format!(
                 "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
-                ddl::join(unit.name(), edge.name()),
+                ddl::joint(unit.name(), edge.name()),
                 left,
                 ddl::EXPIRES,
                 ddl::EXPIRES
@@ -402,14 +427,14 @@ impl<'a> Work<'a> {
         let base = self.peek(unit, key)?;
         self.solid(unit, fields, Some((key, &base)))?;
         let tick = now();
-        let mut text = format!("UPDATE {} SET ", ddl::table(unit.name()));
+        let mut text = format!("UPDATE {} SET ", ddl::seat(unit.name()));
         let mut vals: Vec<rusqlite::types::Value> = Vec::new();
         for (i, (col, val)) in fields.iter().enumerate() {
             if i > 0 {
                 text.push_str(", ");
             }
             let (name, cell) = self.entry(plan, unit, col, val, key)?;
-            text.push_str(&name);
+            text.push_str(&ddl::col(&name));
             text.push_str(" = ?");
             text.push_str(&(i + 1).to_string());
             vals.push(cell);
@@ -458,11 +483,11 @@ impl<'a> Work<'a> {
             return Err(Error::Adapt("live pair exists".into()));
         }
         let tick = now();
-        let src = ddl::side(unit.name());
-        let dst = ddl::side(edge.target());
+        let src = ddl::col(&ddl::side(unit.name()));
+        let dst = ddl::col(&ddl::side(edge.target()));
         let mut cols = vec![src, dst];
         for slot in edge.fields() {
-            cols.push(slot.name().to_string());
+            cols.push(ddl::col(slot.name()));
         }
         cols.push(ddl::EXPIRES.to_string());
         cols.push(ddl::CREATED.to_string());
@@ -473,7 +498,7 @@ impl<'a> Work<'a> {
             .join(", ");
         let text = format!(
             "INSERT INTO {} ({}) VALUES ({})",
-            ddl::join(unit.name(), edge.name()),
+            ddl::joint(unit.name(), edge.name()),
             cols.join(", "),
             marks
         );
@@ -518,13 +543,13 @@ impl<'a> Work<'a> {
             return Err(Error::Adapt("right not live".into()));
         }
         let tick = now();
-        let mut text = format!("UPDATE {} SET ", ddl::join(unit.name(), edge.name()));
+        let mut text = format!("UPDATE {} SET ", ddl::joint(unit.name(), edge.name()));
         let mut vals: Vec<rusqlite::types::Value> = Vec::new();
         for (i, (col, val)) in fields.iter().enumerate() {
             if i > 0 {
                 text.push_str(", ");
             }
-            text.push_str(col);
+            text.push_str(&ddl::col(col));
             text.push_str(" = ?");
             text.push_str(&(i + 1).to_string());
             vals.push(fit(edge.fields(), col, val)?);
@@ -556,13 +581,13 @@ impl<'a> Work<'a> {
     fn tie_ends(&self, plan: &Plan, owner: &str, bond: &str, key: i64) -> Result<Ends, Error> {
         let (unit, edge) = edge(plan, owner, bond)?;
         let tick = now();
-        let src = ddl::side(unit.name());
-        let dst = ddl::side(edge.target());
+        let src = ddl::col(&ddl::side(unit.name()));
+        let dst = ddl::col(&ddl::side(edge.target()));
         let text = format!(
             "SELECT {}, {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2)",
             src,
             dst,
-            ddl::join(unit.name(), edge.name()),
+            ddl::joint(unit.name(), edge.name()),
             ddl::KEY,
             ddl::EXPIRES,
             ddl::EXPIRES
@@ -582,8 +607,8 @@ impl<'a> Work<'a> {
     pub fn ties(&self, plan: &Plan, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
         let (unit, edge) = edge(plan, owner, bond)?;
         let tick = now();
-        let src = ddl::side(unit.name());
-        let dst = ddl::side(edge.target());
+        let src = ddl::col(&ddl::side(unit.name()));
+        let dst = ddl::col(&ddl::side(edge.target()));
         let mut cols = vec![
             ddl::KEY.to_string(),
             src,
@@ -593,13 +618,13 @@ impl<'a> Work<'a> {
             ddl::UPDATED.to_string(),
         ];
         for slot in edge.fields() {
-            cols.push(slot.name().to_string());
+            cols.push(ddl::col(slot.name()));
         }
         let text = format!(
             "SELECT {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) ORDER BY {}",
             cols.join(", "),
-            ddl::join(unit.name(), edge.name()),
-            ddl::side(unit.name()),
+            ddl::joint(unit.name(), edge.name()),
+            ddl::col(&ddl::side(unit.name())),
             ddl::EXPIRES,
             ddl::EXPIRES,
             ddl::KEY
@@ -618,7 +643,7 @@ impl<'a> Work<'a> {
         let tick = now();
         let text = format!(
             "UPDATE {} SET {} = ?1, {} = ?1 WHERE {} = ?2",
-            ddl::join(unit.name(), edge.name()),
+            ddl::joint(unit.name(), edge.name()),
             ddl::EXPIRES,
             ddl::UPDATED,
             ddl::KEY
@@ -635,7 +660,7 @@ impl<'a> Work<'a> {
         let tick = now();
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
-            ddl::table(unit.name()),
+            ddl::seat(unit.name()),
             ddl::KEY,
             ddl::EXPIRES,
             ddl::EXPIRES
@@ -655,11 +680,11 @@ impl<'a> Work<'a> {
     ) -> Result<bool, Error> {
         let (unit, edge) = edge(plan, owner, bond)?;
         let tick = now();
-        let src = ddl::side(unit.name());
-        let dst = ddl::side(edge.target());
+        let src = ddl::col(&ddl::side(unit.name()));
+        let dst = ddl::col(&ddl::side(edge.target()));
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} = ?2 AND ({} IS NULL OR {} > ?3) LIMIT 1",
-            ddl::join(unit.name(), edge.name()),
+            ddl::joint(unit.name(), edge.name()),
             src,
             dst,
             ddl::EXPIRES,
@@ -766,6 +791,12 @@ fn known(unit: &Unit, name: &str) -> bool {
 
 fn check(unit: &Unit, fields: &[(&str, &str)]) -> Result<(), Error> {
     for slot in unit.fields() {
+        if slot.serial().is_some() {
+            if seek(fields, slot.name()).is_some() {
+                return Err(Error::Adapt(format!("serial field {}", slot.name())));
+            }
+            continue;
+        }
         if !fields.iter().any(|(k, _)| *k == slot.name()) {
             return Err(Error::Adapt(format!("missing field {}", slot.name())));
         }
@@ -785,6 +816,13 @@ fn part(unit: &Unit, fields: &[(&str, &str)]) -> Result<(), Error> {
     for (k, _) in fields {
         if *k == ddl::KEY || *k == ddl::EXPIRES || *k == ddl::CREATED || *k == ddl::UPDATED {
             return Err(Error::Adapt(format!("control field {k}")));
+        }
+        let held = unit
+            .fields()
+            .iter()
+            .any(|s| s.name() == *k && s.serial().is_some());
+        if held {
+            return Err(Error::Adapt(format!("serial field {k}")));
         }
         if !known(unit, k) {
             return Err(Error::Adapt(format!("unknown field {k}")));
