@@ -317,6 +317,20 @@ impl<S: Store> Core<S> {
         cap::sealed(&self.plan, &self.store, token)
     }
 
+    pub fn batch<T>(&self, run: impl FnOnce(&Self) -> Result<T, Error>) -> Result<T, Error> {
+        self.store.begin()?;
+        match run(self) {
+            Ok(value) => {
+                self.store.commit()?;
+                Ok(value)
+            }
+            Err(err) => {
+                let _ = self.store.undo();
+                Err(err)
+            }
+        }
+    }
+
     pub fn share(self) -> Arc<Self> {
         Arc::new(self)
     }
@@ -800,6 +814,20 @@ impl<S: Store> Face<'_, S> {
             "see",
             &ddl::table(&unit),
         )
+    }
+
+    pub fn batch<T>(&self, run: impl FnOnce(&Self) -> Result<T, Error>) -> Result<T, Error> {
+        self.core.store().begin()?;
+        match run(self) {
+            Ok(value) => {
+                self.core.store().commit()?;
+                Ok(value)
+            }
+            Err(err) => {
+                let _ = self.core.store().undo();
+                Err(err)
+            }
+        }
     }
 
     fn grip(&self, unit: &str, bond: &str, key: i64) -> Result<Tie, Error> {

@@ -31,6 +31,12 @@ impl Sqlite {
         }
     }
 
+    fn step(&self, word: &str) -> Result<(), Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        conn.execute_batch(word).map_err(sql)
+    }
+
     fn open(&self) -> Result<Connection, Error> {
         match &self.place {
             Place::Memory => Connection::open_in_memory().map_err(sql),
@@ -171,6 +177,18 @@ impl Store for Sqlite {
             out.push(row.map_err(sql)?);
         }
         Ok(out)
+    }
+
+    fn begin(&self) -> Result<(), Error> {
+        self.step("BEGIN")
+    }
+
+    fn commit(&self) -> Result<(), Error> {
+        self.step("COMMIT")
+    }
+
+    fn undo(&self) -> Result<(), Error> {
+        self.step("ROLLBACK")
     }
 }
 

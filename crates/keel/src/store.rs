@@ -11,6 +11,9 @@ pub trait Store: Send + Sync {
     fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error>;
     fn lease(&self, plan: &Plan, name: &str, key: i64, at: i64) -> Result<(), Error>;
     fn pulse(&self, plan: &Plan, verb: &str, unit: &str, key: i64, who: &str) -> Result<(), Error>;
+    fn begin(&self) -> Result<(), Error>;
+    fn commit(&self) -> Result<(), Error>;
+    fn undo(&self) -> Result<(), Error>;
     fn tie(
         &self,
         plan: &Plan,

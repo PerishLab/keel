@@ -213,3 +213,9 @@ so the shared meaning stays true.
 - `whole` — validate a grant `who` value (id / group / anon / all).
 - `cast` — spec builder: which marker a bond carries (Bond/Free/Root/Crew).
 - `scopes` — macro parse of a unique scope, single ref or a ref tuple (U4).
+- `batch` — Core/Face verb: run a closure of writes as one transaction;
+  all-or-nothing, intra-batch visibility, pulse inside the txn
+  (`docs/txn.md`).
+- `begin` / `commit` / `undo` — store transaction primitives; SQLite txn
+  state lives on the connection, so per-call locking still shares it.
+- `step` — run one transaction control word on the connection.

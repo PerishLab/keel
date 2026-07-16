@@ -41,6 +41,7 @@ done when its scenario is green; no stage begins against unlanded law.
 - Trigger: `docs/trigger.md` (thin events, observe-only, relay).
 - Unique: `docs/unique.md` (serialized write path; live-unique; serial).
 - Cache: `docs/cache.md` (invisible; under coverage; generations+horizon).
+- Transaction: `docs/txn.md` (commit point per verb; batch all-or-nothing).
 - Lease: `docs/lease.md` (end with an instant; no resurrection; L3 edges).
 
 ## Operating
