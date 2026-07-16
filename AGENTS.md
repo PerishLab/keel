@@ -17,7 +17,11 @@ engine projections, not business authoring surfaces.
   `[listen]` in `keel.toml` (do not dual-author ports).
 - **Edge**: always-pack `/query`; `link` → bond bags (H0); root-only order/page
   (`docs/edge.md`). Bond attrs + `has` + live-unique + K1 (`docs/bond.md`).
-- No reverse relation generation. No capability/auth/identity yet.
+- **Capability**: law settled in `docs/capability.md` (bootstrap `@grant`,
+  operator injection, root chain, gate package); implementation pending.
+- **Trigger**: law settled in `docs/trigger.md` (third projection, thin
+  post-commit events, relay package); implementation pending.
+- No reverse relation generation.
 - No field validation yet (later on Store trait).
 
 ## Growth order
@@ -26,7 +30,9 @@ engine projections, not business authoring surfaces.
 2. Row + n2m lifecycle (done)
 3. Core face + axum + sidecar + verify (done)
 4. Query AST + pack + `link` H0 (done); more edge later under `docs/edge.md`
-5. Capability → identity → real estate scenarios
+5. Capability skeleton per `docs/capability.md` (operator face, `@grant`,
+   root chain) → gate → trigger adaptor per `docs/trigger.md` → real
+   estate scenarios
 
 ## Laws
 
@@ -34,6 +40,8 @@ engine projections, not business authoring surfaces.
 - Vocabulary deltas in `docs/vocabulary.md`.
 - Boundaries in `negentropy.toml`.
 - Edge navigation: `docs/edge.md` (flat bags; root-only order/page).
+- Capability: `docs/capability.md` (six verbs, `@grant`, operator, gate).
+- Trigger: `docs/trigger.md` (thin events, observe-only, relay).
 
 ## Operating
 
@@ -48,7 +56,7 @@ engine projections, not business authoring surfaces.
 - `crates/api/` — demo HTTP binary for sidecar
 - `keel.toml` — runtime policy (listen/store)
 - `sidecar.toml` — local process plan
-- `docs/` — vocabulary, verify, edge law
+- `docs/` — vocabulary, verify, edge, capability, trigger laws
 - `.runseal/` / `.forgejo/` — guard and CI
 
 ## Verification
