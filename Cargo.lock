@@ -491,7 +491,7 @@ dependencies = [
 
 [[package]]
 name = "keel"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "axum",
  "keel-macro",
@@ -506,7 +506,7 @@ dependencies = [
 
 [[package]]
 name = "keel-api"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "axum",
  "keel",
@@ -517,7 +517,7 @@ dependencies = [
 
 [[package]]
 name = "keel-gate"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "axum",
  "keel",
@@ -527,7 +527,7 @@ dependencies = [
 
 [[package]]
 name = "keel-macro"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -536,7 +536,7 @@ dependencies = [
 
 [[package]]
 name = "keel-relay"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "keel",
  "serde_json",
