@@ -26,13 +26,9 @@ engine projections, not business authoring surfaces.
 
 ## Growth order
 
-1. Pure data + sqlite DDL (done)
-2. Row + n2m lifecycle (done)
-3. Core face + axum + sidecar + verify (done)
-4. Query AST + pack + `link` H0 (done); more edge later under `docs/edge.md`
-5. Capability skeleton per `docs/capability.md` (operator face, `@grant`,
-   root chain) → gate → trigger adaptor per `docs/trigger.md` → real
-   estate scenarios
+Staged delivery contract: `docs/spec.md` (S0 legislation → S1 data →
+S2 capability → S3 gate → S4 trigger → S5 cache → S6 estate). A stage is
+done when its scenario is green; no stage begins against unlanded law.
 
 ## Laws
 
