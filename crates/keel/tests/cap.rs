@@ -105,6 +105,41 @@ fn faces() {
 }
 
 #[test]
+fn birth() {
+    let mut graph = Graph::new();
+    graph.plug::<Actor>();
+    let core = bind(graph, Sqlite::memory())
+        .expect("bind")
+        .identify("Actor")
+        .expect("identify");
+    let sudo = core.sudo();
+    sudo.put(
+        "@grant",
+        &[
+            ("who", "anon"),
+            ("verb", "put"),
+            ("unit", "Actor"),
+            ("scope", "all"),
+        ],
+    )
+    .expect("register seed");
+
+    let eve = core
+        .anon()
+        .put("Actor", &[("login", "eve")])
+        .expect("register");
+    let own = core.of(eve);
+    own.set("Actor", eve, &[("login", "eva")])
+        .expect("newborn owns itself");
+    assert_eq!(own.live("Actor").expect("live").len(), 1);
+    assert!(
+        core.of(eve + 1)
+            .set("Actor", eve, &[("login", "x")])
+            .is_err()
+    );
+}
+
+#[test]
 fn cover() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();

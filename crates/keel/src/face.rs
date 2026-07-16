@@ -10,11 +10,26 @@ use std::sync::Arc;
 pub struct Core<S: Store> {
     plan: Plan,
     store: S,
+    identity: Option<String>,
 }
 
 impl<S: Store> Core<S> {
     pub(crate) fn new(plan: Plan, store: S) -> Self {
-        Self { plan, store }
+        Self {
+            plan,
+            store,
+            identity: None,
+        }
+    }
+
+    pub fn identify(mut self, unit: &str) -> Result<Self, Error> {
+        let name = query::resolve(&self.plan, unit)?;
+        self.identity = Some(name);
+        Ok(self)
+    }
+
+    pub fn identity(&self) -> Option<&str> {
+        self.identity.as_deref()
     }
 
     pub fn plan(&self) -> &Plan {
@@ -201,16 +216,18 @@ impl<S: Store> Face<'_, S> {
     }
 
     fn mint(&self, unit: &str, key: i64) -> Result<(), Error> {
-        let Who::Op(op) = self.who else {
-            return Ok(());
-        };
         if unit == cap::GRANT {
             return Ok(());
         }
+        let who = match self.who {
+            Who::Op(op) => op,
+            Who::Anon if self.core.identity() == Some(unit) => key,
+            _ => return Ok(()),
+        };
         self.core.put(
             cap::GRANT,
             &[
-                ("who", &op.to_string()),
+                ("who", &who.to_string()),
                 ("verb", "*"),
                 ("unit", unit),
                 ("scope", &format!("row {key}")),

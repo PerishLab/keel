@@ -159,3 +159,6 @@ so the shared meaning stays true.
 - `lease` — `end` completed with an instant (`docs/lease.md`): schedule
   death, renew while live, never resurrect; same verb, same coverage.
 - `fresh` — live with `expires_at` NULL (unleased); new edges require it.
+- `identity` — `keel.toml [identity] unit` names the operator unit;
+  `Core::identify` carries it; anon put on it mints to the created row
+  (C-14 exception).

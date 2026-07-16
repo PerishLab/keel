@@ -9,7 +9,14 @@ const NAME: &str = "keel.toml";
 pub struct Config {
     pub listen: Listen,
     pub store: Store,
+    pub identity: Identity,
     pub root: PathBuf,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Identity {
+    pub unit: String,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -40,6 +47,7 @@ pub enum Kind {
 struct File {
     listen: Listen,
     store: Store,
+    identity: Identity,
 }
 
 impl Default for Listen {
@@ -69,6 +77,7 @@ pub fn load(root: impl AsRef<Path>) -> Config {
     Config {
         listen: file.listen,
         store: file.store,
+        identity: file.identity,
         root,
     }
 }
