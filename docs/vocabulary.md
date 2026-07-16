@@ -156,3 +156,6 @@ so the shared meaning stays true.
 - `front` — serve helper: sudo window else injected operator else anon.
 - `gate` — forge demo middleware: `x-login` → operator (deliberately toy).
 - `app` — exported Router builder so caller middleware can wrap keel.
+- `lease` — `end` completed with an instant (`docs/lease.md`): schedule
+  death, renew while live, never resurrect; same verb, same coverage.
+- `fresh` — live with `expires_at` NULL (unleased); new edges require it.

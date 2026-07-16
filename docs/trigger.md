@@ -30,6 +30,9 @@ event
   time. Fat payloads would freeze stale data into deliveries and dodge the
   read check.
 - `see` never emits events (reads are not occurrences).
+- A scheduled `end` (`docs/lease.md`) is the event for the death it
+  schedules: the transition at the instant is silent but fully determined.
+  Consumers and caches bound validity by lease horizons (L4).
 
 ## Post-commit, observe-only
 

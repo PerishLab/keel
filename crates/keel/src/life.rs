@@ -243,6 +243,9 @@ impl<'a> Work<'a> {
         if !self.live_has(plan, edge.target(), key)? {
             return Err(Error::Adapt("right not live".into()));
         }
+        if !self.fresh(plan, edge.target(), key)? {
+            return Err(Error::Adapt(format!("ref {} leased", edge.name())));
+        }
         if edge.kind() == bond::Kind::One2one {
             self.lone(unit, edge, key, myself)?;
         }
@@ -351,23 +354,47 @@ impl<'a> Work<'a> {
     }
 
     pub fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error> {
+        self.lease(plan, name, key, now())
+    }
+
+    pub fn lease(&self, plan: &Plan, name: &str, key: i64, at: i64) -> Result<(), Error> {
         let unit = find(plan, name)?;
+        let tick = now();
+        if at < tick {
+            return Err(Error::Adapt("lease is not the past".into()));
+        }
         if self.live_in(plan, unit.name(), key)? || self.live_out(unit, key)? {
             return Err(Error::Adapt("live ties remain".into()));
         }
-        let tick = now();
         let text = format!(
-            "UPDATE {} SET {} = ?1, {} = ?1 WHERE {} = ?2",
+            "UPDATE {} SET {} = ?1, {} = ?2 WHERE {} = ?3 AND ({} IS NULL OR {} > ?2)",
             ddl::seat(unit.name()),
             ddl::EXPIRES,
             ddl::UPDATED,
-            ddl::KEY
+            ddl::KEY,
+            ddl::EXPIRES,
+            ddl::EXPIRES
         );
-        let n = self.conn.execute(&text, params![tick, key]).map_err(fail)?;
+        let n = self
+            .conn
+            .execute(&text, params![at, tick, key])
+            .map_err(fail)?;
         if n == 0 {
             return Err(Error::Adapt(format!("missing row {key}")));
         }
         Ok(())
+    }
+
+    fn fresh(&self, plan: &Plan, name: &str, key: i64) -> Result<bool, Error> {
+        let unit = find(plan, name)?;
+        let text = format!(
+            "SELECT 1 FROM {} WHERE {} = ?1 AND {} IS NULL LIMIT 1",
+            ddl::seat(unit.name()),
+            ddl::KEY,
+            ddl::EXPIRES
+        );
+        let mut stmt = self.conn.prepare(&text).map_err(fail)?;
+        stmt.exists(params![key]).map_err(fail)
     }
 
     fn live_in(&self, plan: &Plan, target: &str, key: i64) -> Result<bool, Error> {
@@ -493,6 +520,12 @@ impl<'a> Work<'a> {
         }
         if !self.live_has(plan, edge.target(), ends.right)? {
             return Err(Error::Adapt("right not live".into()));
+        }
+        if !self.fresh(plan, unit.name(), ends.left)? {
+            return Err(Error::Adapt("left leased".into()));
+        }
+        if !self.fresh(plan, edge.target(), ends.right)? {
+            return Err(Error::Adapt("right leased".into()));
         }
         if self.live_pair(plan, owner, bond, ends.left, ends.right)? {
             return Err(Error::Adapt("live pair exists".into()));

@@ -51,6 +51,10 @@ impl<S: Store> Core<S> {
         self.store.end(&self.plan, name, key)
     }
 
+    pub fn lease(&self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+        self.store.lease(&self.plan, name, key, at)
+    }
+
     pub fn tie(
         &self,
         owner: &str,
@@ -323,6 +327,20 @@ impl<S: Store> Face<'_, S> {
         };
         self.may("end", &unit, &mark)?;
         self.core.end(&unit, key)
+    }
+
+    pub fn lease(&self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+        if self.free() {
+            return self.core.lease(name, key, at);
+        }
+        let unit = query::resolve(self.plan(), name)?;
+        let row = self.seen(&unit, key)?;
+        let mark = cap::Mark {
+            key: Some(key),
+            cells: row.cells(),
+        };
+        self.may("end", &unit, &mark)?;
+        self.core.lease(&unit, key, at)
     }
 
     pub fn live(&self, name: &str) -> Result<Vec<Row>, Error> {

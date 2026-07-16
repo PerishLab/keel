@@ -9,6 +9,7 @@ pub trait Store: Send + Sync {
     fn live(&self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error>;
     fn one(&self, plan: &Plan, name: &str, key: i64) -> Result<Option<Row>, Error>;
     fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error>;
+    fn lease(&self, plan: &Plan, name: &str, key: i64, at: i64) -> Result<(), Error>;
     fn tie(
         &self,
         plan: &Plan,
