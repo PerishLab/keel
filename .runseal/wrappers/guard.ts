@@ -50,6 +50,7 @@ await bin("deno").run([
   ".runseal/wrappers/smoke.ts",
   ".runseal/wrappers/course.ts",
   ".runseal/wrappers/forge.ts",
+  ".runseal/wrappers/ship.ts",
 ]);
 
 io.print("==> negentropy");

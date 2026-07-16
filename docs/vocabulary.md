@@ -204,3 +204,6 @@ so the shared meaning stays true.
 - `hold` — cache capacity constant; overflow clears (eviction, never error).
 - `involved` — the units a tree reads (root, link and pred targets);
   the invalidation footprint of a cached entry.
+- `ship` — publish the crate family to the perish registry from clean
+  main; idempotent per version (sparse-index probe skips published).
+- `shelf` — sparse index path prefix for a crate name.
