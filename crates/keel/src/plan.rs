@@ -56,6 +56,7 @@ impl Plan {
             }
         }
         units.insert(crate::cap::GRANT.into(), Unit::grant());
+        units.insert(crate::cap::SEAL.into(), Unit::seal());
         Ok(Self { units })
     }
 
@@ -78,6 +79,20 @@ impl Unit {
         Self {
             name: crate::cap::GRANT.into(),
             fields,
+            bonds: Vec::new(),
+            reign: Reign::engine(),
+        }
+    }
+
+    fn seal() -> Self {
+        Self {
+            name: crate::cap::SEAL.into(),
+            fields: vec![Slot {
+                name: "hash".into(),
+                kind: atom::Kind::Text,
+                only: Only::Free,
+                serial: None,
+            }],
             bonds: Vec::new(),
             reign: Reign::engine(),
         }

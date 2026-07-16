@@ -27,4 +27,4 @@ pub use spec::Resource;
 pub use store::Store;
 
 #[cfg(feature = "http")]
-pub use serve::{listen, serve};
+pub use serve::{Operator, app, listen, serve};

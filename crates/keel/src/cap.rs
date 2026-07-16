@@ -9,12 +9,46 @@ use crate::store::Store;
 use std::collections::BTreeMap;
 
 pub const GRANT: &str = "@grant";
+pub const SEAL: &str = "@seal";
 pub const VERBS: [&str; 6] = ["see", "put", "set", "end", "tie", "cut"];
 pub const DEPTH: usize = 16;
 
 pub struct Mark<'a> {
     pub key: Option<i64>,
     pub cells: &'a BTreeMap<String, Cell>,
+}
+
+pub fn genesis<S: Store>(plan: &Plan, store: &S) -> Result<Option<String>, Error> {
+    if !store.live(plan, SEAL)?.is_empty() {
+        return Ok(None);
+    }
+    let token = wild();
+    store.put(plan, SEAL, &[("hash", &digest(&token))])?;
+    Ok(Some(token))
+}
+
+pub fn sealed<S: Store>(plan: &Plan, store: &S, token: &str) -> Result<bool, Error> {
+    let rows = store.live(plan, SEAL)?;
+    let want = digest(token);
+    Ok(rows.first().is_some_and(|row| cell(row, "hash") == want))
+}
+
+fn wild() -> String {
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hasher};
+    let mut out = String::new();
+    for _ in 0..4 {
+        let word = RandomState::new().build_hasher().finish();
+        out.push_str(&format!("{word:016x}"));
+    }
+    out
+}
+
+fn digest(token: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(token.as_bytes());
+    format!("{:x}", hasher.finalize())
 }
 
 pub fn vet(plan: &Plan, fields: &[(&str, &str)]) -> Result<(), Error> {

@@ -48,15 +48,34 @@ const child = new Deno.Command("cargo", {
   stderr: "piped",
 }).spawn();
 
+let boot = "";
+const drain = (async () => {
+  const decoder = new TextDecoder();
+  for await (const part of child.stderr) {
+    boot += decoder.decode(part);
+  }
+})();
+
 let failed = false;
 try {
   await ready(`${base}/health`, 40);
+  const sudo = await token();
 
-  const ada = num((await postJson("/actor", { login: "ada" })).id);
-  const bob = num((await postJson("/actor", { login: "bob" })).id);
+  const crown = { authorization: `sudo ${sudo}` };
+  const ada = num((await postJson("/actor", { login: "ada" }, crown)).id);
+  const bob = num((await postJson("/actor", { login: "bob" }, crown)).id);
+
+  await check("bad sudo token is 401", async () => {
+    const res = await post("/actor", { login: "eve" }, {
+      authorization: "sudo feedbead",
+    });
+    if (res.status !== 401) {
+      throw new Error(`expected 401, got ${res.status}`);
+    }
+  });
 
   await check("login unique", async () => {
-    const dup = await post("/actor", { login: "ada" });
+    const dup = await post("/actor", { login: "ada" }, crown);
     if (dup.status !== 409) {
       throw new Error(`expected 409, got ${dup.status}`);
     }
@@ -67,14 +86,14 @@ try {
       name: "keel",
       visibility: "public",
       owner: ada,
-    })).id,
+    }, crown)).id,
   );
   const twin = num(
     (await postJson("/repo", {
       name: "keel",
       visibility: "public",
       owner: bob,
-    })).id,
+    }, crown)).id,
   );
 
   await check("repo name unique per owner", async () => {
@@ -82,7 +101,7 @@ try {
       name: "keel",
       visibility: "public",
       owner: ada,
-    });
+    }, crown);
     if (dup.status !== 409) {
       throw new Error(`expected 409, got ${dup.status}`);
     }
@@ -94,20 +113,20 @@ try {
       closed: false,
       repo: keel,
       author: ada,
-    });
+    }, crown);
     const two = await postJson("/issue", {
       title: "b",
       closed: false,
       repo: keel,
       author: bob,
-    });
+    }, crown);
     const side = await postJson("/issue", {
       title: "c",
       closed: false,
       repo: twin,
       author: bob,
-    });
-    const rows = packRows(await query("from Issue"), "issue");
+    }, crown);
+    const rows = packRows(await query("from Issue", crown), "issue");
     const at = (id: unknown) => rows.find((r) => r.id === id);
     if (at(one.id)?.index !== 1 || at(two.id)?.index !== 2) {
       throw new Error("keel indexes wrong");
@@ -127,7 +146,7 @@ try {
       closed: false,
       repo: keel,
       author: ada,
-    });
+    }, crown);
     if (res.status !== 400) {
       throw new Error(`expected 400, got ${res.status}`);
     }
@@ -135,13 +154,13 @@ try {
 
   await check("close is business state", async () => {
     const rows = packRows(
-      await query(`from Issue where repo = "${keel}" order by index`),
+      await query(`from Issue where repo = "${keel}" order by index`, crown),
       "issue",
     );
     const first = num(rows[0].id);
     const res = await fetch(`${base}/issue/${first}`, {
       method: "PATCH",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...crown },
       body: JSON.stringify({ closed: true }),
     });
     if (!res.ok) {
@@ -152,7 +171,10 @@ try {
       throw new Error("expected closed true");
     }
     const open = packRows(
-      await query(`from Issue where repo = "${keel}" and closed = "false"`),
+      await query(
+        `from Issue where repo = "${keel}" and closed = "false"`,
+        crown,
+      ),
       "issue",
     );
     if (open.length !== 1) {
@@ -161,9 +183,12 @@ try {
   });
 
   await check("star count", async () => {
-    await postJson(`/actor/${ada}/stars`, { right: twin });
-    await postJson(`/actor/${bob}/stars`, { right: twin });
-    const pack = await query(`from Actor where stars has "${twin}" count`);
+    await postJson(`/actor/${ada}/stars`, { right: twin }, crown);
+    await postJson(`/actor/${bob}/stars`, { right: twin }, crown);
+    const pack = await query(
+      `from Actor where stars has "${twin}" count`,
+      crown,
+    );
     if (pack.count !== 2 || pack.bags !== undefined) {
       throw new Error("expected count pack of 2");
     }
@@ -175,7 +200,7 @@ try {
   await check("count stands alone", async () => {
     const res = await fetch(`${base}/query`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...crown },
       body: JSON.stringify({ q: "from Issue count limit 1" }),
     });
     if (res.status !== 400) {
@@ -184,11 +209,17 @@ try {
   });
 
   await check("end blocked by live refs", async () => {
-    const repo = await fetch(`${base}/repo/${keel}`, { method: "DELETE" });
+    const repo = await fetch(`${base}/repo/${keel}`, {
+      method: "DELETE",
+      headers: crown,
+    });
     if (repo.status !== 409) {
       throw new Error(`repo expected 409, got ${repo.status}`);
     }
-    const actor = await fetch(`${base}/actor/${ada}`, { method: "DELETE" });
+    const actor = await fetch(`${base}/actor/${ada}`, {
+      method: "DELETE",
+      headers: crown,
+    });
     if (actor.status !== 409) {
       throw new Error(`actor expected 409, got ${actor.status}`);
     }
@@ -196,11 +227,150 @@ try {
 
   await check("issues order by index desc", async () => {
     const rows = packRows(
-      await query(`from Issue where repo = "${keel}" order by index desc`),
+      await query(`from Issue where repo = "${keel}" order by index desc`, crown),
       "issue",
     );
     if (rows.length !== 2 || rows[0].index !== 2) {
       throw new Error("desc order wrong");
+    }
+  });
+
+  io.print("==> act 2: authority matrix");
+  const grant = async (
+    who: string,
+    verb: string,
+    unit: string,
+    scope: string,
+  ) => {
+    await postJson("/@grant", { who, verb, unit, scope }, crown);
+  };
+  await grant("all", "*", "Actor", 'pred id = "@me"');
+  await grant("anon", "see", "Repo", 'pred visibility = "public"');
+  await grant("all", "put", "Repo", 'pred owner = "@me"');
+  await grant("all", "put", "Issue", 'pred author = "@me"');
+  await grant("all", "set", "Issue", 'pred author = "@me"');
+  await grant("all", "see", "Issue", 'pred author = "@me"');
+
+  const carol = num(
+    (await postJson("/actor", { login: "carol" }, crown)).id,
+  );
+  const dave = num((await postJson("/actor", { login: "dave" }, crown)).id);
+  const her = { "x-login": "carol" };
+  const him = { "x-login": "dave" };
+
+  let den = 0;
+  await check("operator creates own repo", async () => {
+    const made = await postJson("/repo", {
+      name: "den",
+      visibility: "private",
+      owner: carol,
+    }, her);
+    den = num(made.id);
+    const steal = await post("/repo", {
+      name: "loot",
+      visibility: "private",
+      owner: carol,
+    }, him);
+    if (steal.status !== 403) {
+      throw new Error(`expected 403, got ${steal.status}`);
+    }
+  });
+
+  await check("invisible reads as absence", async () => {
+    const res = await fetch(`${base}/repo/${den}`, { headers: him });
+    if (res.status !== 404) {
+      throw new Error(`expected 404, got ${res.status}`);
+    }
+    const blind = await fetch(`${base}/repo/${den}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...him },
+      body: JSON.stringify({ visibility: "public" }),
+    });
+    if (blind.status !== 404) {
+      throw new Error(`patch expected 404, got ${blind.status}`);
+    }
+    const list = await (await fetch(`${base}/repo`)).json();
+    if (!Array.isArray(list) || list.some((r) => r.id === den)) {
+      throw new Error("anon must not see den");
+    }
+  });
+
+  await check("owner opens, stranger sees", async () => {
+    const res = await fetch(`${base}/repo/${den}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...her },
+      body: JSON.stringify({ visibility: "public" }),
+    });
+    if (!res.ok) {
+      throw new Error(`owner patch ${res.status}`);
+    }
+    const seen = await fetch(`${base}/repo/${den}`, { headers: him });
+    if (seen.status !== 200) {
+      throw new Error(`expected 200, got ${seen.status}`);
+    }
+    const write = await fetch(`${base}/repo/${den}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...him },
+      body: JSON.stringify({ name: "grab" }),
+    });
+    if (write.status !== 403) {
+      throw new Error(`expected 403, got ${write.status}`);
+    }
+  });
+
+  await check("author preds bind issues", async () => {
+    const own = await post("/issue", {
+      title: "mine",
+      closed: false,
+      repo: den,
+      author: dave,
+    }, him);
+    if (own.status !== 201) {
+      throw new Error(`own issue ${own.status}`);
+    }
+    const fake = await post("/issue", {
+      title: "forged",
+      closed: false,
+      repo: den,
+      author: carol,
+    }, him);
+    if (fake.status !== 403) {
+      throw new Error(`expected 403, got ${fake.status}`);
+    }
+  });
+
+  await check("delegation is attenuated", async () => {
+    const share = await post("/@grant", {
+      who: String(dave),
+      verb: "set",
+      unit: "Repo",
+      scope: `row ${den}`,
+    }, her);
+    if (share.status !== 201) {
+      throw new Error(`share ${share.status}`);
+    }
+    const write = await fetch(`${base}/repo/${den}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...him },
+      body: JSON.stringify({ name: "ours" }),
+    });
+    if (!write.ok) {
+      throw new Error(`delegated write ${write.status}`);
+    }
+    const grab = await post("/@grant", {
+      who: "all",
+      verb: "put",
+      unit: "Repo",
+      scope: "all",
+    }, him);
+    if (grab.status !== 403) {
+      throw new Error(`expected 403, got ${grab.status}`);
+    }
+  });
+
+  await check("sudo verbs are journaled", async () => {
+    if (!boot.includes("keel: sudo put")) {
+      throw new Error("missing sudo journal line");
     }
   });
 
@@ -221,6 +391,11 @@ try {
     // ignore
   }
   try {
+    await drain;
+  } catch {
+    // ignore
+  }
+  try {
     await Deno.remove(dir, { recursive: true });
   } catch {
     // ignore
@@ -234,10 +409,11 @@ if (failed) {
 async function post(
   path: string,
   body: Record<string, unknown>,
+  extra: Record<string, string> = {},
 ): Promise<Response> {
   const res = await fetch(`${base}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...extra },
     body: JSON.stringify(body),
   });
   await res.body?.cancel();
@@ -247,11 +423,12 @@ async function post(
 async function postJson(
   path: string,
   body: Record<string, unknown>,
+  extra: Record<string, string> = {},
 ): Promise<Record<string, unknown>> {
   io.print(`==> POST ${path}`);
   const res = await fetch(`${base}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...extra },
     body: JSON.stringify(body),
   });
   if (res.status !== 201) {
@@ -260,16 +437,30 @@ async function postJson(
   return await res.json();
 }
 
-async function query(q: string): Promise<Record<string, unknown>> {
+async function query(
+  q: string,
+  extra: Record<string, string> = {},
+): Promise<Record<string, unknown>> {
   const res = await fetch(`${base}/query`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...extra },
     body: JSON.stringify({ q }),
   });
   if (!res.ok) {
     throw new Error(`query status ${res.status}`);
   }
   return await res.json();
+}
+
+async function token(): Promise<string> {
+  for (let i = 0; i < 40; i++) {
+    const hit = boot.match(/sudo token ([0-9a-f]+)/);
+    if (hit) {
+      return hit[1];
+    }
+    await sleep(250);
+  }
+  throw new Error("no sudo token in boot log");
 }
 
 function num(value: unknown): number {

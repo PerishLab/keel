@@ -148,3 +148,11 @@ so the shared meaning stays true.
 - `sift` / `strain` / `spot` — see-coverage filtering of reads (rows,
   packs incl. bond bags and count).
 - `broad` — coverage probe for all-scope on a unit (attenuation floor).
+- `@seal` — engine unit holding the sudo token hash; minted at first bind,
+  surfaced once on stderr; the unique wire window (`authorization: sudo`).
+- `genesis` / `sealed` — mint the axiom token / verify a presented token.
+- `operator` — HTTP extension (`Operator(id)`) injected by caller
+  middleware; keel never authenticates (401 belongs to middleware).
+- `front` — serve helper: sudo window else injected operator else anon.
+- `gate` — forge demo middleware: `x-login` → operator (deliberately toy).
+- `app` — exported Router builder so caller middleware can wrap keel.

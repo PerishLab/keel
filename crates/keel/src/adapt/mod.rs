@@ -25,5 +25,8 @@ impl std::error::Error for Error {}
 pub fn bind<S: Store>(graph: crate::graph::Graph, store: S) -> Result<crate::face::Core<S>, Error> {
     let plan = crate::plan::Plan::lift(&graph)?;
     store.wire(&plan)?;
+    if let Some(token) = crate::cap::genesis(&plan, &store)? {
+        eprintln!("keel: sudo token {token}");
+    }
     Ok(crate::face::Core::new(plan, store))
 }

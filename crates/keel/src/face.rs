@@ -87,6 +87,10 @@ impl<S: Store> Core<S> {
         self.store.cols(name)
     }
 
+    pub fn seal(&self, token: &str) -> Result<bool, Error> {
+        cap::sealed(&self.plan, &self.store, token)
+    }
+
     pub fn share(self) -> Arc<Self> {
         Arc::new(self)
     }

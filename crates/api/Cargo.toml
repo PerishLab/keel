@@ -13,5 +13,6 @@ name = "keel-api"
 path = "src/main.rs"
 
 [dependencies]
+axum = { workspace = true }
 keel = { workspace = true, features = ["http"] }
 tokio = { workspace = true }
