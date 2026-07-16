@@ -86,6 +86,15 @@ engine cache invalidation (internal), and — archived, not planned —
 replication would be a third. One investment, several payoffs; none of
 them changes modeling.
 
+## Seat (settled)
+
+The stream is the engine unit **`@pulse`** (T-M2): rows are events, the
+engine key is `seq`, reign `created_at` is `at`. Caller writes to `@pulse`
+are rejected — it is engine-owned like reign. The window is the engine
+constant `WINDOW` (T-M1, C0 seat); pruning is hard deletion beyond it.
+`Core::flow(cursor)` is the pull surface; a cursor before the window's
+floor errors (`cursor past window`).
+
 ## Settled package
 
 | Id | Choice |
@@ -97,13 +106,14 @@ them changes modeling.
 | T-5 | Total order via `seq`; single-writer makes it free |
 | T-6 | `relay` default webhook package in caller space (gate pattern) |
 | T-7 | At-least-once + cursor pull; window overflow errors (C0 spirit) |
+| T-M1 | Window = engine constant (`WINDOW`), C0 seat |
+| T-M2 | Stream unit named `@pulse`; `flow` is the pull verb surface |
 
 ## Open
 
 | Id | Question |
 |----|----------|
-| T-M1 | Retention / replay window size and seat (engine constant vs toml) |
-| T-M2 | Adaptor module naming (single word) |
+
 | T-M3 | Subscription filter designation grammar on the stream API |
 | T-M4 | `end`-event hydration vs history-read semantics (open elsewhere) |
 

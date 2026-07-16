@@ -121,6 +121,9 @@ impl<'a> Work<'a> {
 
     pub fn put(&self, plan: &Plan, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
         let unit = find(plan, name)?;
+        if unit.name() == crate::cap::PULSE {
+            return Err(Error::Adapt("pulse is engine owned".into()));
+        }
         if unit.name() == crate::cap::GRANT {
             crate::cap::vet(plan, fields)?;
         }
@@ -359,6 +362,9 @@ impl<'a> Work<'a> {
 
     pub fn lease(&self, plan: &Plan, name: &str, key: i64, at: i64) -> Result<(), Error> {
         let unit = find(plan, name)?;
+        if unit.name() == crate::cap::PULSE {
+            return Err(Error::Adapt("pulse is engine owned".into()));
+        }
         let tick = now();
         if at < tick {
             return Err(Error::Adapt("lease is not the past".into()));
@@ -382,6 +388,44 @@ impl<'a> Work<'a> {
         if n == 0 {
             return Err(Error::Adapt(format!("missing row {key}")));
         }
+        Ok(())
+    }
+
+    pub fn pulse(
+        &self,
+        plan: &Plan,
+        verb: &str,
+        unit: &str,
+        key: i64,
+        who: &str,
+    ) -> Result<(), Error> {
+        let seat = find(plan, crate::cap::PULSE)?;
+        let tick = now();
+        let text = format!(
+            "INSERT INTO {} (verb, unit, who, {}, {}, {}, {}) VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?5)",
+            ddl::seat(seat.name()),
+            ddl::col("key"),
+            ddl::EXPIRES,
+            ddl::CREATED,
+            ddl::UPDATED
+        );
+        self.conn
+            .execute(&text, params![verb, unit, who, key, tick])
+            .map_err(fail)?;
+        self.trim(seat)
+    }
+
+    fn trim(&self, seat: &Unit) -> Result<(), Error> {
+        let text = format!(
+            "DELETE FROM {} WHERE {} <= (SELECT MAX({}) FROM {}) - ?1",
+            ddl::seat(seat.name()),
+            ddl::KEY,
+            ddl::KEY,
+            ddl::seat(seat.name())
+        );
+        self.conn
+            .execute(&text, params![crate::cap::WINDOW as i64])
+            .map_err(fail)?;
         Ok(())
     }
 
@@ -462,6 +506,9 @@ impl<'a> Work<'a> {
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
         let unit = find(plan, name)?;
+        if unit.name() == crate::cap::PULSE {
+            return Err(Error::Adapt("pulse is engine owned".into()));
+        }
         if unit.name() == crate::cap::GRANT {
             return Err(Error::Adapt("grant rows are put or end".into()));
         }

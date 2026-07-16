@@ -95,6 +95,12 @@ impl Store for Sqlite {
         life::Work::new(conn).lease(plan, name, key, at)
     }
 
+    fn pulse(&self, plan: &Plan, verb: &str, unit: &str, key: i64, who: &str) -> Result<(), Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).pulse(plan, verb, unit, key, who)
+    }
+
     fn tie(
         &self,
         plan: &Plan,

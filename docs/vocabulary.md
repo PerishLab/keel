@@ -172,3 +172,15 @@ so the shared meaning stays true.
 - `deny` — gate fault mapping (401/403/404/400).
 - `make` / `gear` — macro-only files; scan excludes retired at negentropy
   v0.4.0 (macro items parse; templates under law).
+- `@pulse` — engine unit: the write log's public face; one row per write
+  verb (verb, unit, key, who); engine key is the total order; caller
+  writes rejected.
+- `beat` — emit one pulse row after a landed verb (who-attributed;
+  `@pulse`/`@seal` excepted; emission failure logged, never blocking).
+- `flow` — pull the stream after a cursor; floor-crossing cursor errors.
+- `trim` — prune pulse rows beyond `WINDOW` (hard delete, engine-owned).
+- `craft`/`shift`/`fell`/`knot`/`bend`/`snip` — who-attributed core verb
+  bodies (put/set/end+lease/tie/set_tie/cut) shared by Core (sudo) and
+  Face (operator); `lane` names a bond event path.
+- self-referential many2many — KNOWN GAP: join table collides both sides
+  as `{table}_id`; verify F6 was wrong for m2m; fix seat pending.

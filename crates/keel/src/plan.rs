@@ -57,6 +57,7 @@ impl Plan {
         }
         units.insert(crate::cap::GRANT.into(), Unit::grant());
         units.insert(crate::cap::SEAL.into(), Unit::seal());
+        units.insert(crate::cap::PULSE.into(), Unit::pulse());
         Ok(Self { units })
     }
 
@@ -78,6 +79,30 @@ impl Unit {
             .collect();
         Self {
             name: crate::cap::GRANT.into(),
+            fields,
+            bonds: Vec::new(),
+            reign: Reign::engine(),
+        }
+    }
+
+    fn pulse() -> Self {
+        let mut fields: Vec<Slot> = ["verb", "unit", "who"]
+            .iter()
+            .map(|name| Slot {
+                name: (*name).to_string(),
+                kind: atom::Kind::Text,
+                only: Only::Free,
+                serial: None,
+            })
+            .collect();
+        fields.push(Slot {
+            name: "key".into(),
+            kind: atom::Kind::Int,
+            only: Only::Free,
+            serial: None,
+        });
+        Self {
+            name: crate::cap::PULSE.into(),
             fields,
             bonds: Vec::new(),
             reign: Reign::engine(),

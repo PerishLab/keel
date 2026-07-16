@@ -10,6 +10,8 @@ use std::collections::BTreeMap;
 
 pub const GRANT: &str = "@grant";
 pub const SEAL: &str = "@seal";
+pub const PULSE: &str = "@pulse";
+pub const WINDOW: usize = 4096;
 pub const VERBS: [&str; 6] = ["see", "put", "set", "end", "tie", "cut"];
 pub const DEPTH: usize = 16;
 

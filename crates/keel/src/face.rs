@@ -41,11 +41,46 @@ impl<S: Store> Core<S> {
     }
 
     pub fn put(&self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
-        self.store.put(&self.plan, name, fields)
+        self.craft(Who::Sudo, name, fields)
+    }
+
+    pub(crate) fn craft(
+        &self,
+        who: Who,
+        name: &str,
+        fields: &[(&str, &str)],
+    ) -> Result<i64, Error> {
+        let unit = query::resolve(&self.plan, name)?;
+        let key = self.store.put(&self.plan, &unit, fields)?;
+        self.beat(who, "put", &ddl::table(&unit), key);
+        Ok(key)
+    }
+
+    pub(crate) fn beat(&self, who: Who, verb: &str, unit: &str, key: i64) {
+        if unit == ddl::table(cap::PULSE) || unit == ddl::table(cap::SEAL) {
+            return;
+        }
+        let told = label(who);
+        if let Err(err) = self.store.pulse(&self.plan, verb, unit, key, &told) {
+            eprintln!("keel: pulse: {err}");
+        }
     }
 
     pub fn set(&self, name: &str, key: i64, fields: &[(&str, &str)]) -> Result<(), Error> {
-        self.store.set(&self.plan, name, key, fields)
+        self.shift(Who::Sudo, name, key, fields)
+    }
+
+    pub(crate) fn shift(
+        &self,
+        who: Who,
+        name: &str,
+        key: i64,
+        fields: &[(&str, &str)],
+    ) -> Result<(), Error> {
+        let unit = query::resolve(&self.plan, name)?;
+        self.store.set(&self.plan, &unit, key, fields)?;
+        self.beat(who, "set", &ddl::table(&unit), key);
+        Ok(())
     }
 
     pub fn live(&self, name: &str) -> Result<Vec<Row>, Error> {
@@ -63,11 +98,27 @@ impl<S: Store> Core<S> {
     }
 
     pub fn end(&self, name: &str, key: i64) -> Result<(), Error> {
-        self.store.end(&self.plan, name, key)
+        self.fell(Who::Sudo, name, key, None)
     }
 
     pub fn lease(&self, name: &str, key: i64, at: i64) -> Result<(), Error> {
-        self.store.lease(&self.plan, name, key, at)
+        self.fell(Who::Sudo, name, key, Some(at))
+    }
+
+    pub(crate) fn fell(
+        &self,
+        who: Who,
+        name: &str,
+        key: i64,
+        at: Option<i64>,
+    ) -> Result<(), Error> {
+        let unit = query::resolve(&self.plan, name)?;
+        match at {
+            Some(at) => self.store.lease(&self.plan, &unit, key, at)?,
+            None => self.store.end(&self.plan, &unit, key)?,
+        }
+        self.beat(who, "end", &ddl::table(&unit), key);
+        Ok(())
     }
 
     pub fn tie(
@@ -77,7 +128,21 @@ impl<S: Store> Core<S> {
         ends: Ends,
         fields: &[(&str, &str)],
     ) -> Result<i64, Error> {
-        self.store.tie(&self.plan, owner, bond, ends, fields)
+        self.knot(Who::Sudo, owner, bond, ends, fields)
+    }
+
+    pub(crate) fn knot(
+        &self,
+        who: Who,
+        owner: &str,
+        bond: &str,
+        ends: Ends,
+        fields: &[(&str, &str)],
+    ) -> Result<i64, Error> {
+        let unit = query::resolve(&self.plan, owner)?;
+        let key = self.store.tie(&self.plan, &unit, bond, ends, fields)?;
+        self.beat(who, "tie", &lane(&unit, bond), key);
+        Ok(key)
     }
 
     pub fn set_tie(
@@ -87,7 +152,21 @@ impl<S: Store> Core<S> {
         key: i64,
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
-        self.store.set_tie(&self.plan, owner, bond, key, fields)
+        self.bend(Who::Sudo, owner, bond, key, fields)
+    }
+
+    pub(crate) fn bend(
+        &self,
+        who: Who,
+        owner: &str,
+        bond: &str,
+        key: i64,
+        fields: &[(&str, &str)],
+    ) -> Result<(), Error> {
+        let unit = query::resolve(&self.plan, owner)?;
+        self.store.set_tie(&self.plan, &unit, bond, key, fields)?;
+        self.beat(who, "tie", &lane(&unit, bond), key);
+        Ok(())
     }
 
     pub fn ties(&self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
@@ -95,7 +174,24 @@ impl<S: Store> Core<S> {
     }
 
     pub fn cut(&self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
-        self.store.cut(&self.plan, owner, bond, key)
+        self.snip(Who::Sudo, owner, bond, key)
+    }
+
+    pub(crate) fn snip(&self, who: Who, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
+        let unit = query::resolve(&self.plan, owner)?;
+        self.store.cut(&self.plan, &unit, bond, key)?;
+        self.beat(who, "cut", &lane(&unit, bond), key);
+        Ok(())
+    }
+
+    pub fn flow(&self, cursor: i64) -> Result<Vec<Row>, Error> {
+        let rows = self.store.live(&self.plan, cap::PULSE)?;
+        if let Some(first) = rows.first()
+            && cursor + 1 < first.key()
+        {
+            return Err(Error::Adapt("cursor past window".into()));
+        }
+        Ok(rows.into_iter().filter(|row| row.key() > cursor).collect())
     }
 
     pub fn has(&self, name: &str) -> Result<bool, Error> {
@@ -202,7 +298,7 @@ impl<S: Store> Face<'_, S> {
         let unit = query::resolve(self.plan(), name)?;
         if unit == cap::GRANT {
             self.narrow(fields)?;
-            return self.core.put(&unit, fields);
+            return self.core.craft(self.who, &unit, fields);
         }
         let cells = cap::mold(self.plan(), &unit, fields);
         let mark = cap::Mark {
@@ -210,7 +306,7 @@ impl<S: Store> Face<'_, S> {
             cells: &cells,
         };
         self.may("put", &unit, &mark)?;
-        let key = self.core.put(&unit, fields)?;
+        let key = self.core.craft(self.who, &unit, fields)?;
         self.mint(&unit, key)?;
         Ok(key)
     }
@@ -224,7 +320,8 @@ impl<S: Store> Face<'_, S> {
             Who::Anon if self.core.identity() == Some(unit) => key,
             _ => return Ok(()),
         };
-        self.core.put(
+        self.core.craft(
+            self.who,
             cap::GRANT,
             &[
                 ("who", &who.to_string()),
@@ -258,7 +355,7 @@ impl<S: Store> Face<'_, S> {
             .map(|c| c.show())
             .unwrap_or_default();
         self.narrow(&[("verb", &verb), ("unit", &unit), ("scope", &span)])?;
-        self.core.end(cap::GRANT, key)
+        self.core.fell(self.who, cap::GRANT, key, None)
     }
 
     fn narrow(&self, fields: &[(&str, &str)]) -> Result<(), Error> {
@@ -326,7 +423,7 @@ impl<S: Store> Face<'_, S> {
             cells: &post,
         };
         self.may("set", &unit, &after)?;
-        self.core.set(&unit, key, fields)
+        self.core.shift(self.who, &unit, key, fields)
     }
 
     pub fn end(&self, name: &str, key: i64) -> Result<(), Error> {
@@ -343,7 +440,7 @@ impl<S: Store> Face<'_, S> {
             cells: row.cells(),
         };
         self.may("end", &unit, &mark)?;
-        self.core.end(&unit, key)
+        self.core.fell(self.who, &unit, key, None)
     }
 
     pub fn lease(&self, name: &str, key: i64, at: i64) -> Result<(), Error> {
@@ -357,7 +454,7 @@ impl<S: Store> Face<'_, S> {
             cells: row.cells(),
         };
         self.may("end", &unit, &mark)?;
-        self.core.lease(&unit, key, at)
+        self.core.fell(self.who, &unit, key, Some(at))
     }
 
     pub fn live(&self, name: &str) -> Result<Vec<Row>, Error> {
@@ -474,7 +571,7 @@ impl<S: Store> Face<'_, S> {
         if !self.spot(&target, ends.right)? {
             return Err(Error::Adapt(format!("missing row {}", ends.right)));
         }
-        self.core.tie(&unit, bond, ends, fields)
+        self.core.knot(self.who, &unit, bond, ends, fields)
     }
 
     pub fn set_tie(
@@ -495,7 +592,7 @@ impl<S: Store> Face<'_, S> {
             cells: left.cells(),
         };
         self.may("tie", &unit, &mark)?;
-        self.core.set_tie(&unit, bond, key, fields)
+        self.core.bend(self.who, &unit, bond, key, fields)
     }
 
     pub fn ties(&self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
@@ -527,7 +624,7 @@ impl<S: Store> Face<'_, S> {
             cells: left.cells(),
         };
         self.may("cut", &unit, &mark)?;
-        self.core.cut(&unit, bond, key)
+        self.core.snip(self.who, &unit, bond, key)
     }
 
     fn grip(&self, unit: &str, bond: &str, key: i64) -> Result<Tie, Error> {
@@ -564,4 +661,16 @@ impl<S: Store> Face<'_, S> {
             .map(|e| e.target().to_string())
             .ok_or_else(|| Error::Adapt(format!("missing bond {bond}")))
     }
+}
+
+fn label(who: Who) -> String {
+    match who {
+        Who::Sudo => "sudo".into(),
+        Who::Anon => "anon".into(),
+        Who::Op(id) => id.to_string(),
+    }
+}
+
+fn lane(unit: &str, bond: &str) -> String {
+    format!("{}.{}", ddl::table(unit), bond)
 }
