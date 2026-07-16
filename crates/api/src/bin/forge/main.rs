@@ -62,7 +62,12 @@ async fn main() {
     graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
     plug(&mut graph);
     wire(&mut graph);
-    let made = bind(graph, store).and_then(|core| core.identify("Actor"));
+    let made = bind(graph, store)
+        .and_then(|core| core.identify("Actor"))
+        .map(|core| match cfg.cache.kind {
+            keel::config::Hold::Memory => core,
+            keel::config::Hold::None => core.bare(),
+        });
     let core = match made {
         Ok(core) => core.share(),
         Err(err) => {

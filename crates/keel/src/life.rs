@@ -791,6 +791,10 @@ impl<'a> Work<'a> {
     }
 }
 
+pub fn tick() -> i64 {
+    now()
+}
+
 fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

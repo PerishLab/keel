@@ -36,7 +36,11 @@ async fn main() {
     };
     let mut graph = Graph::new();
     graph.plug::<Course>().plug::<Student>();
-    let core = match bind(graph, store) {
+    let made = bind(graph, store).map(|core| match cfg.cache.kind {
+        keel::config::Hold::Memory => core,
+        keel::config::Hold::None => core.bare(),
+    });
+    let core = match made {
         Ok(core) => core.share(),
         Err(err) => {
             eprintln!("keel-api: bind: {err}");

@@ -87,6 +87,10 @@ prefix = ""
 kind = "memory"
 # kind = "file"
 # path = ".local/keel.sqlite"
+
+[cache]
+kind = "memory"
+# kind = "none"
 ```
 
 ```rust

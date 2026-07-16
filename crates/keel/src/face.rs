@@ -5,12 +5,106 @@ use crate::life::{Ends, Row, Tie};
 use crate::plan::Plan;
 use crate::query::{self, Pack, Tree};
 use crate::store::Store;
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
+pub const HOLD: usize = 1024;
+
+struct Deal {
+    gens: Vec<(String, i64)>,
+    until: Option<i64>,
+    pack: Pack,
+}
+
+#[derive(Default)]
+struct Stash {
+    on: bool,
+    gens: Mutex<HashMap<String, i64>>,
+    deals: Mutex<HashMap<String, Deal>>,
+}
+
+impl Stash {
+    fn bump(&self, unit: &str) {
+        if !self.on {
+            return;
+        }
+        let owner = unit.split('.').next().unwrap_or(unit).to_string();
+        if let Ok(mut gens) = self.gens.lock() {
+            *gens.entry(owner).or_insert(0) += 1;
+        }
+    }
+
+    fn stamp(&self, units: &[String]) -> Vec<(String, i64)> {
+        let gens = self.gens.lock().ok();
+        units
+            .iter()
+            .map(|unit| {
+                let step = gens
+                    .as_ref()
+                    .and_then(|g| g.get(unit).copied())
+                    .unwrap_or(0);
+                (unit.clone(), step)
+            })
+            .collect()
+    }
+
+    fn read(&self, key: &str, units: &[String]) -> Option<Pack> {
+        if !self.on {
+            return None;
+        }
+        let deals = self.deals.lock().ok()?;
+        let deal = deals.get(key)?;
+        if deal.gens != self.stamp(units) {
+            return None;
+        }
+        if let Some(until) = deal.until
+            && crate::life::tick() >= until
+        {
+            return None;
+        }
+        Some(deal.pack.clone())
+    }
+
+    fn keep(&self, key: String, units: &[String], pack: &Pack) {
+        if !self.on {
+            return;
+        }
+        let Ok(mut deals) = self.deals.lock() else {
+            return;
+        };
+        if deals.len() >= HOLD {
+            deals.clear();
+        }
+        deals.insert(
+            key,
+            Deal {
+                gens: self.stamp(units),
+                until: horizon(pack),
+                pack: pack.clone(),
+            },
+        );
+    }
+}
+
+fn horizon(pack: &Pack) -> Option<i64> {
+    let mut edge: Option<i64> = None;
+    for bag in pack.bags().values() {
+        let ats: Vec<i64> = match bag {
+            crate::query::Bag::Unit(rows) => rows.iter().filter_map(Row::expires).collect(),
+            crate::query::Bag::Bond(ties) => ties.iter().filter_map(Tie::expires).collect(),
+        };
+        for at in ats {
+            edge = Some(edge.map_or(at, |held| held.min(at)));
+        }
+    }
+    edge
+}
 
 pub struct Core<S: Store> {
     plan: Plan,
     store: S,
     identity: Option<String>,
+    stash: Stash,
 }
 
 impl<S: Store> Core<S> {
@@ -19,7 +113,16 @@ impl<S: Store> Core<S> {
             plan,
             store,
             identity: None,
+            stash: Stash {
+                on: true,
+                ..Default::default()
+            },
         }
+    }
+
+    pub fn bare(mut self) -> Self {
+        self.stash.on = false;
+        self
     }
 
     pub fn identify(mut self, unit: &str) -> Result<Self, Error> {
@@ -57,6 +160,7 @@ impl<S: Store> Core<S> {
     }
 
     pub(crate) fn beat(&self, who: Who, verb: &str, unit: &str, key: i64) {
+        self.stash.bump(unit);
         if unit == ddl::table(cap::PULSE) || unit == ddl::table(cap::SEAL) {
             return;
         }
@@ -94,7 +198,14 @@ impl<S: Store> Core<S> {
     }
 
     pub fn ask(&self, tree: &Tree) -> Result<Pack, Error> {
-        query::run(&self.plan, &self.store, tree)
+        let key = query::digest(tree);
+        let units = query::involved(&self.plan, tree)?;
+        if let Some(pack) = self.stash.read(&key, &units) {
+            return Ok(pack);
+        }
+        let pack = query::run(&self.plan, &self.store, tree)?;
+        self.stash.keep(key, &units, &pack);
+        Ok(pack)
     }
 
     pub fn end(&self, name: &str, key: i64) -> Result<(), Error> {

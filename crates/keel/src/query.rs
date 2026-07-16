@@ -855,6 +855,33 @@ fn hit_at(key: Option<i64>, cells: &BTreeMap<String, Cell>, pred: &Pred) -> bool
     hit_map(cells, pred)
 }
 
+pub fn involved(plan: &Plan, tree: &Tree) -> Result<Vec<String>, Error> {
+    let name = resolve(plan, tree.from())?;
+    let unit = plan
+        .units()
+        .get(&name)
+        .ok_or_else(|| Error::Missing(name.clone()))?;
+    let mut out = vec![ddl::table(&name)];
+    for pred in tree.preds() {
+        if matches!(pred.op(), Op::Has | Op::Some)
+            && let Ok(bond) = edge(unit, pred.field())
+            && let Some(e) = unit.bonds().iter().find(|e| e.name() == bond)
+        {
+            out.push(ddl::table(e.target()));
+        }
+    }
+    for bond in tree.links() {
+        if let Ok(bond) = edge(unit, bond)
+            && let Some(e) = unit.bonds().iter().find(|e| e.name() == bond)
+        {
+            out.push(ddl::table(e.target()));
+        }
+    }
+    out.sort();
+    out.dedup();
+    Ok(out)
+}
+
 pub fn bare(tree: &Tree) -> Tree {
     let mut out = tree.clone();
     out.tally = false;

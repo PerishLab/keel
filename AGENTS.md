@@ -40,6 +40,7 @@ done when its scenario is green; no stage begins against unlanded law.
 - Capability: `docs/capability.md` (six verbs, `@grant`, operator, gate).
 - Trigger: `docs/trigger.md` (thin events, observe-only, relay).
 - Unique: `docs/unique.md` (serialized write path; live-unique; serial).
+- Cache: `docs/cache.md` (invisible; under coverage; generations+horizon).
 - Lease: `docs/lease.md` (end with an instant; no resurrection; L3 edges).
 
 ## Operating

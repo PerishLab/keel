@@ -10,7 +10,28 @@ pub struct Config {
     pub listen: Listen,
     pub store: Store,
     pub identity: Identity,
+    pub cache: Cache,
     pub root: PathBuf,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Cache {
+    pub kind: Hold,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Hold {
+    #[default]
+    Memory,
+    None,
+}
+
+impl Default for Cache {
+    fn default() -> Self {
+        Self { kind: Hold::Memory }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
@@ -48,6 +69,7 @@ struct File {
     listen: Listen,
     store: Store,
     identity: Identity,
+    cache: Cache,
 }
 
 impl Default for Listen {
@@ -78,6 +100,7 @@ pub fn load(root: impl AsRef<Path>) -> Config {
         listen: file.listen,
         store: file.store,
         identity: file.identity,
+        cache: file.cache,
         root,
     }
 }

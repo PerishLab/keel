@@ -193,3 +193,14 @@ so the shared meaning stays true.
   (at-least-once, T-7).
 - `tick` / `serve` / `fits` / `letter` / `knock` — relay loop: one poll;
   one hook's deliveries; filter match; thin event json; raw http post.
+- `stash` — the engine cache: engine-view packs under coverage; key =
+  digest, validity = per-unit generation vector + lease horizon
+  (`docs/cache.md`).
+- `deal` — one cache entry (gens, until, pack).
+- `bump` / `stamp` — advance a unit generation at `beat`; snapshot the
+  vector for an entry.
+- `horizon` — nearest lease `expires_at` inside a pack; entry dies there.
+- `bare` — Core builder: cache off (`[cache] kind = "none"`).
+- `hold` — cache capacity constant; overflow clears (eviction, never error).
+- `involved` — the units a tree reads (root, link and pred targets);
+  the invalidation footprint of a cached entry.
