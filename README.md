@@ -108,7 +108,9 @@ sidecar start --config sidecar.toml
 sidecar stop --config sidecar.toml
 ```
 
-`keel-api` is a demo binary (Student/Course selection + store/listen from keel.toml).
+`keel-api` is a demo binary (Student/Course selection + store/listen from
+keel.toml). `forge` is the staged scenario binary (`docs/spec.md`);
+`keel-gate` ships the default credential package (`gate!(Actor)` + wall).
 
 ## Operating
 

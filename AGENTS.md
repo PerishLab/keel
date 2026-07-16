@@ -17,8 +17,9 @@ engine projections, not business authoring surfaces.
   `[listen]` in `keel.toml` (do not dual-author ports).
 - **Edge**: always-pack `/query`; `link` → bond bags (H0); root-only order/page
   (`docs/edge.md`). Bond attrs + `has` + live-unique + K1 (`docs/bond.md`).
-- **Capability**: law settled in `docs/capability.md` (bootstrap `@grant`,
-  operator injection, root chain, gate package); implementation pending.
+- **Capability**: `docs/capability.md` — landed: `@grant` bootstrap,
+  operator faces, root-chain subtree checks, mint/attenuation, genesis
+  token window, `keel-gate` package (S2+S3 of `docs/spec.md`).
 - **Trigger**: law settled in `docs/trigger.md` (third projection, thin
   post-commit events, relay package); implementation pending.
 - No reverse relation generation.
@@ -51,7 +52,8 @@ done when its scenario is green; no stage begins against unlanded law.
 
 - `crates/keel/` — engine library
 - `crates/macro/` — proc macros
-- `crates/api/` — demo HTTP binary for sidecar
+- `crates/api/` — demo binaries (`keel-api`, `forge`) for sidecar/scenarios
+- `crates/gate/` — `keel-gate`: default credential package (caller space)
 - `keel.toml` — runtime policy (listen/store)
 - `sidecar.toml` — local process plan
 - `docs/` — vocabulary, verify, edge, capability, trigger laws
