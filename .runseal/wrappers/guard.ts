@@ -49,6 +49,7 @@ await bin("deno").run([
   ".runseal/wrappers/land.ts",
   ".runseal/wrappers/smoke.ts",
   ".runseal/wrappers/course.ts",
+  ".runseal/wrappers/forge.ts",
 ]);
 
 io.print("==> negentropy");
@@ -86,6 +87,22 @@ await bin("deno").run([
   ".runseal/deno.lock",
   "--frozen=true",
   ".runseal/wrappers/course.ts",
+], { cwd: root });
+
+io.print("==> forge");
+await bin("deno").run([
+  "run",
+  "--allow-read",
+  "--allow-write",
+  "--allow-env",
+  "--allow-net",
+  "--allow-run",
+  "--config",
+  ".runseal/deno.json",
+  "--lock",
+  ".runseal/deno.lock",
+  "--frozen=true",
+  ".runseal/wrappers/forge.ts",
 ], { cwd: root });
 
 io.print("guard: clean");

@@ -261,6 +261,9 @@ fn cells_skip(body: &Map<String, Value>, skip: &[&str]) -> Result<BTreeMap<Strin
 }
 
 fn pack_json(pack: &crate::query::Pack) -> Value {
+    if let Some(n) = pack.count() {
+        return json!({ "root": pack.root(), "count": n });
+    }
     let mut bags = Map::new();
     for (key, bag) in pack.bags() {
         let list = match bag {
@@ -344,6 +347,10 @@ impl From<Error> for Fault {
                 note,
             },
             Error::Adapt(note) if note.starts_with("live ref exists") => Self {
+                status: StatusCode::CONFLICT,
+                note,
+            },
+            Error::Adapt(note) if note.ends_with(" taken") => Self {
                 status: StatusCode::CONFLICT,
                 note,
             },

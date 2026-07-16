@@ -3,6 +3,12 @@
 Pressure pass of keel through a classic enroll / drop / schedule flow.
 Gates: L1 `tests/course.rs`, L2 `runseal :course` (also from `:guard`).
 
+The flagship staged scenario is **`:forge`** (`docs/spec.md`): a thin
+Forgejo slice growing one act per delivery stage. Act 1 (S1 data
+completeness) covers unique login, per-owner repo names, per-repo issue
+serials, typed json, count packs, and ref-blocked ends over the `forge`
+binary (`crates/api/src/bin/forge.rs`).
+
 ## Model (keel-api)
 
 | Unit | Fields | Bonds |

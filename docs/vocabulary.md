@@ -122,3 +122,7 @@ so the shared meaning stays true.
 - `col` / `seat` / `joint` — ddl: quoted SQL identifiers for business
   columns, unit tables, join tables; single-word fields may collide with
   SQL keywords (`index`, `order`), so generated SQL always quotes.
+- `count` — query terminal: count pack `{root, count}` without bags; stands
+  alone (`docs/edge.md`). Tree flag named `tally`.
+- `forge` — flagship scenario binary + `:forge` gate; one act per spec
+  stage (`docs/spec.md`).

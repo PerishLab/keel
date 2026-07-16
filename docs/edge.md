@@ -174,6 +174,19 @@ Example pack under **H0**:
 }
 ```
 
+## Count terminal
+
+`from <Unit> [where …] count` returns a count pack — no bags:
+
+```json
+{ "root": "student", "count": 3 }
+```
+
+- Counts live root rows passing the preds; `has` / `some` apply.
+- **Count stands alone**: combining with `link` / `order` / `limit` /
+  `after` is an error.
+- No group-by, no further aggregates; `digest` includes the terminal.
+
 ## Single subject (root only order / page)
 
 Only the **root** unit of a tree (the `from` unit) may take:
@@ -218,6 +231,7 @@ truncation is forbidden.
 | Response | **A** — always pack on `/query` |
 | Hydrate | **H0** — bond bags only; no target unit bag from `link` |
 | Cap seat | **C0** — engine constants; error on overflow |
+| Count | terminal, stands alone, count pack without bags |
 | Association data | **Bond attrs** on many2many join — see `docs/bond.md` |
 
 ## Bond suite (see `docs/bond.md`)

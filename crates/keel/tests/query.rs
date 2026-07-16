@@ -128,6 +128,17 @@ fn run() {
     assert_eq!(pack.rows().len(), 3);
     assert_eq!(pack.rows()[0].key(), ada);
     assert_eq!(pack.bags().len(), 1);
+    assert_eq!(pack.count(), None);
+
+    let pack = core.query("from Student count").expect("count");
+    assert_eq!(pack.count(), Some(3));
+    assert!(pack.bags().is_empty());
+    let pack = core
+        .query(r#"from Student where nickname != "ada" count"#)
+        .expect("count pred");
+    assert_eq!(pack.count(), Some(2));
+    assert!(core.query("from Student count limit 1").is_err());
+    assert!(core.query("from Student count link classes").is_err());
 
     let pack = core
         .query(r#"from Student where nickname = "ada""#)

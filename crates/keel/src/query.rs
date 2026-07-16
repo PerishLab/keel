@@ -87,6 +87,7 @@ pub struct Tree {
     sort: Option<Sort>,
     limit: Option<usize>,
     after: Option<i64>,
+    tally: bool,
 }
 
 impl Tree {
@@ -117,6 +118,10 @@ impl Tree {
     pub fn after(&self) -> Option<i64> {
         self.after
     }
+
+    pub fn tally(&self) -> bool {
+        self.tally
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -129,6 +134,7 @@ pub enum Bag {
 pub struct Pack {
     root: String,
     bags: BTreeMap<String, Bag>,
+    count: Option<usize>,
 }
 
 impl Pack {
@@ -157,6 +163,10 @@ impl Pack {
     pub fn rows(&self) -> &[Row] {
         self.unit(&self.root).unwrap_or(&[])
     }
+
+    pub fn count(&self) -> Option<usize> {
+        self.count
+    }
 }
 
 pub type Ask = Tree;
@@ -170,6 +180,7 @@ pub fn form(unit: &str) -> Tree {
         sort: None,
         limit: None,
         after: None,
+        tally: false,
     }
 }
 
@@ -189,6 +200,8 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
             }
         }
     }
+    scan.ws();
+    let tally = scan.opt("count");
     let links = take_links(&mut scan)?;
     let sort = take_sort(&mut scan)?;
     let limit = take_limit(&mut scan)?;
@@ -196,6 +209,10 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
     scan.ws();
     if !scan.done() {
         return Err(Error::Adapt("query has trailing tokens".into()));
+    }
+    let more = !links.is_empty() || sort.is_some() || limit.is_some() || after.is_some();
+    if tally && more {
+        return Err(Error::Adapt("count stands alone".into()));
     }
     Ok(Tree {
         from: unit,
@@ -205,6 +222,7 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
         sort,
         limit,
         after,
+        tally,
     })
 }
 
@@ -228,6 +246,13 @@ pub fn run(plan: &Plan, store: &impl Store, tree: &Tree) -> Result<Pack, Error> 
         rows.retain(|row| pass(row, tree.preds()));
     }
     hold(plan, store, &name, &mut rows, tree.preds())?;
+    if tree.tally() {
+        return Ok(Pack {
+            root: ddl::table(&name),
+            bags: BTreeMap::new(),
+            count: Some(rows.len()),
+        });
+    }
     order(&mut rows, tree.sort());
     page(&mut rows, tree.after(), tree.limit());
     let keys: Vec<i64> = rows.iter().map(|row| row.key()).collect();
@@ -250,7 +275,11 @@ pub fn run(plan: &Plan, store: &impl Store, tree: &Tree) -> Result<Pack, Error> 
         let key = format!("{root}.{bond}");
         bags.insert(key, Bag::Bond(ties));
     }
-    Ok(Pack { root, bags })
+    Ok(Pack {
+        root,
+        bags,
+        count: None,
+    })
 }
 
 pub fn digest(tree: &Tree) -> String {
@@ -287,6 +316,9 @@ pub fn digest(tree: &Tree) -> String {
         out.push_str(" after \"");
         out.push_str(&id.to_string());
         out.push('"');
+    }
+    if tree.tally() {
+        out.push_str(" count");
     }
     out
 }

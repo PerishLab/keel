@@ -68,6 +68,7 @@ runseal :init
 runseal :guard
 runseal :smoke
 runseal :course
+runseal :forge
 cargo run -p keel-api --locked
 sidecar start --config sidecar.toml
 ```
