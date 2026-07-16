@@ -123,7 +123,7 @@ fn one(
 enum Only {
     Free,
     All,
-    Per(String),
+    Per(Vec<String>),
 }
 
 enum Made {
@@ -135,7 +135,10 @@ fn grow(label: &str, atom: &Ident, only: &Only) -> proc_macro2::TokenStream {
     match only {
         Only::Free => quote! { .field(#label, ::keel::atom::Kind::#atom) },
         Only::All => quote! { .sole(#label, ::keel::atom::Kind::#atom) },
-        Only::Per(scope) => quote! { .per(#label, ::keel::atom::Kind::#atom, #scope) },
+        Only::Per(scope) => {
+            let refs = scope.iter();
+            quote! { .per(#label, ::keel::atom::Kind::#atom, &[#(#refs),*]) }
+        }
     }
 }
 
@@ -199,13 +202,27 @@ fn only_of(attr: &Attribute, item: &Expr) -> syn::Result<Only> {
     if let Expr::Assign(ExprAssign { left, right, .. }) = item {
         let name = expr_ident(left)?;
         if name == "unique" {
-            return Ok(Only::Per(expr_ident(right)?.to_string()));
+            return Ok(Only::Per(scopes(attr, right)?));
         }
     }
     Err(syn::Error::new_spanned(
         attr,
         "field extras: unique or unique = rel",
     ))
+}
+
+fn scopes(attr: &Attribute, expr: &Expr) -> syn::Result<Vec<String>> {
+    if let Expr::Tuple(tuple) = expr {
+        let mut out = Vec::new();
+        for item in &tuple.elems {
+            out.push(expr_ident(item)?.to_string());
+        }
+        if out.is_empty() {
+            return Err(syn::Error::new_spanned(attr, "unique scope is empty"));
+        }
+        return Ok(out);
+    }
+    Ok(vec![expr_ident(expr)?.to_string()])
 }
 
 type Link = (Ident, String, Vec<(String, Ident)>, bool, bool, bool);

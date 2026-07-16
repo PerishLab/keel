@@ -167,18 +167,17 @@ impl Unit {
             ));
         }
         for slot in &fields {
-            let scope = match slot.only() {
-                Only::Per(scope) => Some(scope.as_str()),
-                _ => slot.serial.as_deref(),
+            let scopes: Vec<&str> = match slot.only() {
+                Only::Per(scopes) => scopes.iter().map(String::as_str).collect(),
+                _ => slot.serial.as_deref().into_iter().collect(),
             };
-            let Some(scope) = scope else {
-                continue;
-            };
-            let held = bonds.iter().any(|e| e.kind().point() && e.name() == scope);
-            if !held {
-                return Err(crate::adapt::Error::Adapt(format!(
-                    "unique scope {scope} is not a ref"
-                )));
+            for scope in scopes {
+                let held = bonds.iter().any(|e| e.kind().point() && e.name() == scope);
+                if !held {
+                    return Err(crate::adapt::Error::Adapt(format!(
+                        "unique scope {scope} is not a ref"
+                    )));
+                }
             }
         }
         Ok(Self {

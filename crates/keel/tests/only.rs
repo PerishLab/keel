@@ -127,3 +127,48 @@ fn tally() {
         .expect("order");
     assert_eq!(pack.rows()[0].key(), three);
 }
+
+#[resource]
+struct React {
+    #[field(string, unique = (fan, issue))]
+    emoji: string,
+    #[relation(Org, many2one, root)]
+    fan: Org,
+    #[relation(Repo, many2one)]
+    issue: Repo,
+}
+
+#[test]
+fn composite() {
+    let mut graph = Graph::new();
+    graph.plug::<Org>().plug::<Repo>().plug::<React>();
+    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let lab = core.put("Org", &[("slug", "lab")]).expect("lab");
+    let ada = core.put("Org", &[("slug", "ada")]).expect("ada");
+    let one = core
+        .put("Repo", &[("name", "one"), ("org", &lab.to_string())])
+        .expect("one");
+    let two = core
+        .put("Repo", &[("name", "two"), ("org", &lab.to_string())])
+        .expect("two");
+
+    let seed = |emoji: &str, actor: i64, issue: i64| {
+        core.put(
+            "React",
+            &[
+                ("emoji", emoji),
+                ("fan", &actor.to_string()),
+                ("issue", &issue.to_string()),
+            ],
+        )
+    };
+    seed("up", lab, one).expect("first");
+    seed("tada", lab, one).expect("same pair other emoji");
+    seed("up", ada, one).expect("other actor same emoji");
+    seed("up", lab, two).expect("other issue same emoji");
+    assert!(seed("up", lab, one).is_err());
+
+    let react = seed("heart", lab, two).expect("live");
+    core.end("React", react).expect("undo");
+    seed("heart", lab, two).expect("re-react after undo");
+}

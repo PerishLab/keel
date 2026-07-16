@@ -64,14 +64,17 @@ pub fn script(plan: &Plan) -> Vec<String> {
 
 fn lock(node: &Unit, slot: &Slot) -> String {
     let place = table(node.name());
-    let scope = match slot.only() {
-        Only::Per(rel) => Some(rel.as_str()),
-        _ => slot.serial(),
+    let scopes: Vec<String> = match slot.only() {
+        Only::Per(rels) => rels.iter().map(|rel| col(&side(rel))).collect(),
+        _ => slot
+            .serial()
+            .map(|rel| col(&side(rel)))
+            .into_iter()
+            .collect(),
     };
-    let cols = match scope {
-        Some(rel) => format!("{}, {}", col(&side(rel)), col(slot.name())),
-        None => col(slot.name()),
-    };
+    let mut parts = scopes;
+    parts.push(col(slot.name()));
+    let cols = parts.join(", ");
     format!(
         "CREATE UNIQUE INDEX IF NOT EXISTS only_{place}_{} ON {} ({cols}) WHERE {EXPIRES} IS NULL;",
         slot.name(),

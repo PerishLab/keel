@@ -15,7 +15,7 @@ differ per store, provided the scenario suite cannot tell.
 | U1 | at most one **live** tie per `(left, right)` per bond; second rejected |
 | U2 | `unique` field: at most one live row per value, engine-wide |
 | U3 | `unique = <relation>` field: at most one live row per value **within the parent row** |
-| U4 | composite unique: one live row per value tuple (grammar open, see S1) |
+| U4 | composite unique: one live row per value tuple; `unique = (rel, rel)` scopes a field by a tuple of refs |
 | U5 | scoped serial: per-parent monotonic allocation at `put`; never reused |
 
 ## Liveness rule

@@ -212,3 +212,4 @@ so the shared meaning stays true.
 - `bearer` — who-match incl. group expansion through a crew bond.
 - `whole` — validate a grant `who` value (id / group / anon / all).
 - `cast` — spec builder: which marker a bond carries (Bond/Free/Root/Crew).
+- `scopes` — macro parse of a unique scope, single ref or a ref tuple (U4).

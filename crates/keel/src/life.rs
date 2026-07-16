@@ -208,12 +208,15 @@ impl<'a> Work<'a> {
             rusqlite::types::Value::Integer(me),
             rusqlite::types::Value::Integer(now()),
         ];
-        if let Only::Per(rel) = slot.only() {
-            let col = ddl::col(&ddl::side(rel));
-            text.push_str(&format!(
-                " AND ({col} = ?4 OR (?4 IS NULL AND {col} IS NULL))"
-            ));
-            vals.push(anchor(fields, myself, rel)?);
+        if let Only::Per(rels) = slot.only() {
+            for rel in rels {
+                let col = ddl::col(&ddl::side(rel));
+                let at = vals.len() + 1;
+                text.push_str(&format!(
+                    " AND ({col} = ?{at} OR (?{at} IS NULL AND {col} IS NULL))"
+                ));
+                vals.push(anchor(fields, myself, rel)?);
+            }
         }
         text.push_str(" LIMIT 1");
         let mut stmt = self.conn.prepare(&text).map_err(fail)?;

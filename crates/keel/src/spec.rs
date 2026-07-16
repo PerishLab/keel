@@ -25,7 +25,7 @@ enum Cast {
 pub enum Only {
     Free,
     All,
-    Per(String),
+    Per(Vec<String>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -144,16 +144,11 @@ impl Builder {
         self
     }
 
-    pub fn per(
-        mut self,
-        name: impl Into<String>,
-        kind: atom::Kind,
-        scope: impl Into<String>,
-    ) -> Self {
+    pub fn per(mut self, name: impl Into<String>, kind: atom::Kind, scope: &[&str]) -> Self {
         self.fields.push(Field {
             name: name.into(),
             kind,
-            only: Only::Per(scope.into()),
+            only: Only::Per(scope.iter().map(|s| s.to_string()).collect()),
             serial: None,
         });
         self
