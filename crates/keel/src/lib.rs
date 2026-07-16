@@ -11,6 +11,7 @@ pub mod plan;
 pub mod query;
 pub mod spec;
 pub mod store;
+pub mod wire;
 
 #[cfg(feature = "http")]
 pub mod serve;

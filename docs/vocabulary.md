@@ -219,3 +219,9 @@ so the shared meaning stays true.
 - `begin` / `commit` / `undo` — store transaction primitives; SQLite txn
   state lives on the connection, so per-call locking still shares it.
 - `step` — run one transaction control word on the connection.
+- `wire` — driver-agnostic SQL seam: `Wire` trait speaks only keel's `Val`
+  (Null/Int/Text); `life::Work` is generic over it, never touches a driver
+  row type. `run`/`plant`/`rows`/`script` are the four calls.
+- `sql` — the rusqlite `Wire` impl (in adapt::db); `cast`/`lift` convert
+  Val <-> rusqlite Value.
+- `sheet` — canonical select column order for positional row reads.
