@@ -49,6 +49,14 @@ fn parse() {
     let tree = query::parse(r#"from Student where nickname in ("ada", "bob")"#).expect("in");
     assert_eq!(tree.preds()[0].op(), Op::In);
 
+    let tree = query::parse(r#"from Student where nickname like "da""#).expect("like");
+    assert_eq!(tree.preds()[0].op(), Op::Like);
+    assert_eq!(tree.preds()[0].value(), "da");
+    assert_eq!(
+        query::digest(&tree),
+        r#"from student slice live where nickname like "da""#
+    );
+
     let tree = query::parse("from Student link classes").expect("link");
     assert_eq!(tree.links(), &["classes".to_string()]);
     assert_eq!(query::digest(&tree), "from student slice live link classes");
@@ -158,6 +166,12 @@ fn run() {
         .query(r#"from Student where nickname in ("ada", "cy")"#)
         .expect("in");
     assert_eq!(pack.rows().len(), 2);
+
+    let pack = core
+        .query(r#"from Student where nickname like "A""#)
+        .expect("like");
+    assert_eq!(pack.rows().len(), 1);
+    assert_eq!(pack.rows()[0].key(), ada);
 
     let pack = core
         .query("from Student order by nickname desc")

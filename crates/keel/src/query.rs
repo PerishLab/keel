@@ -22,6 +22,7 @@ pub enum Op {
     Gt,
     Ge,
     In,
+    Like,
     Has,
     Some,
 }
@@ -442,6 +443,16 @@ fn take_cell_rest(scan: &mut Scan<'_>, field: String) -> Result<Pred, Error> {
             nest: None,
         });
     }
+    if scan.opt("like") {
+        scan.ws();
+        let value = scan.quoted()?;
+        return Ok(Pred {
+            field,
+            op: Op::Like,
+            values: vec![value],
+            nest: None,
+        });
+    }
     let op = scan.op()?;
     scan.ws();
     let value = scan.quoted()?;
@@ -515,6 +526,7 @@ fn mark(op: Op) -> &'static str {
         Op::Gt => ">",
         Op::Ge => ">=",
         Op::In => "in",
+        Op::Like => "like",
         Op::Has => "has",
         Op::Some => "some",
     }
@@ -595,6 +607,9 @@ fn check_pred(plan: &Plan, unit: &crate::plan::Unit, pred: &Pred) -> Result<(), 
 
 fn check_cell(unit: &crate::plan::Unit, pred: &Pred) -> Result<(), Error> {
     let kind = slot(unit, pred.field())?;
+    if pred.op() == Op::Like && !matches!(kind, atom::Kind::Text | atom::Kind::Link) {
+        return Err(Error::Adapt("like wants a text field".into()));
+    }
     for value in pred.values() {
         fit(kind, value)?;
     }
@@ -822,6 +837,7 @@ fn hit_text(got: &str, pred: &Pred) -> bool {
         Op::Gt => got > pred.value(),
         Op::Ge => got >= pred.value(),
         Op::In => pred.values().iter().any(|want| want == got),
+        Op::Like => got.to_lowercase().contains(&pred.value().to_lowercase()),
         Op::Has | Op::Some => false,
     }
 }
@@ -914,7 +930,7 @@ fn hit_key(key: i64, pred: &Pred) -> bool {
             .values()
             .iter()
             .any(|want| key_text(want).is_ok_and(|n| n == key)),
-        Op::Has | Op::Some => false,
+        Op::Like | Op::Has | Op::Some => false,
     }
 }
 

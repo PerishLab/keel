@@ -232,6 +232,7 @@ truncation is forbidden.
 | Hydrate | **H0** — bond bags only; no target unit bag from `link` |
 | Cap seat | **C0** — engine constants; error on overflow |
 | Count | terminal, stands alone, count pack without bags |
+| Like | `field like "frag"` case-insensitive substring on a text field |
 | Association data | **Bond attrs** on many2many join — see `docs/bond.md` |
 
 ## Bond suite (see `docs/bond.md`)

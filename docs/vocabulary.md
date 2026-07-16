@@ -234,3 +234,4 @@ so the shared meaning stays true.
 - `vault` / `shelf` — blob state + route merge. `stow` (POST /asset:
   gated put + presigned PUT url), `fetch` (GET /asset/{id}: gated see +
   302 to presigned GET url). `object` keys by asset id.
+- `like` — query op: case-insensitive substring on a text field (issue search).
