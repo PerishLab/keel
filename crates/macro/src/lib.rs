@@ -88,12 +88,18 @@ fn one(
         let row = quote! { .field(#label, ::keel::atom::Kind::#atom) };
         return Ok((mark, Some(row), None));
     }
-    if let Some((card, target, slots)) = link(&field.attrs, &field.ty)? {
+    if let Some((card, target, slots, need)) = link(&field.attrs, &field.ty)? {
         let pairs = slots.iter().map(|(n, k)| {
             quote! { (#n, ::keel::atom::Kind::#k) }
         });
-        let row = quote! {
-            .bond(#label, ::keel::bond::Kind::#card, #target, &[#(#pairs),*])
+        let row = if need {
+            quote! {
+                .bond(#label, ::keel::bond::Kind::#card, #target, &[#(#pairs),*])
+            }
+        } else {
+            quote! {
+                .free(#label, ::keel::bond::Kind::#card, #target)
+            }
         };
         return Ok((mark, None, Some(row)));
     }
@@ -125,27 +131,14 @@ fn atom(attrs: &[Attribute]) -> syn::Result<Option<Ident>> {
     Ok(None)
 }
 
-type Link = (Ident, String, Vec<(String, Ident)>);
+type Link = (Ident, String, Vec<(String, Ident)>, bool);
 
 fn link(attrs: &[Attribute], ty: &Type) -> syn::Result<Option<Link>> {
     for attr in attrs {
         if !attr.path().is_ident("relation") {
             continue;
         }
-        let Meta::List(list) = &attr.meta else {
-            return Err(syn::Error::new_spanned(
-                attr,
-                "use #[relation(Type, many2many)] or #[relation(Type, many2many, field = atom)]",
-            ));
-        };
-        let items = Punctuated::<Expr, Token![,]>::parse_terminated
-            .parse2(list.tokens.clone())
-            .map_err(|_| {
-                syn::Error::new_spanned(
-                    attr,
-                    "use #[relation(Type, many2many)] or #[relation(Type, many2many, field = atom)]",
-                )
-            })?;
+        let items = rest(attr)?;
         if items.len() < 2 {
             return Err(syn::Error::new_spanned(
                 attr,
@@ -156,13 +149,46 @@ fn link(attrs: &[Attribute], ty: &Type) -> syn::Result<Option<Link>> {
         let card = path_ident(&items[1])?;
         let kind = card_of(&card)?;
         let mut slots = Vec::new();
+        let mut need = true;
         for item in items.iter().skip(2) {
+            if expr_ident(item).is_ok_and(|word| word == "opt") {
+                need = false;
+                continue;
+            }
             slots.push(slot_of(item)?);
         }
+        shape(attr, &kind, &slots, need)?;
         let _ = ty;
-        return Ok(Some((kind, target, slots)));
+        return Ok(Some((kind, target, slots, need)));
     }
     Ok(None)
+}
+
+fn rest(attr: &Attribute) -> syn::Result<Punctuated<Expr, Token![,]>> {
+    let Meta::List(list) = &attr.meta else {
+        return Err(syn::Error::new_spanned(
+            attr,
+            "use #[relation(Type, many2many)] or #[relation(Type, many2one)]",
+        ));
+    };
+    Punctuated::<Expr, Token![,]>::parse_terminated
+        .parse2(list.tokens.clone())
+        .map_err(|_| {
+            syn::Error::new_spanned(
+                attr,
+                "use #[relation(Type, many2many, field = atom)] or #[relation(Type, many2one, opt)]",
+            )
+        })
+}
+
+fn shape(attr: &Attribute, kind: &Ident, slots: &[(String, Ident)], need: bool) -> syn::Result<()> {
+    if kind == "Many2one" && !slots.is_empty() {
+        return Err(syn::Error::new_spanned(attr, "many2one takes no fields"));
+    }
+    if kind == "Many2many" && !need {
+        return Err(syn::Error::new_spanned(attr, "opt is many2one only"));
+    }
+    Ok(())
 }
 
 fn kind_of(atom: &Ident) -> syn::Result<Ident> {
@@ -181,6 +207,7 @@ fn kind_of(atom: &Ident) -> syn::Result<Ident> {
 fn card_of(card: &Ident) -> syn::Result<Ident> {
     match card.to_string().as_str() {
         "many2many" => Ok(Ident::new("Many2many", card.span())),
+        "many2one" => Ok(Ident::new("Many2one", card.span())),
         other => Err(syn::Error::new(
             card.span(),
             format!("unknown relation kind: {other}"),

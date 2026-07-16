@@ -324,7 +324,9 @@ fn check_links(plan: &Plan, name: &str, links: &[String]) -> Result<(), Error> {
 fn edge(unit: &crate::plan::Unit, bond: &str) -> Result<String, Error> {
     unit.bonds()
         .iter()
-        .find(|edge| edge.name().eq_ignore_ascii_case(bond))
+        .find(|edge| {
+            edge.name().eq_ignore_ascii_case(bond) && edge.kind() == crate::bond::Kind::Many2many
+        })
         .map(|edge| edge.name().to_string())
         .ok_or_else(|| Error::Adapt(format!("unknown bond {bond}")))
 }
@@ -600,11 +602,17 @@ fn slot(unit: &crate::plan::Unit, field: &str) -> Result<atom::Kind, Error> {
     if field == ddl::KEY {
         return Ok(atom::Kind::Int);
     }
-    unit.fields()
+    if let Some(slot) = unit.fields().iter().find(|slot| slot.name() == field) {
+        return Ok(slot.kind());
+    }
+    let point = unit
+        .bonds()
         .iter()
-        .find(|slot| slot.name() == field)
-        .map(|slot| slot.kind())
-        .ok_or_else(|| Error::Adapt(format!("unknown field {field}")))
+        .any(|e| e.kind() == crate::bond::Kind::Many2one && e.name() == field);
+    if point {
+        return Ok(atom::Kind::Int);
+    }
+    Err(Error::Adapt(format!("unknown field {field}")))
 }
 
 fn hold(

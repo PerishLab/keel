@@ -25,6 +25,7 @@ pub struct Bond {
     kind: bond::Kind,
     target: String,
     fields: Vec<Field>,
+    need: bool,
 }
 
 pub struct Builder {
@@ -81,6 +82,10 @@ impl Bond {
     pub fn fields(&self) -> &[Field] {
         &self.fields
     }
+
+    pub fn need(&self) -> bool {
+        self.need
+    }
 }
 
 impl Builder {
@@ -93,11 +98,31 @@ impl Builder {
     }
 
     pub fn bond(
+        self,
+        name: impl Into<String>,
+        kind: bond::Kind,
+        target: impl Into<String>,
+        fields: &[(&str, atom::Kind)],
+    ) -> Self {
+        self.join(name, kind, target, fields, true)
+    }
+
+    pub fn free(
+        self,
+        name: impl Into<String>,
+        kind: bond::Kind,
+        target: impl Into<String>,
+    ) -> Self {
+        self.join(name, kind, target, &[], false)
+    }
+
+    fn join(
         mut self,
         name: impl Into<String>,
         kind: bond::Kind,
         target: impl Into<String>,
         fields: &[(&str, atom::Kind)],
+        need: bool,
     ) -> Self {
         let fields = fields
             .iter()
@@ -111,6 +136,7 @@ impl Builder {
             kind,
             target: target.into(),
             fields,
+            need,
         });
         self
     }

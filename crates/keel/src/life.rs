@@ -122,10 +122,13 @@ impl<'a> Work<'a> {
         let unit = find(plan, name)?;
         check(unit, fields)?;
         let tick = now();
-        let mut cols: Vec<&str> = unit.fields().iter().map(|s| s.name()).collect();
-        cols.push(ddl::EXPIRES);
-        cols.push(ddl::CREATED);
-        cols.push(ddl::UPDATED);
+        let mut cols: Vec<String> = unit.fields().iter().map(|s| s.name().to_string()).collect();
+        for edge in refs(unit) {
+            cols.push(ddl::side(edge.name()));
+        }
+        cols.push(ddl::EXPIRES.into());
+        cols.push(ddl::CREATED.into());
+        cols.push(ddl::UPDATED.into());
         let marks = (1..=cols.len())
             .map(|i| format!("?{i}"))
             .collect::<Vec<_>>()
@@ -139,12 +142,12 @@ impl<'a> Work<'a> {
         let mut stmt = self.conn.prepare(&text).map_err(fail)?;
         let mut vals: Vec<rusqlite::types::Value> = Vec::new();
         for slot in unit.fields() {
-            let hit = fields
-                .iter()
-                .find(|(k, _)| *k == slot.name())
-                .map(|(_, v)| *v)
-                .unwrap_or("");
+            let hit = pluck(fields, slot.name());
             vals.push(bind(slot, hit)?);
+        }
+        for edge in refs(unit) {
+            let hit = pluck(fields, edge.name());
+            vals.push(self.point(plan, edge, hit)?);
         }
         vals.push(rusqlite::types::Value::Null);
         vals.push(rusqlite::types::Value::Integer(tick));
@@ -152,6 +155,40 @@ impl<'a> Work<'a> {
         stmt.execute(rusqlite::params_from_iter(vals))
             .map_err(fail)?;
         Ok(self.conn.last_insert_rowid())
+    }
+
+    fn point(
+        &self,
+        plan: &Plan,
+        edge: &Edge,
+        value: &str,
+    ) -> Result<rusqlite::types::Value, Error> {
+        if value.is_empty() {
+            if edge.need() {
+                return Err(Error::Adapt(format!("missing ref {}", edge.name())));
+            }
+            return Ok(rusqlite::types::Value::Null);
+        }
+        let key = value
+            .parse::<i64>()
+            .map_err(|_| Error::Adapt(format!("ref {} needs id", edge.name())))?;
+        if !self.live_has(plan, edge.target(), key)? {
+            return Err(Error::Adapt("right not live".into()));
+        }
+        Ok(rusqlite::types::Value::Integer(key))
+    }
+
+    fn entry(
+        &self,
+        plan: &Plan,
+        unit: &Unit,
+        col: &str,
+        val: &str,
+    ) -> Result<(String, rusqlite::types::Value), Error> {
+        if let Some(edge) = refs(unit).find(|e| e.name() == col) {
+            return Ok((ddl::side(edge.name()), self.point(plan, edge, val)?));
+        }
+        Ok((col.to_string(), fit(unit.fields(), col, val)?))
     }
 
     pub fn live(&self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error> {
@@ -194,22 +231,12 @@ impl<'a> Work<'a> {
     }
 
     fn live_in(&self, plan: &Plan, target: &str, key: i64) -> Result<bool, Error> {
-        let tick = now();
         for unit in plan.units().values() {
             for edge in unit.bonds() {
                 if edge.target() != target {
                     continue;
                 }
-                let right = ddl::side(edge.target());
-                let text = format!(
-                    "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
-                    ddl::join(unit.name(), edge.name()),
-                    right,
-                    ddl::EXPIRES,
-                    ddl::EXPIRES
-                );
-                let mut stmt = self.conn.prepare(&text).map_err(fail)?;
-                if stmt.exists(params![key, tick]).map_err(fail)? {
+                if self.live_from(unit, edge, key)? {
                     return Ok(true);
                 }
             }
@@ -217,9 +244,32 @@ impl<'a> Work<'a> {
         Ok(false)
     }
 
+    fn live_from(&self, unit: &Unit, edge: &Edge, key: i64) -> Result<bool, Error> {
+        let tick = now();
+        let (place, col) = match edge.kind() {
+            bond::Kind::Many2many => (
+                ddl::join(unit.name(), edge.name()),
+                ddl::side(edge.target()),
+            ),
+            bond::Kind::Many2one => (ddl::table(unit.name()), ddl::side(edge.name())),
+        };
+        let text = format!(
+            "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
+            place,
+            col,
+            ddl::EXPIRES,
+            ddl::EXPIRES
+        );
+        let mut stmt = self.conn.prepare(&text).map_err(fail)?;
+        stmt.exists(params![key, tick]).map_err(fail)
+    }
+
     fn live_out(&self, unit: &Unit, key: i64) -> Result<bool, Error> {
         let tick = now();
         for edge in unit.bonds() {
+            if edge.kind() != bond::Kind::Many2many {
+                continue;
+            }
             let left = ddl::side(unit.name());
             let text = format!(
                 "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
@@ -252,10 +302,11 @@ impl<'a> Work<'a> {
             if i > 0 {
                 text.push_str(", ");
             }
-            text.push_str(col);
+            let (name, cell) = self.entry(plan, unit, col, val)?;
+            text.push_str(&name);
             text.push_str(" = ?");
             text.push_str(&(i + 1).to_string());
-            vals.push(fit(unit.fields(), col, val)?);
+            vals.push(cell);
         }
         let n = fields.len();
         text.push_str(&format!(
@@ -290,9 +341,6 @@ impl<'a> Work<'a> {
         fields: &[(&str, &str)],
     ) -> Result<i64, Error> {
         let (unit, edge) = edge(plan, owner, bond)?;
-        if edge.kind() != bond::Kind::Many2many {
-            return Err(Error::Adapt("bond is not many2many".into()));
-        }
         bond_part(edge, fields)?;
         if !self.live_has(plan, unit.name(), ends.left)? {
             return Err(Error::Adapt("left not live".into()));
@@ -551,22 +599,37 @@ fn edge<'a>(plan: &'a Plan, owner: &str, bond: &str) -> Result<(&'a Unit, &'a Ed
     let edge = unit
         .bonds()
         .iter()
-        .find(|edge| edge.name().eq_ignore_ascii_case(bond))
+        .find(|edge| edge.name().eq_ignore_ascii_case(bond) && edge.kind() == bond::Kind::Many2many)
         .ok_or_else(|| Error::Adapt(format!("missing bond {bond}")))?;
     Ok((unit, edge))
 }
 
+fn refs(unit: &Unit) -> impl Iterator<Item = &crate::plan::Edge> {
+    unit.bonds()
+        .iter()
+        .filter(|edge| edge.kind() == bond::Kind::Many2one)
+}
+
+fn pluck<'a>(fields: &[(&'a str, &'a str)], name: &str) -> &'a str {
+    fields
+        .iter()
+        .find(|(k, _)| *k == name)
+        .map(|(_, v)| *v)
+        .unwrap_or("")
+}
+
+fn known(unit: &Unit, name: &str) -> bool {
+    unit.fields().iter().any(|s| s.name() == name) || refs(unit).any(|e| e.name() == name)
+}
+
 fn check(unit: &Unit, fields: &[(&str, &str)]) -> Result<(), Error> {
-    if fields.len() != unit.fields().len() {
-        return Err(Error::Adapt("field count mismatch".into()));
-    }
     for slot in unit.fields() {
         if !fields.iter().any(|(k, _)| *k == slot.name()) {
             return Err(Error::Adapt(format!("missing field {}", slot.name())));
         }
     }
     for (k, _) in fields {
-        if !unit.fields().iter().any(|s| s.name() == *k) {
+        if !known(unit, k) {
             return Err(Error::Adapt(format!("unknown field {k}")));
         }
     }
@@ -581,7 +644,7 @@ fn part(unit: &Unit, fields: &[(&str, &str)]) -> Result<(), Error> {
         if *k == ddl::KEY || *k == ddl::EXPIRES || *k == ddl::CREATED || *k == ddl::UPDATED {
             return Err(Error::Adapt(format!("control field {k}")));
         }
-        if !unit.fields().iter().any(|s| s.name() == *k) {
+        if !known(unit, k) {
             return Err(Error::Adapt(format!("unknown field {k}")));
         }
     }
@@ -633,6 +696,13 @@ fn read(unit: &Unit, row: &rusqlite::Row<'_>) -> Result<Row, Error> {
     let mut cells = BTreeMap::new();
     for slot in unit.fields() {
         cells.insert(slot.name().to_string(), pick(slot, row, slot.name())?);
+    }
+    for edge in refs(unit) {
+        let col = ddl::side(edge.name());
+        let value: Option<i64> = row.get(col.as_str()).map_err(fail)?;
+        if let Some(key) = value {
+            cells.insert(edge.name().to_string(), Cell::Int(key));
+        }
     }
     let expires: Option<i64> = row.get(ddl::EXPIRES).optional().map_err(fail)?.flatten();
     let created: i64 = row.get(ddl::CREATED).map_err(fail)?;

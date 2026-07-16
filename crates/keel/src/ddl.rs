@@ -27,7 +27,9 @@ pub fn script(plan: &Plan) -> Vec<String> {
     }
     for node in plan.units().values() {
         for bond in node.bonds() {
-            out.push(arc(node, bond.name(), bond.target(), bond.kind()));
+            if bond.kind() == bond::Kind::Many2many {
+                out.push(arc(node, bond.name(), bond.target()));
+            }
         }
     }
     out
@@ -38,6 +40,12 @@ fn form(node: &Unit) -> String {
     for slot in node.fields() {
         cols.push(format!("{} {} NOT NULL", slot.name(), cast(slot.kind())));
     }
+    for edge in node.bonds() {
+        if edge.kind() == bond::Kind::Many2one {
+            let null = if edge.need() { " NOT NULL" } else { "" };
+            cols.push(format!("{} INTEGER{}", side(edge.name()), null));
+        }
+    }
     stamp(node.reign(), &mut cols);
     format!(
         "CREATE TABLE IF NOT EXISTS {} ({});",
@@ -46,32 +54,28 @@ fn form(node: &Unit) -> String {
     )
 }
 
-fn arc(node: &Unit, bond: &str, target: &str, kind: bond::Kind) -> String {
-    match kind {
-        bond::Kind::Many2many => {
-            let edge = node
-                .bonds()
-                .iter()
-                .find(|edge| edge.name() == bond)
-                .expect("bond");
-            let left = side(node.name());
-            let right = side(target);
-            let mut cols = vec![
-                format!("{KEY} INTEGER PRIMARY KEY NOT NULL"),
-                format!("{left} INTEGER NOT NULL"),
-                format!("{right} INTEGER NOT NULL"),
-            ];
-            for slot in edge.fields() {
-                cols.push(format!("{} {} NOT NULL", slot.name(), cast(slot.kind())));
-            }
-            stamp(node.reign(), &mut cols);
-            format!(
-                "CREATE TABLE IF NOT EXISTS {} ({});",
-                join(node.name(), bond),
-                cols.join(", ")
-            )
-        }
+fn arc(node: &Unit, bond: &str, target: &str) -> String {
+    let edge = node
+        .bonds()
+        .iter()
+        .find(|edge| edge.name() == bond)
+        .expect("bond");
+    let left = side(node.name());
+    let right = side(target);
+    let mut cols = vec![
+        format!("{KEY} INTEGER PRIMARY KEY NOT NULL"),
+        format!("{left} INTEGER NOT NULL"),
+        format!("{right} INTEGER NOT NULL"),
+    ];
+    for slot in edge.fields() {
+        cols.push(format!("{} {} NOT NULL", slot.name(), cast(slot.kind())));
     }
+    stamp(node.reign(), &mut cols);
+    format!(
+        "CREATE TABLE IF NOT EXISTS {} ({});",
+        join(node.name(), bond),
+        cols.join(", ")
+    )
 }
 
 fn stamp(reign: &Reign, cols: &mut Vec<String>) {

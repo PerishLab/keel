@@ -29,6 +29,7 @@ pub struct Edge {
     kind: bond::Kind,
     target: String,
     fields: Vec<Slot>,
+    need: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +85,7 @@ impl Unit {
                         kind: field.kind(),
                     })
                     .collect(),
+                need: bond.need(),
             })
             .collect();
         Ok(Self {
@@ -136,6 +138,10 @@ impl Edge {
 
     pub fn fields(&self) -> &[Slot] {
         &self.fields
+    }
+
+    pub fn need(&self) -> bool {
+        self.need
     }
 }
 

@@ -91,3 +91,13 @@ so the shared meaning stays true.
 - `many2many` — relation kind, spelled out; digit form `n2m` retired with no
   alias. Family law: `many2one` / `one2one` next; `one2many` deliberately
   absent (FK side declares).
+- `many2one` — relation kind: FK column `{field}_id` on the declaring side;
+  target must be live on put/set; inbound live refs block `end` (K3).
+- `opt` — relation marker: many2one column may be NULL; empty value clears.
+- `need` — spec/plan flag: relation is required (not `opt`).
+- `point` — validate and cast one ref value (live target) to a storage key.
+- `refs` — the many2one edges of a unit.
+- `pluck` — read one caller field value by name, empty when absent.
+- `known` — field name is a slot or a ref of the unit.
+- `entry` — resolve one set column to storage column + casted value.
+- `free` — spec builder: declare an `opt` relation (need = false).
