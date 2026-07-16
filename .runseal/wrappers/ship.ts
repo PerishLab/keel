@@ -3,7 +3,7 @@ import { bin } from "@/lib/std/cmd.ts";
 import { io } from "@/lib/std/io.ts";
 
 const INDEX = "https://git.perish.top/api/packages/PerishLab/cargo";
-const CRATES = ["keel-macro", "keel", "keel-gate", "keel-relay"];
+const CRATES = ["keel-macro", "keel", "keel-gate", "keel-relay", "keel-blob"];
 
 function usage(): void {
   io.print("Usage: runseal :ship");
