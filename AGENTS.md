@@ -38,6 +38,7 @@ done when its scenario is green; no stage begins against unlanded law.
 - Edge navigation: `docs/edge.md` (flat bags; root-only order/page).
 - Capability: `docs/capability.md` (six verbs, `@grant`, operator, gate).
 - Trigger: `docs/trigger.md` (thin events, observe-only, relay).
+- Unique: `docs/unique.md` (serialized write path; live-unique; serial).
 
 ## Operating
 

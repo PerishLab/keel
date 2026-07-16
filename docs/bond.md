@@ -87,7 +87,7 @@ Empty attrs on a field-less bond: body may be only `{ "right" }`.
 | W1 | **W1b** — attrs on `tie`; `set_tie` + HTTP PATCH on tie |
 | D3 | **P1+P2** — `has` + `some (field op val)` on bond or target |
 | D4 | **K1+K3** — link hides dead targets; `end` rejects while live ties remain (in **or** out) |
-| D5 | **U1** — no DDL UNIQUE; engine rejects second live pair |
+| D5 | **U1** — live-pair unique on the serialized write path (`docs/unique.md`) |
 | D2 | **R0** — no reverse; roster via P1 / scan |
 
 ### P2 surface
@@ -115,11 +115,29 @@ end. HTTP maps this to **409 Conflict**. K1 remains for read filtering.
 - `left not live` / `right not live` (HTTP **400**)
 - aligns write path with K1 (no new edges to retired rows)
 
+## Promotion law (bond → unit)
+
+Default stays bond attrs. Promote the association to a named unit when
+**any** hard trigger holds:
+
+| Trigger | Test |
+|---------|------|
+| further edges | something must attach to the association itself (e.g. line comments on a review) |
+| workflow | the association owns state transitions (e.g. review approve/reject) |
+| multiplicity | the same pair must exist more than once live — live-unique on `(left, right)` is wrong for the fact (e.g. reactions: one actor, one issue, many emoji) |
+| root need | the association must be ordered, paged, or filtered as the query subject (bond bags never order/page) |
+
+Exemplars: a review (edges + workflow → unit), a reaction (multiplicity →
+unit), an enrollment grade (no trigger → bond attr).
+
+Promotion is a modeling change, not an engine feature: the unit declares
+`many2one` to both former endpoints and lives under normal law. No dual
+form — a promoted association must not keep a shadow bond.
+
 ### Deferred
 
 - R3: shared-arc reverse entrance
 - K2 cascade cut on end
-- Enrollment unit promotion when association must be query root
 
 ## Must not
 
