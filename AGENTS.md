@@ -20,8 +20,8 @@ engine projections, not business authoring surfaces.
 - **Capability**: `docs/capability.md` — landed: `@grant` bootstrap,
   operator faces, root-chain subtree checks, mint/attenuation, genesis
   token window, `keel-gate` package (S2+S3 of `docs/spec.md`).
-- **Trigger**: law settled in `docs/trigger.md` (third projection, thin
-  post-commit events, relay package); implementation pending.
+- **Trigger**: `docs/trigger.md` — landed: `@pulse` stream, who-attributed
+  events, coverage-bound `flow`, `keel-relay` webhooks (S4 of spec).
 - No reverse relation generation.
 - No field validation yet (later on Store trait).
 
@@ -54,6 +54,7 @@ done when its scenario is green; no stage begins against unlanded law.
 - `crates/macro/` — proc macros
 - `crates/api/` — demo binaries (`keel-api`, `forge`) for sidecar/scenarios
 - `crates/gate/` — `keel-gate`: default credential package (caller space)
+- `crates/relay/` — `keel-relay`: default webhook package (caller space)
 - `keel.toml` — runtime policy (listen/store)
 - `sidecar.toml` — local process plan
 - `docs/` — vocabulary, verify, edge, capability, trigger laws

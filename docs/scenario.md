@@ -10,7 +10,9 @@ serials, typed json, count packs, and ref-blocked ends over the `forge`
 binary (`crates/api/src/bin/forge.rs`). Act 2 (S2 capability): seed policy,
 authority matrix, subtree transfer, sudo window + journal. Act 3 (S3 gate):
 register / token / login / logout / self-revoke over `keel-gate`, sessions
-riding reign via lease.
+riding reign via lease. Act 4 (S4 trigger+relay): webhook delivery over
+`keel-relay` — coverage-bound, `@grant` changes observable, window backed
+by L1 `tests/pulse.rs`.
 
 ## Model (keel-api)
 

@@ -186,3 +186,10 @@ so the shared meaning stays true.
   as `{table}_id`; verify F6 was wrong for m2m; fix seat pending.
 - `heard` / `caught` — delivery-time coverage on flow: live targets check
   normally; dead targets (end, cut ties) need all-scope see (T-M4 v1).
+- `keel-relay` — the default webhook package crate (caller space):
+  `relay!(Actor)` ships a Hook unit (url, unit/verb equality filters —
+  data columns, not a second language); svc reads hooks, owners' coverage
+  gates delivery (T-4), batch cursor holds on any failed post
+  (at-least-once, T-7).
+- `tick` / `serve` / `fits` / `letter` / `knock` — relay loop: one poll;
+  one hook's deliveries; filter match; thin event json; raw http post.

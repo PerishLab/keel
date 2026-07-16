@@ -16,4 +16,5 @@ path = "src/main.rs"
 axum = { workspace = true }
 keel = { workspace = true, features = ["http"] }
 keel-gate = { workspace = true }
+keel-relay = { workspace = true }
 tokio = { workspace = true }

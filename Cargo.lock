@@ -355,6 +355,7 @@ dependencies = [
  "axum",
  "keel",
  "keel-gate",
+ "keel-relay",
  "tokio",
 ]
 
@@ -375,6 +376,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "keel-relay"
+version = "0.1.0"
+dependencies = [
+ "keel",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -628,6 +638,7 @@ version = "1.52.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fc7f01b389ac15039e4dc9531aa973a135d7a4135281b12d7c1bc79fd57fffe"
 dependencies = [
+ "bytes",
  "libc",
  "mio",
  "pin-project-lite",

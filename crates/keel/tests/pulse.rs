@@ -139,3 +139,18 @@ fn heard() {
     assert_eq!(core.anon().flow(0).expect("anon").len(), 0);
     assert!(core.flow(0).expect("sudo").len() >= 6);
 }
+
+#[test]
+fn window() {
+    let mut graph = Graph::new();
+    graph.plug::<Room>().plug::<Actor>();
+    let core = bind(graph, Sqlite::memory()).expect("bind");
+    for i in 0..4100 {
+        core.put("Room", &[("name", &format!("r{i}"))])
+            .expect("put");
+    }
+    assert!(core.flow(0).is_err());
+    let tail = core.flow(4099).expect("tail");
+    assert_eq!(tail.len(), 1);
+    assert_eq!(core.flow(4100).expect("empty").len(), 0);
+}

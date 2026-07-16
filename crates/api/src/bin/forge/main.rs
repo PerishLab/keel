@@ -7,9 +7,10 @@ use keel::config;
 use keel::resource;
 use keel::{Cell, Core, Graph, Operator, app, bind};
 use keel_gate::Gate;
+use keel_relay::Relay;
 
 mod gear;
-use gear::plug;
+use gear::{plug, wire};
 use std::env;
 use std::path::Path;
 use std::sync::Arc;
@@ -60,6 +61,7 @@ async fn main() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
     plug(&mut graph);
+    wire(&mut graph);
     let made = bind(graph, store).and_then(|core| core.identify("Actor"));
     let core = match made {
         Ok(core) => core.share(),
@@ -75,6 +77,21 @@ async fn main() {
             std::process::exit(1);
         }
     };
+    let post = match core.put("Actor", &[("login", "relay")]) {
+        Ok(post) => post,
+        Err(err) => {
+            eprintln!("forge: relay svc: {err}");
+            std::process::exit(1);
+        }
+    };
+    let mail = match Relay::rise(core.clone(), post) {
+        Ok(mail) => mail,
+        Err(err) => {
+            eprintln!("forge: relay: {err}");
+            std::process::exit(1);
+        }
+    };
+    mail.run();
     let door = match Gate::rise(core.clone(), svc) {
         Ok(door) => door,
         Err(err) => {

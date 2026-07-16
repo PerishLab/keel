@@ -509,6 +509,73 @@ try {
     }
   });
 
+  io.print("==> act 4: relay");
+  const inbox: Array<Record<string, unknown>> = [];
+  const ear = Deno.serve(
+    { hostname: "127.0.0.1", port: 18768, onListen: () => {} },
+    async (req) => {
+      inbox.push(await req.json());
+      return new Response(null, { status: 204 });
+    },
+  );
+
+  await grant(String(carol), "see", "@grant", "all");
+  await postJson("/hook", {
+    url: "http://127.0.0.1:18768/hooked",
+    unit: "repo",
+    verb: "",
+    actor: carol,
+  }, her);
+  await postJson("/hook", {
+    url: "http://127.0.0.1:18768/hooked",
+    unit: "@grant",
+    verb: "put",
+    actor: carol,
+  }, her);
+  await sleep(700);
+  inbox.length = 0;
+
+  await check("delivery is coverage bound", async () => {
+    await fetch(`${base}/repo/${den}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...him },
+      body: JSON.stringify({ about: "" }),
+    }).then((r) => r.body?.cancel());
+    const res = await fetch(`${base}/repo/${den}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...her },
+      body: JSON.stringify({ visibility: "public" }),
+    });
+    if (!res.ok) {
+      throw new Error(`carol patch ${res.status}`);
+    }
+    await postJson("/repo", {
+      name: "vault",
+      visibility: "private",
+      owner: dave,
+    }, him);
+    await sleep(1200);
+    const seen = inbox.filter((e) => e.unit === "repo");
+    if (seen.length !== 1) {
+      throw new Error(`expected 1 repo event, got ${seen.length}`);
+    }
+    if (seen[0].verb !== "set" || Number(seen[0].key) !== den) {
+      throw new Error("wrong repo event");
+    }
+  });
+
+  await check("grant changes are observable", async () => {
+    const minted = inbox.filter((e) => e.unit === "@grant");
+    if (minted.length < 1) {
+      throw new Error("expected mint event on @grant hook");
+    }
+    if (!minted.every((e) => e.verb === "put")) {
+      throw new Error("grant hook filtered on put");
+    }
+  });
+
+  await ear.shutdown();
+
   io.print("forge: clean");
 } catch (err) {
   failed = true;
