@@ -108,6 +108,7 @@ floor errors (`cursor past window`).
 | T-7 | At-least-once + cursor pull; window overflow errors (C0 spirit) |
 | T-M1 | Window = engine constant (`WINDOW`), C0 seat |
 | T-M2 | Stream unit named `@pulse`; `flow` is the pull verb surface |
+| T-M4 | v1: dead-target events (end, cut ties) deliver only under all-scope `see` on the unit; live targets check normally at delivery time |
 
 ## Open
 
@@ -115,7 +116,7 @@ floor errors (`cursor past window`).
 |----|----------|
 
 | T-M3 | Subscription filter designation grammar on the stream API |
-| T-M4 | `end`-event hydration vs history-read semantics (open elsewhere) |
+
 
 ## Must not
 

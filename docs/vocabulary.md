@@ -184,3 +184,5 @@ so the shared meaning stays true.
   Face (operator); `lane` names a bond event path.
 - self-referential many2many — KNOWN GAP: join table collides both sides
   as `{table}_id`; verify F6 was wrong for m2m; fix seat pending.
+- `heard` / `caught` — delivery-time coverage on flow: live targets check
+  normally; dead targets (end, cut ties) need all-scope see (T-M4 v1).

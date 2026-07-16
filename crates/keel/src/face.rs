@@ -627,6 +627,70 @@ impl<S: Store> Face<'_, S> {
         self.core.snip(self.who, &unit, bond, key)
     }
 
+    pub fn flow(&self, cursor: i64) -> Result<Vec<Row>, Error> {
+        let rows = self.core.flow(cursor)?;
+        if self.free() {
+            return Ok(rows);
+        }
+        let mut out = Vec::new();
+        for row in rows {
+            if self.heard(&row)? {
+                out.push(row);
+            }
+        }
+        Ok(out)
+    }
+
+    fn heard(&self, event: &Row) -> Result<bool, Error> {
+        let place = event
+            .cells()
+            .get("unit")
+            .map(crate::life::Cell::show)
+            .unwrap_or_default();
+        let key = match event.cells().get("key") {
+            Some(crate::life::Cell::Int(key)) => *key,
+            _ => return Ok(false),
+        };
+        if let Some((owner, bond)) = place.split_once('.') {
+            return self.caught(owner, bond, key);
+        }
+        let Ok(unit) = query::resolve(self.plan(), &place) else {
+            return Ok(false);
+        };
+        match self.core.store().one(self.plan(), &unit, key)? {
+            Some(row) => {
+                let mark = cap::Mark {
+                    key: Some(key),
+                    cells: row.cells(),
+                };
+                self.held("see", &unit, &mark)
+            }
+            None => cap::broad(
+                self.plan(),
+                self.core.store(),
+                self.who,
+                "see",
+                &ddl::table(&unit),
+            ),
+        }
+    }
+
+    fn caught(&self, owner: &str, bond: &str, key: i64) -> Result<bool, Error> {
+        let Ok(unit) = query::resolve(self.plan(), owner) else {
+            return Ok(false);
+        };
+        if let Ok(tie) = self.grip(&unit, bond, key) {
+            return Ok(self.seen(&unit, tie.left()).is_ok());
+        }
+        cap::broad(
+            self.plan(),
+            self.core.store(),
+            self.who,
+            "see",
+            &ddl::table(&unit),
+        )
+    }
+
     fn grip(&self, unit: &str, bond: &str, key: i64) -> Result<Tie, Error> {
         let node = self
             .plan()

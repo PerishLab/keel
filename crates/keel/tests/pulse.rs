@@ -97,3 +97,45 @@ fn blame() {
     assert!(core.put("@pulse", &[("verb", "x")]).is_err());
     assert!(core.end("@pulse", 1).is_err());
 }
+
+#[test]
+fn heard() {
+    let mut graph = Graph::new();
+    graph.plug::<Room>().plug::<Actor>();
+    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let sudo = core.sudo();
+    let ada = sudo.put("Actor", &[("login", "ada")]).expect("ada");
+    let bob = sudo.put("Actor", &[("login", "bob")]).expect("bob");
+    let seed = |who: String, verb: &str, unit: &str, scope: String| {
+        sudo.put(
+            "@grant",
+            &[
+                ("who", &who),
+                ("verb", verb),
+                ("unit", unit),
+                ("scope", &scope),
+            ],
+        )
+        .expect("seed");
+    };
+    seed(ada.to_string(), "see", "Actor", format!("row {ada}"));
+    seed(bob.to_string(), "see", "Room", "all".into());
+
+    let den = sudo.put("Room", &[("name", "den")]).expect("den");
+    sudo.set("Actor", ada, &[("login", "ada2")]).expect("set");
+    sudo.end("Room", den).expect("end den");
+
+    let hers = core.of(ada).flow(0).expect("her flow");
+    assert!(
+        hers.iter()
+            .all(|row| text(row, "unit") == "actor" && text(row, "key") == ada.to_string())
+    );
+    assert_eq!(hers.len(), 2);
+
+    let his = core.of(bob).flow(0).expect("his flow");
+    let rooms: Vec<String> = his.iter().map(|row| text(row, "verb")).collect();
+    assert_eq!(rooms, vec!["put", "end"]);
+
+    assert_eq!(core.anon().flow(0).expect("anon").len(), 0);
+    assert!(core.flow(0).expect("sudo").len() >= 6);
+}
