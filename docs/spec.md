@@ -44,7 +44,7 @@ friction, then implement.
 | Part | Content |
 |------|---------|
 | laws | vocabulary delta: relation kinds spelled `many2many` / `many2one` / `one2one` (+ `opt`); `one2many` recorded as deliberately absent |
-| surface | atoms `int` / `bool`; the three relation kinds; global / scoped / composite unique; scoped serial; `count` terminal |
+| surface | atoms `int` / `bool`; the three relation kinds; global / scoped unique; scoped serial; `count` terminal (composite unique settles at need, first act that models a reaction-shaped unit) |
 | scenario | `:forge` act 1 — the slice declares; repo name unique per owner; issue index per repo; star count |
 
 Open inside: serial txn mechanics (under U1 law), text-match pred if the
