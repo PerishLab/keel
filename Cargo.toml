@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/keel", "crates/macro", "crates/api", "crates/gate", "crates/relay", "crates/blob"]
 
 [workspace.package]
-version = "0.1.9"
+version = "0.1.10"
 edition = "2024"
 license = "MIT"
 repository = "https://git.perish.top/PerishLab/keel"

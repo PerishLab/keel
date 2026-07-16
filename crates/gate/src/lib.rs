@@ -16,6 +16,7 @@ pub const TTL: i64 = 60 * 60 * 24 * 14;
 pub struct Gate<S: Store> {
     core: Arc<Core<S>>,
     svc: i64,
+    bar: Option<String>,
 }
 
 impl<S: Store> Clone for Gate<S> {
@@ -23,6 +24,7 @@ impl<S: Store> Clone for Gate<S> {
         Self {
             core: self.core.clone(),
             svc: self.svc,
+            bar: self.bar.clone(),
         }
     }
 }
@@ -50,7 +52,16 @@ impl<S: Store + 'static> Gate<S> {
                 )?;
             }
         }
-        Ok(Self { core, svc })
+        Ok(Self {
+            core,
+            svc,
+            bar: None,
+        })
+    }
+
+    pub fn bar(mut self, field: &str) -> Self {
+        self.bar = Some(field.to_string());
+        self
     }
 
     pub fn wall(self, router: Router) -> Router {
@@ -80,6 +91,14 @@ async fn pass<S: Store + 'static>(
 }
 
 fn whom<S: Store>(gate: &Gate<S>, headers: &HeaderMap) -> Option<i64> {
+    let key = resolve(gate, headers)?;
+    if barred(gate, key) {
+        return None;
+    }
+    Some(key)
+}
+
+fn resolve<S: Store>(gate: &Gate<S>, headers: &HeaderMap) -> Option<i64> {
     let face = gate.core.of(gate.svc);
     if let Some(token) = bearer(headers) {
         let q = format!(r#"from Token where hash = "{}""#, digest(&token));
@@ -88,6 +107,23 @@ fn whom<S: Store>(gate: &Gate<S>, headers: &HeaderMap) -> Option<i64> {
     let sid = crumb(headers)?;
     let q = format!(r#"from Session where hash = "{}""#, digest(&sid));
     actor(face.query(&q).ok()?.rows().first()?)
+}
+
+fn barred<S: Store>(gate: &Gate<S>, key: i64) -> bool {
+    let Some(field) = gate.bar.as_ref() else {
+        return false;
+    };
+    let Some(whom) = gate.core.identity() else {
+        return false;
+    };
+    let q = format!(r#"from {whom} where id = "{key}""#);
+    let Ok(pack) = gate.core.of(gate.svc).query(&q) else {
+        return false;
+    };
+    match pack.rows().first() {
+        Some(row) => row.cells().get(field).map(Cell::show) == Some("true".into()),
+        None => false,
+    }
 }
 
 fn actor(row: &keel::Row) -> Option<i64> {

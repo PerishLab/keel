@@ -236,3 +236,5 @@ so the shared meaning stays true.
   302 to presigned GET url). `object` keys by asset id.
 - `like` — query op: case-insensitive substring on a text field (issue search).
 - pred-subtree (C-16) — a pred grant flows down the root chain; `held` evaluates it against the matching ancestor row.
+- `bar` — gate suspension hook (`Gate::bar(field)`): refuses to resolve an operator whose identity row has the named bool field set true (settled gate law).
+- `resolve` / `barred` — gate: credential→id, then suspension check.
