@@ -15,12 +15,12 @@ pub mod store;
 pub mod serve;
 
 pub use adapt::bind;
-pub use atom::{string, url};
+pub use atom::{int, string, url};
 pub use config::{Config, load};
 pub use face::Core;
 pub use graph::Graph;
 pub use keel_macro::resource;
-pub use life::{Ends, Row, Tie};
+pub use life::{Cell, Ends, Row, Tie};
 pub use query::{Ask, Bag, Op, Pack, Pred, Rank, Slice, Sort, Tree};
 pub use spec::Resource;
 pub use store::Store;

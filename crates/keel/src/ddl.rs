@@ -89,5 +89,6 @@ fn stamp(reign: &Reign, cols: &mut Vec<String>) {
 fn cast(kind: atom::Kind) -> &'static str {
     match kind {
         atom::Kind::Text | atom::Kind::Link => "TEXT",
+        atom::Kind::Int | atom::Kind::Bool => "INTEGER",
     }
 }

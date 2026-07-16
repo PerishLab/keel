@@ -166,6 +166,8 @@ fn kind_of(atom: &Ident) -> syn::Result<Ident> {
     match atom.to_string().as_str() {
         "string" => Ok(Ident::new("Text", atom.span())),
         "url" => Ok(Ident::new("Link", atom.span())),
+        "int" => Ok(Ident::new("Int", atom.span())),
+        "bool" => Ok(Ident::new("Bool", atom.span())),
         other => Err(syn::Error::new(
             atom.span(),
             format!("unknown field atom: {other}"),

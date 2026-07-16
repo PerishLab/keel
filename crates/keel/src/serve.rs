@@ -276,7 +276,7 @@ fn row_json(row: &crate::life::Row) -> Value {
     let mut map = Map::new();
     map.insert("id".into(), json!(row.key()));
     for (k, v) in row.cells() {
-        map.insert(k.clone(), Value::String(v.clone()));
+        map.insert(k.clone(), cell_json(v));
     }
     map.insert("expires_at".into(), json!(row.expires()));
     map.insert("created_at".into(), json!(row.created()));
@@ -290,12 +290,20 @@ fn tie_json(tie: &crate::life::Tie) -> Value {
     map.insert("left".into(), json!(tie.left()));
     map.insert("right".into(), json!(tie.right()));
     for (k, v) in tie.cells() {
-        map.insert(k.clone(), Value::String(v.clone()));
+        map.insert(k.clone(), cell_json(v));
     }
     map.insert("expires_at".into(), json!(tie.expires()));
     map.insert("created_at".into(), json!(tie.created()));
     map.insert("updated_at".into(), json!(tie.updated()));
     Value::Object(map)
+}
+
+fn cell_json(cell: &crate::life::Cell) -> Value {
+    match cell {
+        crate::life::Cell::Text(value) => Value::String(value.clone()),
+        crate::life::Cell::Int(value) => json!(value),
+        crate::life::Cell::Bool(value) => Value::Bool(*value),
+    }
 }
 
 struct Fault {

@@ -1,6 +1,6 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
-use keel::life::Ends;
+use keel::life::{Cell, Ends};
 use keel::resource;
 use keel::{Graph, bind};
 
@@ -85,7 +85,7 @@ fn select() {
             .expect("algo")
             .cells()
             .get("grade")
-            .map(String::as_str),
+            .map(Cell::text),
         Some("A")
     );
 

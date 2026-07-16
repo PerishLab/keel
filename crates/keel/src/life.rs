@@ -1,15 +1,40 @@
 use crate::adapt::Error;
+use crate::atom;
 use crate::bond;
 use crate::ddl;
-use crate::plan::{Edge, Plan, Unit};
+use crate::plan::{Edge, Plan, Slot, Unit};
 use rusqlite::{Connection, OptionalExtension, params};
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum Cell {
+    Bool(bool),
+    Int(i64),
+    Text(String),
+}
+
+impl Cell {
+    pub fn text(&self) -> &str {
+        match self {
+            Cell::Text(value) => value,
+            _ => "",
+        }
+    }
+
+    pub fn show(&self) -> String {
+        match self {
+            Cell::Text(value) => value.clone(),
+            Cell::Int(value) => value.to_string(),
+            Cell::Bool(value) => value.to_string(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Row {
     key: i64,
-    cells: BTreeMap<String, String>,
+    cells: BTreeMap<String, Cell>,
     expires: Option<i64>,
     created: i64,
     updated: i64,
@@ -26,7 +51,7 @@ pub struct Tie {
     key: i64,
     left: i64,
     right: i64,
-    cells: BTreeMap<String, String>,
+    cells: BTreeMap<String, Cell>,
     expires: Option<i64>,
     created: i64,
     updated: i64,
@@ -37,7 +62,7 @@ impl Row {
         self.key
     }
 
-    pub fn cells(&self) -> &BTreeMap<String, String> {
+    pub fn cells(&self) -> &BTreeMap<String, Cell> {
         &self.cells
     }
 
@@ -67,7 +92,7 @@ impl Tie {
         self.right
     }
 
-    pub fn cells(&self) -> &BTreeMap<String, String> {
+    pub fn cells(&self) -> &BTreeMap<String, Cell> {
         &self.cells
     }
 
@@ -112,18 +137,15 @@ impl<'a> Work<'a> {
             marks
         );
         let mut stmt = self.conn.prepare(&text).map_err(fail)?;
-        let mut vals: Vec<rusqlite::types::Value> = unit
-            .fields()
-            .iter()
-            .map(|slot| {
-                let hit = fields
-                    .iter()
-                    .find(|(k, _)| *k == slot.name())
-                    .map(|(_, v)| *v)
-                    .unwrap_or("");
-                rusqlite::types::Value::Text(hit.to_string())
-            })
-            .collect();
+        let mut vals: Vec<rusqlite::types::Value> = Vec::new();
+        for slot in unit.fields() {
+            let hit = fields
+                .iter()
+                .find(|(k, _)| *k == slot.name())
+                .map(|(_, v)| *v)
+                .unwrap_or("");
+            vals.push(bind(slot, hit)?);
+        }
         vals.push(rusqlite::types::Value::Null);
         vals.push(rusqlite::types::Value::Integer(tick));
         vals.push(rusqlite::types::Value::Integer(tick));
@@ -233,7 +255,7 @@ impl<'a> Work<'a> {
             text.push_str(col);
             text.push_str(" = ?");
             text.push_str(&(i + 1).to_string());
-            vals.push(rusqlite::types::Value::Text(val.to_string()));
+            vals.push(fit(unit.fields(), col, val)?);
         }
         let n = fields.len();
         text.push_str(&format!(
@@ -310,7 +332,7 @@ impl<'a> Work<'a> {
                 .find(|(k, _)| *k == slot.name())
                 .map(|(_, v)| *v)
                 .unwrap_or("");
-            vals.push(rusqlite::types::Value::Text(hit.to_string()));
+            vals.push(bind(slot, hit)?);
         }
         vals.push(rusqlite::types::Value::Null);
         vals.push(rusqlite::types::Value::Integer(tick));
@@ -351,7 +373,7 @@ impl<'a> Work<'a> {
             text.push_str(col);
             text.push_str(" = ?");
             text.push_str(&(i + 1).to_string());
-            vals.push(rusqlite::types::Value::Text(val.to_string()));
+            vals.push(fit(edge.fields(), col, val)?);
         }
         let n = fields.len();
         text.push_str(&format!(
@@ -593,8 +615,7 @@ fn read_tie(edge: &Edge, row: &rusqlite::Row<'_>) -> Result<Tie, Error> {
     let updated: i64 = row.get(5).map_err(fail)?;
     let mut cells = BTreeMap::new();
     for (i, slot) in edge.fields().iter().enumerate() {
-        let value: String = row.get(6 + i).map_err(fail)?;
-        cells.insert(slot.name().to_string(), value);
+        cells.insert(slot.name().to_string(), pick(slot, row, 6 + i)?);
     }
     Ok(Tie {
         key,
@@ -611,8 +632,7 @@ fn read(unit: &Unit, row: &rusqlite::Row<'_>) -> Result<Row, Error> {
     let key: i64 = row.get(ddl::KEY).map_err(fail)?;
     let mut cells = BTreeMap::new();
     for slot in unit.fields() {
-        let value: String = row.get(slot.name()).map_err(fail)?;
-        cells.insert(slot.name().to_string(), value);
+        cells.insert(slot.name().to_string(), pick(slot, row, slot.name())?);
     }
     let expires: Option<i64> = row.get(ddl::EXPIRES).optional().map_err(fail)?.flatten();
     let created: i64 = row.get(ddl::CREATED).map_err(fail)?;
@@ -624,6 +644,46 @@ fn read(unit: &Unit, row: &rusqlite::Row<'_>) -> Result<Row, Error> {
         created,
         updated,
     })
+}
+
+fn pick<I: rusqlite::RowIndex>(slot: &Slot, row: &rusqlite::Row<'_>, at: I) -> Result<Cell, Error> {
+    match slot.kind() {
+        atom::Kind::Text | atom::Kind::Link => {
+            let value: String = row.get(at).map_err(fail)?;
+            Ok(Cell::Text(value))
+        }
+        atom::Kind::Int => {
+            let value: i64 = row.get(at).map_err(fail)?;
+            Ok(Cell::Int(value))
+        }
+        atom::Kind::Bool => {
+            let value: i64 = row.get(at).map_err(fail)?;
+            Ok(Cell::Bool(value != 0))
+        }
+    }
+}
+
+fn bind(slot: &Slot, value: &str) -> Result<rusqlite::types::Value, Error> {
+    match slot.kind() {
+        atom::Kind::Text | atom::Kind::Link => Ok(rusqlite::types::Value::Text(value.into())),
+        atom::Kind::Int => value
+            .parse::<i64>()
+            .map(rusqlite::types::Value::Integer)
+            .map_err(|_| Error::Adapt(format!("field {} needs int", slot.name()))),
+        atom::Kind::Bool => match value {
+            "true" => Ok(rusqlite::types::Value::Integer(1)),
+            "false" => Ok(rusqlite::types::Value::Integer(0)),
+            _ => Err(Error::Adapt(format!("field {} needs bool", slot.name()))),
+        },
+    }
+}
+
+fn fit(slots: &[Slot], col: &str, value: &str) -> Result<rusqlite::types::Value, Error> {
+    let slot = slots
+        .iter()
+        .find(|slot| slot.name() == col)
+        .ok_or_else(|| Error::Adapt(format!("unknown field {col}")))?;
+    bind(slot, value)
 }
 
 fn fail(err: rusqlite::Error) -> Error {

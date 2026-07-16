@@ -1,9 +1,9 @@
 use keel::adapt::db::Sqlite;
-use keel::atom::{string, url};
-use keel::life::Ends;
+use keel::atom::{int, string, url};
+use keel::life::{Cell, Ends};
 use keel::query::{self, Op, Rank, Slice};
 use keel::resource;
-use keel::{Graph, bind};
+use keel::{Graph, Row, bind};
 
 #[resource]
 struct Class {
@@ -134,7 +134,7 @@ fn run() {
         .expect("filter");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(
-        pack.rows()[0].cells().get("nickname").map(String::as_str),
+        pack.rows()[0].cells().get("nickname").map(Cell::text),
         Some("ada")
     );
 
@@ -154,7 +154,7 @@ fn run() {
     assert_eq!(
         pack.rows()
             .iter()
-            .map(|row| row.cells().get("nickname").cloned().unwrap())
+            .map(|row| row.cells().get("nickname").expect("cell").show())
             .collect::<Vec<_>>(),
         vec!["cy", "bob", "ada"]
     );
@@ -207,7 +207,7 @@ fn run() {
         .expect("target");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(
-        pack.rows()[0].cells().get("title").map(String::as_str),
+        pack.rows()[0].cells().get("title").map(Cell::text),
         Some("math")
     );
 
@@ -224,4 +224,82 @@ fn run() {
     assert!(core.query(r#"from Student where missing = "x""#).is_err());
     assert!(core.query("from Ghost").is_err());
     let _ = bob;
+}
+
+#[resource]
+struct Score {
+    #[field(string)]
+    name: string,
+    #[field(int)]
+    points: int,
+    #[field(bool)]
+    passed: bool,
+}
+
+#[test]
+fn cast() {
+    let mut graph = Graph::new();
+    graph.plug::<Score>();
+    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let low = core
+        .put(
+            "Score",
+            &[("name", "low"), ("points", "2"), ("passed", "false")],
+        )
+        .expect("put low");
+    let mid = core
+        .put(
+            "Score",
+            &[("name", "mid"), ("points", "10"), ("passed", "true")],
+        )
+        .expect("put mid");
+    let top = core
+        .put(
+            "Score",
+            &[("name", "top"), ("points", "42"), ("passed", "true")],
+        )
+        .expect("put top");
+
+    let pack = core.query(r#"from Score where points > "5""#).expect("gt");
+    assert_eq!(pack.rows().len(), 2);
+
+    let pack = core.query("from Score order by points desc").expect("ord");
+    assert_eq!(
+        pack.rows().iter().map(Row::key).collect::<Vec<_>>(),
+        vec![top, mid, low]
+    );
+
+    let pack = core
+        .query(r#"from Score where passed = "true""#)
+        .expect("flag");
+    assert_eq!(pack.rows().len(), 2);
+    assert_eq!(pack.rows()[0].cells().get("points"), Some(&Cell::Int(10)));
+    assert_eq!(
+        pack.rows()[0].cells().get("passed"),
+        Some(&Cell::Bool(true))
+    );
+
+    core.set("Score", low, &[("points", "77")]).expect("set");
+    let pack = core
+        .query(r#"from Score where points >= "77""#)
+        .expect("ge");
+    assert_eq!(pack.rows().len(), 1);
+
+    assert!(
+        core.put(
+            "Score",
+            &[("name", "x"), ("points", "x"), ("passed", "true")]
+        )
+        .is_err()
+    );
+    assert!(
+        core.put(
+            "Score",
+            &[("name", "x"), ("points", "1"), ("passed", "yep")]
+        )
+        .is_err()
+    );
+    assert!(core.set("Score", low, &[("passed", "1")]).is_err());
+    assert!(core.query(r#"from Score where points = "x""#).is_err());
+    assert!(core.query(r#"from Score where passed = "x""#).is_err());
 }

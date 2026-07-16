@@ -1,6 +1,7 @@
 use crate::adapt::Error;
+use crate::atom;
 use crate::ddl;
-use crate::life::{Row, Tie};
+use crate::life::{Cell, Row, Tie};
 use crate::plan::Plan;
 use crate::store::Store;
 use std::collections::BTreeMap;
@@ -547,14 +548,22 @@ fn check_pred(plan: &Plan, unit: &crate::plan::Unit, pred: &Pred) -> Result<(), 
 }
 
 fn check_cell(unit: &crate::plan::Unit, pred: &Pred) -> Result<(), Error> {
-    slot(unit, pred.field())?;
-    if pred.field() != ddl::KEY {
-        return Ok(());
-    }
+    let kind = slot(unit, pred.field())?;
     for value in pred.values() {
-        key_text(value)?;
+        fit(kind, value)?;
     }
     Ok(())
+}
+
+fn fit(kind: atom::Kind, value: &str) -> Result<(), Error> {
+    match kind {
+        atom::Kind::Text | atom::Kind::Link => Ok(()),
+        atom::Kind::Int => key_text(value).map(|_| ()),
+        atom::Kind::Bool => match value {
+            "true" | "false" => Ok(()),
+            _ => Err(Error::Adapt("value needs bool".into())),
+        },
+    }
 }
 
 fn check_nest(plan: &Plan, unit: &crate::plan::Unit, bond: &str, nest: &Pred) -> Result<(), Error> {
@@ -566,31 +575,36 @@ fn check_nest(plan: &Plan, unit: &crate::plan::Unit, bond: &str, nest: &Pred) ->
         .iter()
         .find(|e| e.name() == bond)
         .ok_or_else(|| Error::Adapt(format!("unknown bond {bond}")))?;
-    if nest.field() == ddl::KEY {
-        for value in nest.values() {
-            key_text(value)?;
-        }
-        return Ok(());
+    let kind = nest_kind(plan, edge, nest.field())?;
+    for value in nest.values() {
+        fit(kind, value)?;
     }
-    if edge.fields().iter().any(|s| s.name() == nest.field()) {
-        return Ok(());
+    Ok(())
+}
+
+fn nest_kind(plan: &Plan, edge: &crate::plan::Edge, field: &str) -> Result<atom::Kind, Error> {
+    if field == ddl::KEY {
+        return Ok(atom::Kind::Int);
+    }
+    if let Some(slot) = edge.fields().iter().find(|s| s.name() == field) {
+        return Ok(slot.kind());
     }
     let target = plan
         .units()
         .get(edge.target())
         .ok_or_else(|| Error::Missing(edge.target().into()))?;
-    slot(target, nest.field())?;
-    Ok(())
+    slot(target, field)
 }
 
-fn slot(unit: &crate::plan::Unit, field: &str) -> Result<(), Error> {
+fn slot(unit: &crate::plan::Unit, field: &str) -> Result<atom::Kind, Error> {
     if field == ddl::KEY {
-        return Ok(());
+        return Ok(atom::Kind::Int);
     }
-    if unit.fields().iter().any(|slot| slot.name() == field) {
-        return Ok(());
-    }
-    Err(Error::Adapt(format!("unknown field {field}")))
+    unit.fields()
+        .iter()
+        .find(|slot| slot.name() == field)
+        .map(|slot| slot.kind())
+        .ok_or_else(|| Error::Adapt(format!("unknown field {field}")))
 }
 
 fn hold(
@@ -736,19 +750,37 @@ fn find_live(store: &impl Store, plan: &Plan, name: &str, key: i64) -> Result<Op
     Ok(rows.into_iter().find(|row| row.key() == key))
 }
 
-fn hit_map(cells: &BTreeMap<String, String>, pred: &Pred) -> bool {
+fn hit_map(cells: &BTreeMap<String, Cell>, pred: &Pred) -> bool {
     let Some(got) = cells.get(pred.field()) else {
         return false;
     };
+    match got {
+        Cell::Text(value) => hit_text(value, pred),
+        Cell::Int(value) => hit_key(*value, pred),
+        Cell::Bool(value) => hit_flag(*value, pred),
+    }
+}
+
+fn hit_text(got: &str, pred: &Pred) -> bool {
     match pred.op() {
         Op::Eq => got == pred.value(),
         Op::Ne => got != pred.value(),
-        Op::Lt => got.as_str() < pred.value(),
-        Op::Le => got.as_str() <= pred.value(),
-        Op::Gt => got.as_str() > pred.value(),
-        Op::Ge => got.as_str() >= pred.value(),
+        Op::Lt => got < pred.value(),
+        Op::Le => got <= pred.value(),
+        Op::Gt => got > pred.value(),
+        Op::Ge => got >= pred.value(),
         Op::In => pred.values().iter().any(|want| want == got),
         Op::Has | Op::Some => false,
+    }
+}
+
+fn hit_flag(got: bool, pred: &Pred) -> bool {
+    let want = got.to_string();
+    match pred.op() {
+        Op::Eq => pred.value() == want,
+        Op::Ne => pred.value() != want,
+        Op::In => pred.values().contains(&want),
+        _ => false,
     }
 }
 
@@ -814,7 +846,7 @@ fn by(a: &Row, b: &Row, field: &str, desc: bool) -> std::cmp::Ordering {
     primary.then_with(|| a.key().cmp(&b.key()))
 }
 
-fn grade(left: &str, right: &str, desc: bool) -> std::cmp::Ordering {
+fn grade(left: &Cell, right: &Cell, desc: bool) -> std::cmp::Ordering {
     if desc {
         right.cmp(left)
     } else {
@@ -840,8 +872,11 @@ fn past(rows: &mut Vec<Row>, id: i64) {
     }
 }
 
-fn cell(row: &Row, field: &str) -> String {
-    row.cells().get(field).cloned().unwrap_or_default()
+fn cell(row: &Row, field: &str) -> Cell {
+    row.cells()
+        .get(field)
+        .cloned()
+        .unwrap_or(Cell::Text(String::new()))
 }
 
 fn escape(value: &str) -> String {

@@ -82,3 +82,9 @@ so the shared meaning stays true.
 - `course` — classic student/course selection scenario gate (`:course`).
 - `bond` — also: n2m association may carry business field attrs on the join.
 - `verify` — cold-start verification boundary document.
+- `atom` — delta: atoms now `string`, `url`, `int`, `bool`; kinds Text/Link/Int/Bool.
+- `cell` — delta: typed value (`Cell::Text/Int/Bool`), not a raw string.
+- `pick` — read one typed cell out of a store row by slot kind.
+- `bind` — also: cast one caller value to a storage value by slot kind.
+- `fit` — match a value against a slot or pred kind; reject mistyped input.
+- `show` — render a cell as display text (digest/sort-free).

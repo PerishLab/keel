@@ -3,7 +3,7 @@ use keel::adapt::http;
 use keel::atom::{string, url};
 use keel::ddl;
 use keel::resource;
-use keel::{Ends, Graph, bind};
+use keel::{Cell, Ends, Graph, bind};
 
 #[resource]
 struct Class {
@@ -76,7 +76,7 @@ fn life() {
             .expect("a")
             .cells()
             .get("nickname")
-            .map(String::as_str),
+            .map(Cell::text),
         Some("ada")
     );
 
@@ -84,12 +84,9 @@ fn life() {
         .expect("set b");
     let rows = core.live("Student").expect("live after set");
     let bob = rows.iter().find(|row| row.key() == b).expect("b");
+    assert_eq!(bob.cells().get("nickname").map(Cell::text), Some("bobby"));
     assert_eq!(
-        bob.cells().get("nickname").map(String::as_str),
-        Some("bobby")
-    );
-    assert_eq!(
-        bob.cells().get("avatar").map(String::as_str),
+        bob.cells().get("avatar").map(Cell::text),
         Some("https://b.example/b")
     );
     assert!(bob.updated() >= bob.created());
@@ -103,7 +100,7 @@ fn life() {
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].key(), b);
     assert_eq!(
-        rows[0].cells().get("nickname").map(String::as_str),
+        rows[0].cells().get("nickname").map(Cell::text),
         Some("bobby")
     );
     assert!(core.set("Student", a, &[("nickname", "gone")]).is_err());
