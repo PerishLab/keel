@@ -121,6 +121,9 @@ impl<'a> Work<'a> {
 
     pub fn put(&self, plan: &Plan, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
         let unit = find(plan, name)?;
+        if unit.name() == crate::cap::GRANT {
+            crate::cap::vet(plan, fields)?;
+        }
         check(unit, fields)?;
         let tick = now();
         let mut cols: Vec<String> = unit.fields().iter().map(|s| ddl::col(s.name())).collect();
@@ -423,6 +426,9 @@ impl<'a> Work<'a> {
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
         let unit = find(plan, name)?;
+        if unit.name() == crate::cap::GRANT {
+            return Err(Error::Adapt("grant rows are put or end".into()));
+        }
         part(unit, fields)?;
         let base = self.peek(unit, key)?;
         self.solid(unit, fields, Some((key, &base)))?;

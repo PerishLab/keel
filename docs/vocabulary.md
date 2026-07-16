@@ -128,3 +128,11 @@ so the shared meaning stays true.
   stage (`docs/spec.md`).
 - `root` — relation marker (C-M2): the one `many2one` that carries the
   unit's root chain; at most one per unit; always required.
+- `cap` — capability module: `@grant` seat and write vetting.
+- `@grant` — engine unit holding grants (who, verb, unit, scope); admin is
+  put/end/query only — `set` on grant rows rejected (amend = end + put).
+- `vet` — validate one grant row before it lands (verbs, who, unit, scope).
+- `face` — delta: `Face` = operator-scoped verb surface; `Core` methods
+  remain the possession (sudo) surface.
+- `who` — face identity: `Sudo` | `Op(id)` | `Anon`.
+- `of` / `sudo` / `anon` — Core face constructors.

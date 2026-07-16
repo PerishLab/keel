@@ -55,6 +55,7 @@ impl Plan {
                 }
             }
         }
+        units.insert(crate::cap::GRANT.into(), Unit::grant());
         Ok(Self { units })
     }
 
@@ -64,6 +65,24 @@ impl Plan {
 }
 
 impl Unit {
+    fn grant() -> Self {
+        let fields = ["who", "verb", "unit", "scope"]
+            .iter()
+            .map(|name| Slot {
+                name: (*name).to_string(),
+                kind: atom::Kind::Text,
+                only: Only::Free,
+                serial: None,
+            })
+            .collect();
+        Self {
+            name: crate::cap::GRANT.into(),
+            fields,
+            bonds: Vec::new(),
+            reign: Reign::engine(),
+        }
+    }
+
     fn lift(spec: &Spec) -> Result<Self, crate::adapt::Error> {
         let fields: Vec<Slot> = spec
             .fields()

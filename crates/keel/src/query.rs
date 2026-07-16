@@ -985,7 +985,8 @@ impl<'a> Scan<'a> {
         let rest = self.rest();
         let mut end = 0;
         for c in rest.chars() {
-            if c.is_ascii_alphanumeric() || c == '_' {
+            let head = end == 0 && c == '@';
+            if c.is_ascii_alphanumeric() || c == '_' || head {
                 end += c.len_utf8();
             } else {
                 break;
