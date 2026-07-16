@@ -39,16 +39,38 @@ pub fn mate(owner: &str, bond: &str, target: &str) -> String {
     side(target)
 }
 
-pub fn script(plan: &Plan) -> Vec<String> {
+#[derive(Clone, Copy, PartialEq)]
+pub enum Grain {
+    Lite,
+    Pg,
+}
+
+fn stub(grain: Grain) -> &'static str {
+    match grain {
+        Grain::Lite => "INTEGER PRIMARY KEY NOT NULL",
+        Grain::Pg => "BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY",
+    }
+}
+
+fn whole(grain: Grain) -> &'static str {
+    match grain {
+        Grain::Lite => "INTEGER",
+        Grain::Pg => "BIGINT",
+    }
+}
+
+pub fn script(plan: &Plan, grain: Grain) -> Vec<String> {
     let mut out = Vec::new();
-    out.push("PRAGMA foreign_keys = ON;".into());
+    if grain == Grain::Lite {
+        out.push("PRAGMA foreign_keys = ON;".into());
+    }
     for node in plan.units().values() {
-        out.push(form(node));
+        out.push(form(node, grain));
     }
     for node in plan.units().values() {
         for bond in node.bonds() {
             if bond.kind() == bond::Kind::Many2many {
-                out.push(arc(node, bond.name(), bond.target()));
+                out.push(arc(node, bond.name(), bond.target(), grain));
             }
         }
     }
@@ -82,22 +104,27 @@ fn lock(node: &Unit, slot: &Slot) -> String {
     )
 }
 
-fn form(node: &Unit) -> String {
-    let mut cols = vec![format!("{KEY} INTEGER PRIMARY KEY NOT NULL")];
+fn form(node: &Unit, grain: Grain) -> String {
+    let mut cols = vec![format!("{KEY} {}", stub(grain))];
     for slot in node.fields() {
         cols.push(format!(
             "{} {} NOT NULL",
             col(slot.name()),
-            cast(slot.kind())
+            cast(slot.kind(), grain)
         ));
     }
     for edge in node.bonds() {
         if edge.kind().point() {
             let null = if edge.need() { " NOT NULL" } else { "" };
-            cols.push(format!("{} INTEGER{}", col(&side(edge.name())), null));
+            cols.push(format!(
+                "{} {}{}",
+                col(&side(edge.name())),
+                whole(grain),
+                null
+            ));
         }
     }
-    stamp(node.reign(), &mut cols);
+    stamp(node.reign(), &mut cols, grain);
     format!(
         "CREATE TABLE IF NOT EXISTS {} ({});",
         seat(node.name()),
@@ -105,7 +132,7 @@ fn form(node: &Unit) -> String {
     )
 }
 
-fn arc(node: &Unit, bond: &str, target: &str) -> String {
+fn arc(node: &Unit, bond: &str, target: &str, grain: Grain) -> String {
     let edge = node
         .bonds()
         .iter()
@@ -114,18 +141,18 @@ fn arc(node: &Unit, bond: &str, target: &str) -> String {
     let left = col(&side(node.name()));
     let right = col(&mate(node.name(), bond, target));
     let mut cols = vec![
-        format!("{KEY} INTEGER PRIMARY KEY NOT NULL"),
-        format!("{left} INTEGER NOT NULL"),
-        format!("{right} INTEGER NOT NULL"),
+        format!("{KEY} {}", stub(grain)),
+        format!("{left} {} NOT NULL", whole(grain)),
+        format!("{right} {} NOT NULL", whole(grain)),
     ];
     for slot in edge.fields() {
         cols.push(format!(
             "{} {} NOT NULL",
             col(slot.name()),
-            cast(slot.kind())
+            cast(slot.kind(), grain)
         ));
     }
-    stamp(node.reign(), &mut cols);
+    stamp(node.reign(), &mut cols, grain);
     format!(
         "CREATE TABLE IF NOT EXISTS {} ({});",
         joint(node.name(), bond),
@@ -133,21 +160,22 @@ fn arc(node: &Unit, bond: &str, target: &str) -> String {
     )
 }
 
-fn stamp(reign: &Reign, cols: &mut Vec<String>) {
+fn stamp(reign: &Reign, cols: &mut Vec<String>, grain: Grain) {
+    let kind = whole(grain);
     if reign.expires() {
-        cols.push(format!("{EXPIRES} INTEGER"));
+        cols.push(format!("{EXPIRES} {kind}"));
     }
     if reign.created() {
-        cols.push(format!("{CREATED} INTEGER NOT NULL"));
+        cols.push(format!("{CREATED} {kind} NOT NULL"));
     }
     if reign.updated() {
-        cols.push(format!("{UPDATED} INTEGER NOT NULL"));
+        cols.push(format!("{UPDATED} {kind} NOT NULL"));
     }
 }
 
-fn cast(kind: atom::Kind) -> &'static str {
+fn cast(kind: atom::Kind, grain: Grain) -> &'static str {
     match kind {
         atom::Kind::Text | atom::Kind::Link => "TEXT",
-        atom::Kind::Int | atom::Kind::Bool => "INTEGER",
+        atom::Kind::Int | atom::Kind::Bool => whole(grain),
     }
 }

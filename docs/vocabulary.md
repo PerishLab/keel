@@ -225,3 +225,6 @@ so the shared meaning stays true.
 - `sql` — the rusqlite `Wire` impl (in adapt::db); `cast`/`lift` convert
   Val <-> rusqlite Value.
 - `sheet` — canonical select column order for positional row reads.
+- `pg` — the Postgres store (`adapt::pg`, `pg` feature): second Wire impl,
+  proving store portability. `dollar`/`lift`/`lean`/`own` bridge Val <-> pg.
+- `grain` — ddl dialect (`Lite` | `Pg`): key column, int type, header.

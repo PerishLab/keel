@@ -59,7 +59,7 @@ impl Store for Sqlite {
             }
         }
         let conn = self.open()?;
-        for stmt in ddl::script(plan) {
+        for stmt in ddl::script(plan, ddl::Grain::Lite) {
             conn.execute_batch(&stmt).map_err(sql)?;
         }
         let mut guard = self.conn.lock().map_err(lock)?;

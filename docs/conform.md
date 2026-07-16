@@ -44,3 +44,14 @@ postgres-backed Wire, and dialect handling (`?N`→`$N`, `RETURNING id`,
 (name/size/hash + root chain) via a declaration macro, plus routes that
 capability-gate then stream bytes to/from MinIO. keel never stores bytes.
 `forgejo/docker-compose.yml` runs Postgres + MinIO.
+
+
+## Delivered
+
+- **Wire seam** (keel #63): `life` is driver-agnostic; sqlite is one Wire.
+- **PG store** (`adapt::pg::Postgres`, `pg` feature): a second Wire +
+  `ddl::Grain::Pg` dialect (BIGINT identity keys, `$N` params, RETURNING id,
+  information_schema introspection). `tests/pg.rs` runs the course scenario
+  against real Postgres (docker-compose pg:5433) — unique, fat ties, link,
+  count, K3, set all green. **The engine-replaceable law is now proven, not
+  claimed.** Gate the pg test behind the running container.

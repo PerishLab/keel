@@ -1,5 +1,7 @@
 pub mod db;
 pub mod http;
+#[cfg(feature = "pg")]
+pub mod pg;
 
 use crate::store::Store;
 

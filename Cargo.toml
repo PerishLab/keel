@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/keel", "crates/macro", "crates/api", "crates/gate", "crates/relay"]
 
 [workspace.package]
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 license = "MIT"
 repository = "https://git.perish.top/PerishLab/keel"
@@ -16,6 +16,7 @@ keel-macro = { path = "crates/macro", version = "0.1.0", registry = "perish" }
 keel-relay = { path = "crates/relay", version = "0.1.0", registry = "perish" }
 proc-macro2 = "1"
 quote = "1"
+postgres = "0.19"
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
