@@ -7,6 +7,7 @@ pub trait Store: Send + Sync {
     fn put(&self, plan: &Plan, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error>;
     fn set(&self, plan: &Plan, name: &str, key: i64, fields: &[(&str, &str)]) -> Result<(), Error>;
     fn live(&self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error>;
+    fn one(&self, plan: &Plan, name: &str, key: i64) -> Result<Option<Row>, Error>;
     fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error>;
     fn tie(
         &self,

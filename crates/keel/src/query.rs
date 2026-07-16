@@ -167,6 +167,18 @@ impl Pack {
     pub fn count(&self) -> Option<usize> {
         self.count
     }
+
+    pub(crate) fn bags_mut(&mut self) -> &mut BTreeMap<String, Bag> {
+        &mut self.bags
+    }
+
+    pub(crate) fn tallied(root: String, n: usize) -> Pack {
+        Pack {
+            root,
+            bags: BTreeMap::new(),
+            count: Some(n),
+        }
+    }
 }
 
 pub type Ask = Tree;
@@ -827,6 +839,26 @@ fn hit_flag(got: bool, pred: &Pred) -> bool {
 fn key_text(text: &str) -> Result<i64, Error> {
     text.parse::<i64>()
         .map_err(|_| Error::Adapt("id needs integer".into()))
+}
+
+pub fn cover(key: Option<i64>, cells: &BTreeMap<String, Cell>, preds: &[Pred]) -> bool {
+    preds.iter().all(|pred| hit_at(key, cells, pred))
+}
+
+fn hit_at(key: Option<i64>, cells: &BTreeMap<String, Cell>, pred: &Pred) -> bool {
+    if matches!(pred.op(), Op::Has | Op::Some) {
+        return false;
+    }
+    if pred.field() == ddl::KEY {
+        return key.is_some_and(|key| hit_key(key, pred));
+    }
+    hit_map(cells, pred)
+}
+
+pub fn bare(tree: &Tree) -> Tree {
+    let mut out = tree.clone();
+    out.tally = false;
+    out
 }
 
 fn pass(row: &Row, preds: &[Pred]) -> bool {

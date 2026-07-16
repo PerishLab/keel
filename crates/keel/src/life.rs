@@ -305,6 +305,15 @@ impl<'a> Work<'a> {
         Ok((col.to_string(), fit(unit.fields(), col, val)?))
     }
 
+    pub fn one(&self, plan: &Plan, name: &str, key: i64) -> Result<Option<Row>, Error> {
+        let unit = find(plan, name)?;
+        match self.peek(unit, key) {
+            Ok(row) => Ok(Some(row)),
+            Err(Error::Adapt(note)) if note.starts_with("missing row") => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+
     fn peek(&self, unit: &Unit, key: i64) -> Result<Row, Error> {
         let tick = now();
         let text = format!(

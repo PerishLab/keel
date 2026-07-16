@@ -136,3 +136,15 @@ so the shared meaning stays true.
   remain the possession (sudo) surface.
 - `who` — face identity: `Sudo` | `Op(id)` | `Anon`.
 - `of` / `sudo` / `anon` — Core face constructors.
+- `check` — capability core: verb on row allowed iff a live grant covers
+  (who, verb, unit, row) via all / row-subtree / pred scope.
+- `mark` — the row under check: optional key + typed cells.
+- `anchors` — root-chain walk (unit,id) pairs, self upward, depth-capped.
+- `mint` — put grants the creator full verbs on the created row.
+- `narrow` / `beneath` — attenuation gate on grant writes; delegation is
+  inherent to holding; revoke is symmetric.
+- `mold` / `blend` — build / merge typed cells from caller fields for
+  pred-scope evaluation (put postcondition, set pre+post).
+- `sift` / `strain` / `spot` — see-coverage filtering of reads (rows,
+  packs incl. bond bags and count).
+- `broad` — coverage probe for all-scope on a unit (attenuation floor).

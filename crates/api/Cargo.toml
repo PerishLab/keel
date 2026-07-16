@@ -10,7 +10,6 @@ publish = false
 
 [[bin]]
 name = "keel-api"
-default-run = "keel-api"
 path = "src/main.rs"
 
 [dependencies]

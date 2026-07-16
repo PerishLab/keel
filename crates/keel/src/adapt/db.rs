@@ -77,6 +77,12 @@ impl Store for Sqlite {
         life::Work::new(conn).live(plan, name)
     }
 
+    fn one(&self, plan: &Plan, name: &str, key: i64) -> Result<Option<Row>, Error> {
+        let guard = self.conn.lock().map_err(lock)?;
+        let conn = guard.as_ref().ok_or_else(unwired)?;
+        life::Work::new(conn).one(plan, name, key)
+    }
+
     fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error> {
         let guard = self.conn.lock().map_err(lock)?;
         let conn = guard.as_ref().ok_or_else(unwired)?;

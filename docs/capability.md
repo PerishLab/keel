@@ -83,7 +83,8 @@ unit = "Actor"
   engine designation**; self-service management falls out of mint and root
   chain, not special routes.
 - No injection = `anon`. Any injected operator matches `all`. Grants to
-  them are ordinary `@grant` rows.
+  them are ordinary `@grant` rows. A grant to `anon` covers operators too —
+  what is public to strangers is public to members.
 - **Group operator**: a grant's `who` may name a row of a unit with a
   designated membership bond; the check expands membership through that bond
   live. Designation grammar is open (C-M1 below).
@@ -178,6 +179,11 @@ An operator may `put` on `@grant` only what its own live coverage already
 includes — grants can narrow, never amplify. Sudo is exempt (it is the
 axiom). No deny rows exist in any form: absence of a grant is the only
 refusal.
+
+Attenuation is the **whole** gate on grant writes: delegation is inherent
+to holding, never a separate permission. Symmetrically, an operator may
+`end` a grant row it could have issued. Wildcard-unit grants remain
+genesis-only (attenuation refuses them for operators).
 
 ## Read refusal is absence
 

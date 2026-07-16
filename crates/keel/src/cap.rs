@@ -1,9 +1,21 @@
 use crate::adapt::Error;
-use crate::plan::Plan;
+use crate::atom;
+use crate::ddl;
+use crate::face::Who;
+use crate::life::{Cell, Row};
+use crate::plan::{Plan, Unit};
 use crate::query;
+use crate::store::Store;
+use std::collections::BTreeMap;
 
 pub const GRANT: &str = "@grant";
 pub const VERBS: [&str; 6] = ["see", "put", "set", "end", "tie", "cut"];
+pub const DEPTH: usize = 16;
+
+pub struct Mark<'a> {
+    pub key: Option<i64>,
+    pub cells: &'a BTreeMap<String, Cell>,
+}
 
 pub fn vet(plan: &Plan, fields: &[(&str, &str)]) -> Result<(), Error> {
     let verb = get(fields, "verb");
@@ -29,6 +41,9 @@ fn scope(unit: Option<&str>, value: &str) -> Result<(), Error> {
         return Ok(());
     }
     if let Some(id) = value.strip_prefix("row ") {
+        if unit.is_none() {
+            return Err(Error::Adapt("row scope needs a unit".into()));
+        }
         id.parse::<i64>()
             .map_err(|_| Error::Adapt("row scope needs id".into()))?;
         return Ok(());
@@ -37,12 +52,214 @@ fn scope(unit: Option<&str>, value: &str) -> Result<(), Error> {
         let Some(unit) = unit else {
             return Err(Error::Adapt("pred scope needs a unit".into()));
         };
-        query::parse(&format!("from {unit} where {pred}"))?;
+        let tree = query::parse(&format!("from {unit} where {pred}"))?;
+        let plain = tree
+            .preds()
+            .iter()
+            .all(|p| !matches!(p.op(), query::Op::Has | query::Op::Some));
+        if !plain {
+            return Err(Error::Adapt("scope pred is cells only".into()));
+        }
         return Ok(());
     }
     Err(Error::Adapt(
         "scope is all | row <id> | pred <where>".into(),
     ))
+}
+
+pub fn check<S: Store>(
+    plan: &Plan,
+    store: &S,
+    who: Who,
+    verb: &str,
+    unit: &str,
+    mark: &Mark<'_>,
+) -> Result<bool, Error> {
+    let chain = anchors(plan, store, unit, mark)?;
+    for deed in store.live(plan, GRANT)? {
+        if held(&deed, who, verb, unit, mark, &chain)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+pub fn broad<S: Store>(
+    plan: &Plan,
+    store: &S,
+    who: Who,
+    verb: &str,
+    unit: &str,
+) -> Result<bool, Error> {
+    for deed in store.live(plan, GRANT)? {
+        if !who_hit(cell(&deed, "who"), who) || !verb_hit(cell(&deed, "verb"), verb) {
+            continue;
+        }
+        let place = cell(&deed, "unit");
+        let wide = place == "*" || ddl::table(place) == unit;
+        if wide && cell(&deed, "scope") == "all" {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn held(
+    deed: &Row,
+    who: Who,
+    verb: &str,
+    unit: &str,
+    mark: &Mark<'_>,
+    chain: &[(String, i64)],
+) -> Result<bool, Error> {
+    if !who_hit(cell(deed, "who"), who) || !verb_hit(cell(deed, "verb"), verb) {
+        return Ok(false);
+    }
+    let place = cell(deed, "unit");
+    let span = cell(deed, "scope");
+    if span == "all" {
+        return Ok(place == "*" || ddl::table(place) == unit);
+    }
+    if let Some(id) = span.strip_prefix("row ") {
+        let Ok(id) = id.parse::<i64>() else {
+            return Ok(false);
+        };
+        let anchor = ddl::table(place);
+        return Ok(chain.iter().any(|(u, k)| *u == anchor && *k == id));
+    }
+    if let Some(pred) = span.strip_prefix("pred ") {
+        if ddl::table(place) != unit {
+            return Ok(false);
+        }
+        return Ok(pred_hit(unit, pred, who, mark));
+    }
+    Ok(false)
+}
+
+fn pred_hit(unit: &str, pred: &str, who: Who, mark: &Mark<'_>) -> bool {
+    let text = match who {
+        Who::Op(id) => pred.replace("\"@me\"", &format!("\"{id}\"")),
+        _ if pred.contains("\"@me\"") => return false,
+        _ => pred.to_string(),
+    };
+    let Ok(tree) = query::parse(&format!("from {unit} where {text}")) else {
+        return false;
+    };
+    query::cover(mark.key, mark.cells, tree.preds())
+}
+
+fn who_hit(deed: &str, who: Who) -> bool {
+    match deed {
+        "anon" => true,
+        "all" => matches!(who, Who::Op(_)),
+        id => match who {
+            Who::Op(op) => id.parse::<i64>().is_ok_and(|n| n == op),
+            _ => false,
+        },
+    }
+}
+
+fn verb_hit(deed: &str, verb: &str) -> bool {
+    deed == "*" || deed == verb
+}
+
+fn anchors<S: Store>(
+    plan: &Plan,
+    store: &S,
+    unit: &str,
+    mark: &Mark<'_>,
+) -> Result<Vec<(String, i64)>, Error> {
+    let mut out = Vec::new();
+    if let Some(key) = mark.key {
+        out.push((unit.to_string(), key));
+    }
+    let mut name = unit.to_string();
+    let mut cells = mark.cells.clone();
+    for _ in 0..DEPTH {
+        let Some(node) = seat(plan, &name) else {
+            break;
+        };
+        let Some(edge) = node.root() else {
+            break;
+        };
+        let Some(Cell::Int(up)) = cells.get(edge.name()).cloned() else {
+            break;
+        };
+        let target = ddl::table(edge.target());
+        out.push((target.clone(), up));
+        let Some(row) = store.one(plan, edge.target(), up)? else {
+            break;
+        };
+        name = target;
+        cells = row.cells().clone();
+    }
+    Ok(out)
+}
+
+fn seat<'a>(plan: &'a Plan, table: &str) -> Option<&'a Unit> {
+    plan.units()
+        .values()
+        .find(|node| ddl::table(node.name()) == table)
+}
+
+pub fn blend(plan: &Plan, unit: &str, base: &mut BTreeMap<String, Cell>, fields: &[(&str, &str)]) {
+    let Some(node) = seat(plan, &ddl::table(unit)) else {
+        return;
+    };
+    for (k, v) in fields {
+        if v.is_empty() {
+            base.remove(*k);
+            continue;
+        }
+        if let Some(slot) = node.fields().iter().find(|s| s.name() == *k) {
+            base.insert((*k).to_string(), shape(slot.kind(), v));
+            continue;
+        }
+        let refd = node
+            .bonds()
+            .iter()
+            .any(|e| e.kind().point() && e.name() == *k);
+        if refd && let Ok(id) = v.parse::<i64>() {
+            base.insert((*k).to_string(), Cell::Int(id));
+        }
+    }
+}
+
+pub fn mold(plan: &Plan, unit: &str, fields: &[(&str, &str)]) -> BTreeMap<String, Cell> {
+    let mut out = BTreeMap::new();
+    let Some(node) = seat(plan, &ddl::table(unit)) else {
+        return out;
+    };
+    for slot in node.fields() {
+        let raw = get(fields, slot.name());
+        if raw.is_empty() {
+            continue;
+        }
+        out.insert(slot.name().to_string(), shape(slot.kind(), raw));
+    }
+    for edge in node.bonds().iter().filter(|e| e.kind().point()) {
+        let raw = get(fields, edge.name());
+        if let Ok(id) = raw.parse::<i64>() {
+            out.insert(edge.name().to_string(), Cell::Int(id));
+        }
+    }
+    out
+}
+
+fn shape(kind: atom::Kind, raw: &str) -> Cell {
+    match kind {
+        atom::Kind::Int => raw.parse::<i64>().map(Cell::Int).unwrap_or(Cell::Int(0)),
+        atom::Kind::Bool => Cell::Bool(raw == "true"),
+        _ => Cell::Text(raw.to_string()),
+    }
+}
+
+fn cell<'a>(row: &'a Row, name: &str) -> &'a str {
+    row.cells().get(name).map(Cell::text).unwrap_or("")
+}
+
+pub fn field<'a>(fields: &[(&'a str, &'a str)], name: &str) -> &'a str {
+    get(fields, name)
 }
 
 fn get<'a>(fields: &[(&'a str, &'a str)], name: &str) -> &'a str {
