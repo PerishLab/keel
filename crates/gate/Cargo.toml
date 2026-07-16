@@ -1,0 +1,16 @@
+[package]
+name = "keel-gate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Keel default credential package: caller-space gate over the operator window"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+axum = { workspace = true }
+keel = { workspace = true, features = ["http"] }
+serde_json = { workspace = true }
+sha2 = { workspace = true }

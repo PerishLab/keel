@@ -162,3 +162,13 @@ so the shared meaning stays true.
 - `identity` — `keel.toml [identity] unit` names the operator unit;
   `Core::identify` carries it; anon put on it mints to the created row
   (C-14 exception).
+- `keel-gate` — the default credential package crate (caller space):
+  `gate!(Actor)` ships Token/Session bound to the caller's identity unit.
+- `rise` — gate ceremony: seed the service operator's enumerable grants.
+- `wall` / `pass` — gate middleware seat: credentials → injected operator.
+- `doors` — shipped routes: register (anon put + possession token,
+  mini-genesis), login (svc put Session + lease TTL), logout (operator end).
+- `bearer` / `crumb` — authorization token / session cookie readers.
+- `deny` — gate fault mapping (401/403/404/400).
+- `make` / `gear` — macro-only files excluded from the negentropy scan
+  (scanner cannot parse macro_rules regions; debt: unexclude when it can).

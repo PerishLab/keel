@@ -7,7 +7,10 @@ The flagship staged scenario is **`:forge`** (`docs/spec.md`): a thin
 Forgejo slice growing one act per delivery stage. Act 1 (S1 data
 completeness) covers unique login, per-owner repo names, per-repo issue
 serials, typed json, count packs, and ref-blocked ends over the `forge`
-binary (`crates/api/src/bin/forge.rs`).
+binary (`crates/api/src/bin/forge.rs`). Act 2 (S2 capability): seed policy,
+authority matrix, subtree transfer, sudo window + journal. Act 3 (S3 gate):
+register / token / login / logout / self-revoke over `keel-gate`, sessions
+riding reign via lease.
 
 ## Model (keel-api)
 

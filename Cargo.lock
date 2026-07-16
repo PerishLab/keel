@@ -354,7 +354,18 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "keel",
+ "keel-gate",
  "tokio",
+]
+
+[[package]]
+name = "keel-gate"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "keel",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

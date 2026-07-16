@@ -404,6 +404,111 @@ try {
     }
   });
 
+  io.print("==> act 3: gate");
+  await grant("anon", "put", "Actor", "all");
+
+  let key = "";
+  let erin = 0;
+  await check("register mints a newborn and a token", async () => {
+    const made = await postJson("/register", { login: "erin" });
+    erin = num(made.id);
+    if (typeof made.token !== "string" || made.token.length < 32) {
+      throw new Error("register must surface a token once");
+    }
+    key = made.token;
+  });
+
+  const bear = { authorization: `token ${key}` };
+  await check("token resolves the operator", async () => {
+    const seen = await fetch(`${base}/actor/${erin}`, { headers: bear });
+    if (seen.status !== 200) {
+      throw new Error(`expected 200, got ${seen.status}`);
+    }
+    const blind = await fetch(`${base}/actor/${erin}`);
+    if (blind.status !== 404) {
+      throw new Error(`expected 404, got ${blind.status}`);
+    }
+  });
+
+  let jar = "";
+  await check("login leases a session", async () => {
+    const res = await fetch(`${base}/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: key }),
+    });
+    if (res.status !== 201) {
+      throw new Error(`login ${res.status}`);
+    }
+    await res.body?.cancel();
+    const baked = res.headers.get("set-cookie") ?? "";
+    const hit = baked.match(/session=([0-9a-f]+)/);
+    if (!hit) {
+      throw new Error("missing session cookie");
+    }
+    jar = `session=${hit[1]}`;
+    const seen = await fetch(`${base}/actor/${erin}`, {
+      headers: { cookie: jar },
+    });
+    if (seen.status !== 200) {
+      throw new Error(`cookie auth ${seen.status}`);
+    }
+    const mine = await (await fetch(`${base}/session`, {
+      headers: { cookie: jar },
+    })).json();
+    if (!Array.isArray(mine) || mine.length !== 1) {
+      throw new Error("expected own session row");
+    }
+    if (typeof mine[0].expires_at !== "number") {
+      throw new Error("session must ride reign");
+    }
+  });
+
+  await check("logout ends the session", async () => {
+    const out = await fetch(`${base}/logout`, {
+      method: "POST",
+      headers: { cookie: jar },
+    });
+    if (out.status !== 204) {
+      throw new Error(`logout ${out.status}`);
+    }
+    const dead = await fetch(`${base}/actor/${erin}`, {
+      headers: { cookie: jar },
+    });
+    if (dead.status !== 404) {
+      throw new Error(`expected 404 after logout, got ${dead.status}`);
+    }
+  });
+
+  await check("token revoke is self service", async () => {
+    const rows = await (await fetch(`${base}/token`, { headers: bear }))
+      .json();
+    if (!Array.isArray(rows) || rows.length !== 1) {
+      throw new Error("expected own token row");
+    }
+    const gone = await fetch(`${base}/token/${rows[0].id}`, {
+      method: "DELETE",
+      headers: bear,
+    });
+    if (gone.status !== 204) {
+      throw new Error(`revoke ${gone.status}`);
+    }
+    const dead = await fetch(`${base}/actor/${erin}`, { headers: bear });
+    if (dead.status !== 404) {
+      throw new Error(`expected 404 after revoke, got ${dead.status}`);
+    }
+  });
+
+  await check("gate authority is enumerable", async () => {
+    const pack = await query(
+      'from @grant where verb = "see" count',
+      crown,
+    );
+    if (typeof pack.count !== "number" || pack.count < 3) {
+      throw new Error("gate see grants missing");
+    }
+  });
+
   io.print("forge: clean");
 } catch (err) {
   failed = true;

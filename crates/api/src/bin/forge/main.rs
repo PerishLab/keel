@@ -6,6 +6,10 @@ use keel::atom::{int, string};
 use keel::config;
 use keel::resource;
 use keel::{Cell, Core, Graph, Operator, app, bind};
+use keel_gate::Gate;
+
+mod gear;
+use gear::plug;
 use std::env;
 use std::path::Path;
 use std::sync::Arc;
@@ -55,14 +59,31 @@ async fn main() {
     };
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
-    let core = match bind(graph, store) {
+    plug(&mut graph);
+    let made = bind(graph, store).and_then(|core| core.identify("Actor"));
+    let core = match made {
         Ok(core) => core.share(),
         Err(err) => {
             eprintln!("forge: bind: {err}");
             std::process::exit(1);
         }
     };
-    let router = app(core.clone(), &cfg.listen.prefix)
+    let svc = match core.put("Actor", &[("login", "gate")]) {
+        Ok(svc) => svc,
+        Err(err) => {
+            eprintln!("forge: svc: {err}");
+            std::process::exit(1);
+        }
+    };
+    let door = match Gate::rise(core.clone(), svc) {
+        Ok(door) => door,
+        Err(err) => {
+            eprintln!("forge: rise: {err}");
+            std::process::exit(1);
+        }
+    };
+    let router = door
+        .wall(app(core.clone(), &cfg.listen.prefix))
         .layer(middleware::from_fn_with_state(core.clone(), gate));
     let addr = format!("{}:{}", cfg.listen.host, cfg.listen.port);
     let bound = match tokio::net::TcpListener::bind(&addr).await {

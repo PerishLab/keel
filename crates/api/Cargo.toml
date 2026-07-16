@@ -15,4 +15,5 @@ path = "src/main.rs"
 [dependencies]
 axum = { workspace = true }
 keel = { workspace = true, features = ["http"] }
+keel-gate = { workspace = true }
 tokio = { workspace = true }
