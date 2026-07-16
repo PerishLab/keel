@@ -244,7 +244,6 @@ try {
   ) => {
     await postJson("/@grant", { who, verb, unit, scope }, crown);
   };
-  await grant("all", "*", "Actor", 'pred id = "@me"');
   await grant("anon", "see", "Repo", 'pred visibility = "public"');
   await grant("all", "put", "Repo", 'pred owner = "@me"');
   await grant("all", "put", "Issue", 'pred author = "@me"');
@@ -255,6 +254,8 @@ try {
     (await postJson("/actor", { login: "carol" }, crown)).id,
   );
   const dave = num((await postJson("/actor", { login: "dave" }, crown)).id);
+  await grant(String(carol), "*", "Actor", `row ${carol}`);
+  await grant(String(dave), "*", "Actor", `row ${dave}`);
   const her = { "x-login": "carol" };
   const him = { "x-login": "dave" };
 
@@ -365,6 +366,35 @@ try {
     }, him);
     if (grab.status !== 403) {
       throw new Error(`expected 403, got ${grab.status}`);
+    }
+  });
+
+  await check("transfer moves the subtree", async () => {
+    const before = await post("/@grant", {
+      who: String(carol),
+      verb: "end",
+      unit: "Repo",
+      scope: `row ${den}`,
+    }, him);
+    if (before.status !== 403) {
+      throw new Error(`expected 403 before transfer, got ${before.status}`);
+    }
+    const move = await fetch(`${base}/repo/${den}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", ...her },
+      body: JSON.stringify({ owner: dave }),
+    });
+    if (!move.ok) {
+      throw new Error(`transfer ${move.status}`);
+    }
+    const after = await post("/@grant", {
+      who: String(carol),
+      verb: "end",
+      unit: "Repo",
+      scope: `row ${den}`,
+    }, him);
+    if (after.status !== 201) {
+      throw new Error(`expected 201 after transfer, got ${after.status}`);
     }
   });
 

@@ -709,17 +709,6 @@ impl<'a> Work<'a> {
         let found = stmt.exists(params![left, right, tick]).map_err(fail)?;
         Ok(found)
     }
-
-    pub fn live_right(
-        &self,
-        plan: &Plan,
-        owner: &str,
-        bond: &str,
-        left: i64,
-        right: i64,
-    ) -> Result<bool, Error> {
-        self.live_pair(plan, owner, bond, left, right)
-    }
 }
 
 fn now() -> i64 {
