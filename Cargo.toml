@@ -10,10 +10,10 @@ repository = "https://git.perish.top/PerishLab/keel"
 
 [workspace.dependencies]
 axum = "0.8"
-keel = { path = "crates/keel" }
-keel-gate = { path = "crates/gate" }
-keel-macro = { path = "crates/macro" }
-keel-relay = { path = "crates/relay" }
+keel = { path = "crates/keel", version = "0.1.0", registry = "perish" }
+keel-gate = { path = "crates/gate", version = "0.1.0", registry = "perish" }
+keel-macro = { path = "crates/macro", version = "0.1.0", registry = "perish" }
+keel-relay = { path = "crates/relay", version = "0.1.0", registry = "perish" }
 proc-macro2 = "1"
 quote = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
