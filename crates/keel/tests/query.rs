@@ -17,7 +17,7 @@ struct Student {
     nickname: string,
     #[field(url)]
     avatar: url,
-    #[relation(Class, n2m)]
+    #[relation(Class, many2many)]
     classes: Class,
 }
 

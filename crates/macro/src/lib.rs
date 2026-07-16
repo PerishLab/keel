@@ -135,7 +135,7 @@ fn link(attrs: &[Attribute], ty: &Type) -> syn::Result<Option<Link>> {
         let Meta::List(list) = &attr.meta else {
             return Err(syn::Error::new_spanned(
                 attr,
-                "use #[relation(Type, n2m)] or #[relation(Type, n2m, field = atom)]",
+                "use #[relation(Type, many2many)] or #[relation(Type, many2many, field = atom)]",
             ));
         };
         let items = Punctuated::<Expr, Token![,]>::parse_terminated
@@ -143,11 +143,14 @@ fn link(attrs: &[Attribute], ty: &Type) -> syn::Result<Option<Link>> {
             .map_err(|_| {
                 syn::Error::new_spanned(
                     attr,
-                    "use #[relation(Type, n2m)] or #[relation(Type, n2m, field = atom)]",
+                    "use #[relation(Type, many2many)] or #[relation(Type, many2many, field = atom)]",
                 )
             })?;
         if items.len() < 2 {
-            return Err(syn::Error::new_spanned(attr, "use #[relation(Type, n2m)]"));
+            return Err(syn::Error::new_spanned(
+                attr,
+                "use #[relation(Type, many2many)]",
+            ));
         }
         let target = path_tail(&items[0])?;
         let card = path_ident(&items[1])?;
@@ -177,7 +180,7 @@ fn kind_of(atom: &Ident) -> syn::Result<Ident> {
 
 fn card_of(card: &Ident) -> syn::Result<Ident> {
     match card.to_string().as_str() {
-        "n2m" => Ok(Ident::new("N2m", card.span())),
+        "many2many" => Ok(Ident::new("Many2many", card.span())),
         other => Err(syn::Error::new(
             card.span(),
             format!("unknown relation kind: {other}"),

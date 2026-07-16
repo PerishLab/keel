@@ -48,7 +48,7 @@ fn form(node: &Unit) -> String {
 
 fn arc(node: &Unit, bond: &str, target: &str, kind: bond::Kind) -> String {
     match kind {
-        bond::Kind::N2m => {
+        bond::Kind::Many2many => {
             let edge = node
                 .bonds()
                 .iter()

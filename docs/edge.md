@@ -218,7 +218,7 @@ truncation is forbidden.
 | Response | **A** — always pack on `/query` |
 | Hydrate | **H0** — bond bags only; no target unit bag from `link` |
 | Cap seat | **C0** — engine constants; error on overflow |
-| Association data | **Bond attrs** on n2m join — see `docs/bond.md` |
+| Association data | **Bond attrs** on many2many join — see `docs/bond.md` |
 
 ## Bond suite (see `docs/bond.md`)
 

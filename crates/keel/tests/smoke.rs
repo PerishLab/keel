@@ -17,7 +17,7 @@ struct Student {
     nickname: string,
     #[field(url)]
     avatar: url,
-    #[relation(Class, n2m)]
+    #[relation(Class, many2many)]
     classes: Class,
 }
 
@@ -163,7 +163,7 @@ fn bond() {
 fn miss() {
     #[resource]
     struct Lone {
-        #[relation(Ghost, n2m)]
+        #[relation(Ghost, many2many)]
         ghosts: string,
     }
 

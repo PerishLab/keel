@@ -1,13 +1,13 @@
 # Bond attributes law
 
-Settled: n2m associations may carry **business fields** on the join relation.
+Settled: many2many associations may carry **business fields** on the join relation.
 This is 4NF-correct: attributes of the pair, not an independent multivalued
 fact. It is an engine expressiveness gap closed by design — not a fork against
 normalization.
 
 Enrollment-as-named-unit remains a **later promotion** when the association
 must be a query root with its own lifecycle/workflow. Default path is bond
-attrs on `#[relation(..., n2m)]`.
+attrs on `#[relation(..., many2many)]`.
 
 ## Relational shape
 
@@ -22,7 +22,7 @@ join table = owner_bond
 
 - Key of the association fact: live unique on `(left, right)` (see open U*).
 - Reign stays engine-owned; never business fields.
-- Pure n2m (zero bond fields) remains valid.
+- Pure many2many (zero bond fields) remains valid.
 
 ## Macro intent (normative direction)
 
@@ -30,7 +30,7 @@ Declare fields on the relation, not as a second resource:
 
 ```rust
 // illustrative; exact attribute grammar is an open micro-decision
-#[relation(Course, n2m)]
+#[relation(Course, many2many)]
 #[field(string)] // or relation-scoped field attrs — see open M*
 grade: string,
 courses: Course,
@@ -73,7 +73,7 @@ Empty attrs on a field-less bond: body may be only `{ "right" }`.
 
 | Topic | Choice |
 |-------|--------|
-| D1 association data | **Bond attrs** on n2m join (not Enrollment unit first) |
+| D1 association data | **Bond attrs** on many2many join (not Enrollment unit first) |
 | 4NF | Satisfied: attrs of the pair on the association relation |
 | Pack / H0 / root-only page | Unchanged |
 | No auto reverse | Unchanged |
@@ -83,7 +83,7 @@ Empty attrs on a field-less bond: body may be only `{ "right" }`.
 
 | Id | Choice |
 |----|--------|
-| M1 | **M1b** — `#[relation(Course, n2m, grade = string)]` |
+| M1 | **M1b** — `#[relation(Course, many2many, grade = string)]` |
 | W1 | **W1b** — attrs on `tie`; `set_tie` + HTTP PATCH on tie |
 | D3 | **P1+P2** — `has` + `some (field op val)` on bond or target |
 | D4 | **K1+K3** — link hides dead targets; `end` rejects while live ties remain (in **or** out) |
@@ -104,7 +104,7 @@ from Student where courses some (id = "3")
 
 ### K3 surface
 
-`end` on a unit fails with `live ties remain` when any live n2m still references
+`end` on a unit fails with `live ties remain` when any live many2many still references
 it as **right (inbound)** or **left (outbound)**. Cut those ties first, then
 end. HTTP maps this to **409 Conflict**. K1 remains for read filtering.
 

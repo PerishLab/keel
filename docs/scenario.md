@@ -8,9 +8,9 @@ Gates: L1 `tests/course.rs`, L2 `runseal :course` (also from `:guard`).
 | Unit | Fields | Bonds |
 |------|--------|-------|
 | `Course` | `code`, `title` | — |
-| `Student` | `no`, `name` | `courses` → Course (n2m) |
+| `Student` | `no`, `name` | `courses` → Course (many2many) |
 
-Enrollment is pure n2m: live ties only (no grade / term on the edge).
+Enrollment is pure many2many: live ties only (no grade / term on the edge).
 
 ## Flow exercised
 

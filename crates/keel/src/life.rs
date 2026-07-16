@@ -290,8 +290,8 @@ impl<'a> Work<'a> {
         fields: &[(&str, &str)],
     ) -> Result<i64, Error> {
         let (unit, edge) = edge(plan, owner, bond)?;
-        if edge.kind() != bond::Kind::N2m {
-            return Err(Error::Adapt("bond is not n2m".into()));
+        if edge.kind() != bond::Kind::Many2many {
+            return Err(Error::Adapt("bond is not many2many".into()));
         }
         bond_part(edge, fields)?;
         if !self.live_has(plan, unit.name(), ends.left)? {

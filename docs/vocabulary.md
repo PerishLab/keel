@@ -13,7 +13,7 @@ so the shared meaning stays true.
 
 - `keel` — the library crate; data model description engine.
 - `atom` — business field type marker (`string`, `url`) and its `Kind`.
-- `bond` — relation cardinality marker (`n2m`) and its `Kind`.
+- `bond` — relation kind (`many2many`) and its `Kind`.
 - `spec` — sealed business resource shape before plan expansion.
 - `graph` — set of plugged resource specs.
 - `plan` — engine expansion of a graph for adaptors.
@@ -44,13 +44,13 @@ so the shared meaning stays true.
 - `end` — stamp expires_at to now; row leaves the live slice.
 - `row` — one engine-read record (key, cells, reign times).
 - `cell` — one business field value inside a row.
-- `tie` — create one n2m edge with reign stamps.
-- `ties` — live n2m edges from one owner key.
-- `cut` — end one n2m edge via expires_at.
+- `tie` — create one many2many edge with reign stamps.
+- `ties` — live many2many edges from one owner key.
+- `cut` — end one many2many edge via expires_at.
 - `work` — connection-scoped engine lifecycle operator.
 - `path` — one plan-derived http route descriptor.
 - `side` — foreign-key column name for a resource (`student_id`).
-- `ends` — left/right key pair for a n2m tie.
+- `ends` — left/right key pair for a many2many tie.
 - `face` — Core module: unified engine facade over plan + store.
 - `store` — trait for engine row/edge lifecycle backends.
 - `serve` / `listen` — axum entrypoints projecting Core over HTTP.
@@ -80,7 +80,7 @@ so the shared meaning stays true.
 - `prefix` — HTTP api path prefix under listen.
 - `smoke` — L2 process verification of REST + /query.
 - `course` — classic student/course selection scenario gate (`:course`).
-- `bond` — also: n2m association may carry business field attrs on the join.
+- `bond` — also: many2many association may carry business field attrs on the join.
 - `verify` — cold-start verification boundary document.
 - `atom` — delta: atoms now `string`, `url`, `int`, `bool`; kinds Text/Link/Int/Bool.
 - `cell` — delta: typed value (`Cell::Text/Int/Bool`), not a raw string.
@@ -88,3 +88,6 @@ so the shared meaning stays true.
 - `bind` — also: cast one caller value to a storage value by slot kind.
 - `fit` — match a value against a slot or pred kind; reject mistyped input.
 - `show` — render a cell as display text (digest/sort-free).
+- `many2many` — relation kind, spelled out; digit form `n2m` retired with no
+  alias. Family law: `many2one` / `one2one` next; `one2many` deliberately
+  absent (FK side declares).

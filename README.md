@@ -29,7 +29,7 @@ struct Student {
     no: string,
     #[field(string)]
     name: string,
-    #[relation(Course, n2m)]
+    #[relation(Course, many2many)]
     courses: Course,
 }
 
@@ -50,7 +50,7 @@ fn main() {
 | `put` / `set` / `live` / `end` | insert, partial update, live list, soft-end |
 | `query` / `ask` | text → AST → run; `ask` takes `Tree` directly |
 | AST | `from` + where + `link` + order/page → always **pack** |
-| `tie` / `ties` / `cut` | n2m write on Core; read via `link` bond bags (H0) |
+| `tie` / `ties` / `cut` | many2many write on Core; read via `link` bond bags (H0) |
 | edge law | flat pack; root-only order/page — `docs/edge.md` |
 | `serve` / `listen` | axum (`http` feature) |
 
