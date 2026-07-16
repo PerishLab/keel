@@ -59,9 +59,8 @@ pub fn vet(plan: &Plan, fields: &[(&str, &str)]) -> Result<(), Error> {
         return Err(Error::Adapt(format!("unknown verb {verb}")));
     }
     let who = get(fields, "who");
-    let named = who == "anon" || who == "all" || who.parse::<i64>().is_ok();
-    if !named {
-        return Err(Error::Adapt("who is an id, anon, or all".into()));
+    if !whole(plan, who) {
+        return Err(Error::Adapt("who is an id, group, anon, or all".into()));
     }
     let unit = get(fields, "unit");
     let place = if unit == "*" {
@@ -70,6 +69,19 @@ pub fn vet(plan: &Plan, fields: &[(&str, &str)]) -> Result<(), Error> {
         Some(query::resolve(plan, unit)?)
     };
     scope(place.as_deref(), get(fields, "scope"))
+}
+
+fn whole(plan: &Plan, who: &str) -> bool {
+    if who == "anon" || who == "all" || who.parse::<i64>().is_ok() {
+        return true;
+    }
+    let Some((place, id)) = who.split_once(' ') else {
+        return false;
+    };
+    if id.parse::<i64>().is_err() {
+        return false;
+    }
+    seat(plan, &ddl::table(place)).is_some_and(|node| node.crew().is_some())
 }
 
 fn scope(unit: Option<&str>, value: &str) -> Result<(), Error> {
@@ -113,7 +125,7 @@ pub fn check<S: Store>(
 ) -> Result<bool, Error> {
     let chain = anchors(plan, store, unit, mark)?;
     for deed in store.live(plan, GRANT)? {
-        if held(&deed, who, verb, unit, mark, &chain)? {
+        if held(plan, store, &deed, who, verb, unit, mark, &chain)? {
             return Ok(true);
         }
     }
@@ -128,7 +140,7 @@ pub fn broad<S: Store>(
     unit: &str,
 ) -> Result<bool, Error> {
     for deed in store.live(plan, GRANT)? {
-        if !who_hit(cell(&deed, "who"), who) || !verb_hit(cell(&deed, "verb"), verb) {
+        if !bearer(plan, store, cell(&deed, "who"), who)? || !verb_hit(cell(&deed, "verb"), verb) {
             continue;
         }
         let place = cell(&deed, "unit");
@@ -140,7 +152,10 @@ pub fn broad<S: Store>(
     Ok(false)
 }
 
-fn held(
+#[allow(clippy::too_many_arguments)]
+fn held<S: Store>(
+    plan: &Plan,
+    store: &S,
     deed: &Row,
     who: Who,
     verb: &str,
@@ -148,7 +163,7 @@ fn held(
     mark: &Mark<'_>,
     chain: &[(String, i64)],
 ) -> Result<bool, Error> {
-    if !who_hit(cell(deed, "who"), who) || !verb_hit(cell(deed, "verb"), verb) {
+    if !bearer(plan, store, cell(deed, "who"), who)? || !verb_hit(cell(deed, "verb"), verb) {
         return Ok(false);
     }
     let place = cell(deed, "unit");
@@ -193,6 +208,29 @@ fn who_hit(deed: &str, who: Who) -> bool {
             _ => false,
         },
     }
+}
+
+fn bearer<S: Store>(plan: &Plan, store: &S, deed: &str, who: Who) -> Result<bool, Error> {
+    if who_hit(deed, who) {
+        return Ok(true);
+    }
+    let Who::Op(op) = who else {
+        return Ok(false);
+    };
+    let Some((place, id)) = deed.split_once(' ') else {
+        return Ok(false);
+    };
+    let Ok(id) = id.parse::<i64>() else {
+        return Ok(false);
+    };
+    let Some(node) = seat(plan, &ddl::table(place)) else {
+        return Ok(false);
+    };
+    let Some(edge) = node.crew() else {
+        return Ok(false);
+    };
+    let ties = store.ties(plan, node.name(), edge.name(), id)?;
+    Ok(ties.iter().any(|tie| tie.right() == op))
 }
 
 fn verb_hit(deed: &str, verb: &str) -> bool {

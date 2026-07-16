@@ -33,6 +33,7 @@ pub struct Edge {
     fields: Vec<Slot>,
     need: bool,
     root: bool,
+    crew: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -153,6 +154,7 @@ impl Unit {
                     .collect(),
                 need: bond.need(),
                 root: bond.root(),
+                crew: bond.crew(),
             })
             .collect();
         let roots = bonds.iter().filter(|e| e.root).count();
@@ -203,6 +205,10 @@ impl Unit {
         self.bonds.iter().find(|e| e.root)
     }
 
+    pub fn crew(&self) -> Option<&Edge> {
+        self.bonds.iter().find(|e| e.crew)
+    }
+
     pub fn reign(&self) -> &Reign {
         &self.reign
     }
@@ -249,6 +255,10 @@ impl Edge {
 
     pub fn root(&self) -> bool {
         self.root
+    }
+
+    pub fn crew(&self) -> bool {
+        self.crew
     }
 }
 

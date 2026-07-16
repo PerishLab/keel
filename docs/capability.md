@@ -85,9 +85,10 @@ unit = "Actor"
 - No injection = `anon`. Any injected operator matches `all`. Grants to
   them are ordinary `@grant` rows. A grant to `anon` covers operators too —
   what is public to strangers is public to members.
-- **Group operator**: a grant's `who` may name a row of a unit with a
-  designated membership bond; the check expands membership through that bond
-  live. Designation grammar is open (C-M1 below).
+- **Group operator** (C-M1 settled): a many2many bond marked `crew` names a
+  unit's membership roster. A grant's `who` of the form `<unit> <id>` (e.g.
+  `team 5`) admits any operator that is a live member of row `id` via that
+  unit's crew bond. At most one crew bond per unit.
 
 ## Gate (default credential package)
 
@@ -219,6 +220,7 @@ different unit with its own root chain. No field-level grants, ever.
 | C-L | Lockout: recoverable via window; guardrail courtesy, not law |
 | C-1 | Root chain + subtree grants |
 | C-M2 | Chain designation: bare `root` marker on one `many2one`; ≤1 per unit; implies required |
+| C-M1 | Group operator: `crew` marker on a many2many; grant `who = "<unit> <id>"` expands live membership |
 | C-2 | `@me` — sole context variable in pred scopes |
 | C-3 | Write scopes: postcondition on `put`, pre+post on `set` |
 | C-4 | Attenuation; no deny; no amplification |
@@ -237,7 +239,7 @@ different unit with its own root chain. No field-level grants, ever.
 
 | Id | Question |
 |----|----------|
-| C-M1 | Membership-bond designation grammar for group operators |
+
 | C-9 | `batch`: composite multi-verb atomicity (org+team+member+grant) |
 | C-P | Injection cost; materialized root column as known mitigation |
 

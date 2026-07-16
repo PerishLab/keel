@@ -207,3 +207,8 @@ so the shared meaning stays true.
 - `ship` — publish the crate family to the perish registry from clean
   main; idempotent per version (sparse-index probe skips published).
 - `shelf` — sparse index path prefix for a crate name.
+- `crew` — relation marker (C-M1): the one many2many that is a unit's
+  membership roster; grant `who = "<unit> <id>"` admits its live members.
+- `bearer` — who-match incl. group expansion through a crew bond.
+- `whole` — validate a grant `who` value (id / group / anon / all).
+- `cast` — spec builder: which marker a bond carries (Bond/Free/Root/Crew).

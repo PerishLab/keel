@@ -13,6 +13,14 @@ pub struct Spec {
     bonds: Vec<Bond>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Cast {
+    Bond,
+    Free,
+    Root,
+    Crew,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Only {
     Free,
@@ -36,6 +44,7 @@ pub struct Bond {
     fields: Vec<Field>,
     need: bool,
     root: bool,
+    crew: bool,
 }
 
 pub struct Builder {
@@ -108,6 +117,10 @@ impl Bond {
     pub fn root(&self) -> bool {
         self.root
     }
+
+    pub fn crew(&self) -> bool {
+        self.crew
+    }
 }
 
 impl Builder {
@@ -163,7 +176,7 @@ impl Builder {
         target: impl Into<String>,
         fields: &[(&str, atom::Kind)],
     ) -> Self {
-        self.join(name, kind, target, fields, true, false)
+        self.join(name, kind, target, fields, Cast::Bond)
     }
 
     pub fn free(
@@ -172,7 +185,7 @@ impl Builder {
         kind: bond::Kind,
         target: impl Into<String>,
     ) -> Self {
-        self.join(name, kind, target, &[], false, false)
+        self.join(name, kind, target, &[], Cast::Free)
     }
 
     pub fn root(
@@ -181,7 +194,16 @@ impl Builder {
         kind: bond::Kind,
         target: impl Into<String>,
     ) -> Self {
-        self.join(name, kind, target, &[], true, true)
+        self.join(name, kind, target, &[], Cast::Root)
+    }
+
+    pub fn crew(
+        self,
+        name: impl Into<String>,
+        kind: bond::Kind,
+        target: impl Into<String>,
+    ) -> Self {
+        self.join(name, kind, target, &[], Cast::Crew)
     }
 
     fn join(
@@ -190,8 +212,7 @@ impl Builder {
         kind: bond::Kind,
         target: impl Into<String>,
         fields: &[(&str, atom::Kind)],
-        need: bool,
-        root: bool,
+        cast: Cast,
     ) -> Self {
         let fields = fields
             .iter()
@@ -207,8 +228,9 @@ impl Builder {
             kind,
             target: target.into(),
             fields,
-            need,
-            root,
+            need: cast != Cast::Free,
+            root: cast == Cast::Root,
+            crew: cast == Cast::Crew,
         });
         self
     }

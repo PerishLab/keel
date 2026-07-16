@@ -91,13 +91,17 @@ fn one(
         };
         return Ok((mark, Some(row), None));
     }
-    if let Some((card, target, slots, need, root)) = link(&field.attrs, &field.ty)? {
+    if let Some((card, target, slots, need, root, crew)) = link(&field.attrs, &field.ty)? {
         let pairs = slots.iter().map(|(n, k)| {
             quote! { (#n, ::keel::atom::Kind::#k) }
         });
         let row = if root {
             quote! {
                 .root(#label, ::keel::bond::Kind::#card, #target)
+            }
+        } else if crew {
+            quote! {
+                .crew(#label, ::keel::bond::Kind::#card, #target)
             }
         } else if need {
             quote! {
@@ -204,7 +208,7 @@ fn only_of(attr: &Attribute, item: &Expr) -> syn::Result<Only> {
     ))
 }
 
-type Link = (Ident, String, Vec<(String, Ident)>, bool, bool);
+type Link = (Ident, String, Vec<(String, Ident)>, bool, bool, bool);
 
 fn link(attrs: &[Attribute], ty: &Type) -> syn::Result<Option<Link>> {
     for attr in attrs {
@@ -224,6 +228,7 @@ fn link(attrs: &[Attribute], ty: &Type) -> syn::Result<Option<Link>> {
         let mut slots = Vec::new();
         let mut need = true;
         let mut root = false;
+        let mut crew = false;
         for item in items.iter().skip(2) {
             if expr_ident(item).is_ok_and(|word| word == "opt") {
                 need = false;
@@ -233,11 +238,15 @@ fn link(attrs: &[Attribute], ty: &Type) -> syn::Result<Option<Link>> {
                 root = true;
                 continue;
             }
+            if expr_ident(item).is_ok_and(|word| word == "crew") {
+                crew = true;
+                continue;
+            }
             slots.push(slot_of(item)?);
         }
-        shape(attr, &kind, &slots, need, root)?;
+        shape(attr, &kind, &slots, need, root, crew)?;
         let _ = ty;
-        return Ok(Some((kind, target, slots, need, root)));
+        return Ok(Some((kind, target, slots, need, root, crew)));
     }
     Ok(None)
 }
@@ -265,6 +274,7 @@ fn shape(
     slots: &[(String, Ident)],
     need: bool,
     root: bool,
+    crew: bool,
 ) -> syn::Result<()> {
     if kind != "Many2many" && !slots.is_empty() {
         return Err(syn::Error::new_spanned(attr, "only many2many takes fields"));
@@ -274,6 +284,9 @@ fn shape(
             attr,
             "opt and root are for single refs only",
         ));
+    }
+    if crew && kind != "Many2many" {
+        return Err(syn::Error::new_spanned(attr, "crew is many2many only"));
     }
     if root && !need {
         return Err(syn::Error::new_spanned(attr, "root is always required"));
