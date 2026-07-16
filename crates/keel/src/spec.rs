@@ -14,9 +14,17 @@ pub struct Spec {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Only {
+    Free,
+    All,
+    Per(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Field {
     name: String,
     kind: atom::Kind,
+    only: Only,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -64,6 +72,10 @@ impl Field {
     pub fn kind(&self) -> atom::Kind {
         self.kind
     }
+
+    pub fn only(&self) -> &Only {
+        &self.only
+    }
 }
 
 impl Bond {
@@ -93,6 +105,30 @@ impl Builder {
         self.fields.push(Field {
             name: name.into(),
             kind,
+            only: Only::Free,
+        });
+        self
+    }
+
+    pub fn sole(mut self, name: impl Into<String>, kind: atom::Kind) -> Self {
+        self.fields.push(Field {
+            name: name.into(),
+            kind,
+            only: Only::All,
+        });
+        self
+    }
+
+    pub fn per(
+        mut self,
+        name: impl Into<String>,
+        kind: atom::Kind,
+        scope: impl Into<String>,
+    ) -> Self {
+        self.fields.push(Field {
+            name: name.into(),
+            kind,
+            only: Only::Per(scope.into()),
         });
         self
     }
@@ -129,6 +165,7 @@ impl Builder {
             .map(|(n, k)| Field {
                 name: (*n).to_string(),
                 kind: *k,
+                only: Only::Free,
             })
             .collect();
         self.bonds.push(Bond {

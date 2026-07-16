@@ -1,7 +1,7 @@
 use crate::atom;
 use crate::bond;
 use crate::graph::Graph;
-use crate::spec::Spec;
+use crate::spec::{Only, Spec};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug)]
@@ -21,6 +21,7 @@ pub struct Unit {
 pub struct Slot {
     name: String,
     kind: atom::Kind,
+    only: Only,
 }
 
 #[derive(Clone, Debug)]
@@ -62,15 +63,16 @@ impl Plan {
 
 impl Unit {
     fn lift(spec: &Spec) -> Result<Self, crate::adapt::Error> {
-        let fields = spec
+        let fields: Vec<Slot> = spec
             .fields()
             .iter()
             .map(|field| Slot {
                 name: field.name().to_string(),
                 kind: field.kind(),
+                only: field.only().clone(),
             })
             .collect();
-        let bonds = spec
+        let bonds: Vec<Edge> = spec
             .bonds()
             .iter()
             .map(|bond| Edge {
@@ -83,11 +85,22 @@ impl Unit {
                     .map(|field| Slot {
                         name: field.name().to_string(),
                         kind: field.kind(),
+                        only: Only::Free,
                     })
                     .collect(),
                 need: bond.need(),
             })
             .collect();
+        for slot in &fields {
+            if let Only::Per(scope) = slot.only() {
+                let held = bonds.iter().any(|e| e.kind().point() && e.name() == *scope);
+                if !held {
+                    return Err(crate::adapt::Error::Adapt(format!(
+                        "unique scope {scope} is not a ref"
+                    )));
+                }
+            }
+        }
         Ok(Self {
             name: spec.name().to_string(),
             fields,
@@ -120,6 +133,10 @@ impl Slot {
 
     pub fn kind(&self) -> atom::Kind {
         self.kind
+    }
+
+    pub fn only(&self) -> &Only {
+        &self.only
     }
 }
 

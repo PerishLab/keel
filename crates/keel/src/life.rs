@@ -3,6 +3,7 @@ use crate::atom;
 use crate::bond;
 use crate::ddl;
 use crate::plan::{Edge, Plan, Slot, Unit};
+use crate::spec::Only;
 use rusqlite::{Connection, OptionalExtension, params};
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -152,9 +153,67 @@ impl<'a> Work<'a> {
         vals.push(rusqlite::types::Value::Null);
         vals.push(rusqlite::types::Value::Integer(tick));
         vals.push(rusqlite::types::Value::Integer(tick));
+        self.solid(unit, fields, None)?;
         stmt.execute(rusqlite::params_from_iter(vals))
             .map_err(fail)?;
         Ok(self.conn.last_insert_rowid())
+    }
+
+    fn solid(
+        &self,
+        unit: &Unit,
+        fields: &[(&str, &str)],
+        myself: Option<(i64, &Row)>,
+    ) -> Result<(), Error> {
+        for slot in unit.fields() {
+            if *slot.only() == Only::Free {
+                continue;
+            }
+            self.taken(unit, slot, fields, myself)?;
+        }
+        Ok(())
+    }
+
+    fn taken(
+        &self,
+        unit: &Unit,
+        slot: &Slot,
+        fields: &[(&str, &str)],
+        myself: Option<(i64, &Row)>,
+    ) -> Result<(), Error> {
+        let Some(value) = worth(slot, fields, myself)? else {
+            return Ok(());
+        };
+        let me = myself.map(|(key, _)| key).unwrap_or(0);
+        let mut text = format!(
+            "SELECT 1 FROM {} WHERE {} = ?1 AND {} != ?2 AND ({} IS NULL OR {} > ?3)",
+            ddl::table(unit.name()),
+            slot.name(),
+            ddl::KEY,
+            ddl::EXPIRES,
+            ddl::EXPIRES
+        );
+        let mut vals = vec![
+            value,
+            rusqlite::types::Value::Integer(me),
+            rusqlite::types::Value::Integer(now()),
+        ];
+        if let Only::Per(rel) = slot.only() {
+            let col = ddl::side(rel);
+            text.push_str(&format!(
+                " AND ({col} = ?4 OR (?4 IS NULL AND {col} IS NULL))"
+            ));
+            vals.push(anchor(fields, myself, rel)?);
+        }
+        text.push_str(" LIMIT 1");
+        let mut stmt = self.conn.prepare(&text).map_err(fail)?;
+        if stmt
+            .exists(rusqlite::params_from_iter(vals))
+            .map_err(fail)?
+        {
+            return Err(Error::Adapt(format!("field {} taken", slot.name())));
+        }
+        Ok(())
     }
 
     fn point(
@@ -216,6 +275,23 @@ impl<'a> Work<'a> {
             return Ok((ddl::side(edge.name()), cell));
         }
         Ok((col.to_string(), fit(unit.fields(), col, val)?))
+    }
+
+    fn peek(&self, unit: &Unit, key: i64) -> Result<Row, Error> {
+        let tick = now();
+        let text = format!(
+            "SELECT * FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2)",
+            ddl::table(unit.name()),
+            ddl::KEY,
+            ddl::EXPIRES,
+            ddl::EXPIRES
+        );
+        let mut stmt = self.conn.prepare(&text).map_err(fail)?;
+        let mut rows = stmt.query(params![key, tick]).map_err(fail)?;
+        match rows.next().map_err(fail)? {
+            Some(row) => read(unit, row),
+            None => Err(Error::Adapt(format!("missing row {key}"))),
+        }
     }
 
     pub fn live(&self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error> {
@@ -323,6 +399,8 @@ impl<'a> Work<'a> {
     ) -> Result<(), Error> {
         let unit = find(plan, name)?;
         part(unit, fields)?;
+        let base = self.peek(unit, key)?;
+        self.solid(unit, fields, Some((key, &base)))?;
         let tick = now();
         let mut text = format!("UPDATE {} SET ", ddl::table(unit.name()));
         let mut vals: Vec<rusqlite::types::Value> = Vec::new();
@@ -637,11 +715,49 @@ fn refs(unit: &Unit) -> impl Iterator<Item = &crate::plan::Edge> {
 }
 
 fn pluck<'a>(fields: &[(&'a str, &'a str)], name: &str) -> &'a str {
-    fields
-        .iter()
-        .find(|(k, _)| *k == name)
-        .map(|(_, v)| *v)
-        .unwrap_or("")
+    seek(fields, name).unwrap_or("")
+}
+
+fn seek<'a>(fields: &[(&'a str, &'a str)], name: &str) -> Option<&'a str> {
+    fields.iter().find(|(k, _)| *k == name).map(|(_, v)| *v)
+}
+
+fn worth(
+    slot: &Slot,
+    fields: &[(&str, &str)],
+    myself: Option<(i64, &Row)>,
+) -> Result<Option<rusqlite::types::Value>, Error> {
+    if let Some(raw) = seek(fields, slot.name()) {
+        return Ok(Some(bind(slot, raw)?));
+    }
+    let held = myself.and_then(|(_, row)| row.cells().get(slot.name()));
+    Ok(held.map(cell_val))
+}
+
+fn anchor(
+    fields: &[(&str, &str)],
+    myself: Option<(i64, &Row)>,
+    rel: &str,
+) -> Result<rusqlite::types::Value, Error> {
+    if let Some(raw) = seek(fields, rel) {
+        if raw.is_empty() {
+            return Ok(rusqlite::types::Value::Null);
+        }
+        let key = raw
+            .parse::<i64>()
+            .map_err(|_| Error::Adapt(format!("ref {rel} needs id")))?;
+        return Ok(rusqlite::types::Value::Integer(key));
+    }
+    let held = myself.and_then(|(_, row)| row.cells().get(rel));
+    Ok(held.map(cell_val).unwrap_or(rusqlite::types::Value::Null))
+}
+
+fn cell_val(cell: &Cell) -> rusqlite::types::Value {
+    match cell {
+        Cell::Text(value) => rusqlite::types::Value::Text(value.clone()),
+        Cell::Int(value) => rusqlite::types::Value::Integer(*value),
+        Cell::Bool(value) => rusqlite::types::Value::Integer(*value as i64),
+    }
 }
 
 fn known(unit: &Unit, name: &str) -> bool {

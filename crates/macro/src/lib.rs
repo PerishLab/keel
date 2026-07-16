@@ -84,8 +84,8 @@ fn one(
     let label = ident.to_string();
     let ty = &field.ty;
     let mark = quote! { #ty };
-    if let Some(atom) = atom(&field.attrs)? {
-        let row = quote! { .field(#label, ::keel::atom::Kind::#atom) };
+    if let Some((atom, only)) = atom(&field.attrs)? {
+        let row = grow(&label, &atom, &only);
         return Ok((mark, Some(row), None));
     }
     if let Some((card, target, slots, need)) = link(&field.attrs, &field.ty)? {
@@ -109,26 +109,70 @@ fn one(
     ))
 }
 
-fn atom(attrs: &[Attribute]) -> syn::Result<Option<Ident>> {
+enum Only {
+    Free,
+    All,
+    Per(String),
+}
+
+fn grow(label: &str, atom: &Ident, only: &Only) -> proc_macro2::TokenStream {
+    match only {
+        Only::Free => quote! { .field(#label, ::keel::atom::Kind::#atom) },
+        Only::All => quote! { .sole(#label, ::keel::atom::Kind::#atom) },
+        Only::Per(scope) => quote! { .per(#label, ::keel::atom::Kind::#atom, #scope) },
+    }
+}
+
+fn atom(attrs: &[Attribute]) -> syn::Result<Option<(Ident, Only)>> {
     for attr in attrs {
         if !attr.path().is_ident("field") {
             continue;
         }
-        let Meta::List(list) = &attr.meta else {
-            return Err(syn::Error::new_spanned(
-                attr,
-                "use #[field(string)] or #[field(url)]",
-            ));
-        };
-        let atoms = Punctuated::<Ident, Token![,]>::parse_terminated
-            .parse2(list.tokens.clone())
-            .map_err(|_| syn::Error::new_spanned(attr, "use #[field(string)] or #[field(url)]"))?;
-        if atoms.len() != 1 {
+        let items = told(attr)?;
+        if items.is_empty() {
             return Err(syn::Error::new_spanned(attr, "field takes one atom"));
         }
-        return Ok(Some(kind_of(&atoms[0])?));
+        let kind = kind_of(&expr_ident(&items[0])?)?;
+        let mut only = Only::Free;
+        for item in items.iter().skip(1) {
+            only = only_of(attr, item)?;
+        }
+        return Ok(Some((kind, only)));
     }
     Ok(None)
+}
+
+fn told(attr: &Attribute) -> syn::Result<Punctuated<Expr, Token![,]>> {
+    let Meta::List(list) = &attr.meta else {
+        return Err(syn::Error::new_spanned(
+            attr,
+            "use #[field(string)] or #[field(string, unique)]",
+        ));
+    };
+    Punctuated::<Expr, Token![,]>::parse_terminated
+        .parse2(list.tokens.clone())
+        .map_err(|_| {
+            syn::Error::new_spanned(
+                attr,
+                "use #[field(string)] or #[field(string, unique = rel)]",
+            )
+        })
+}
+
+fn only_of(attr: &Attribute, item: &Expr) -> syn::Result<Only> {
+    if expr_ident(item).is_ok_and(|word| word == "unique") {
+        return Ok(Only::All);
+    }
+    if let Expr::Assign(ExprAssign { left, right, .. }) = item {
+        let name = expr_ident(left)?;
+        if name == "unique" {
+            return Ok(Only::Per(expr_ident(right)?.to_string()));
+        }
+    }
+    Err(syn::Error::new_spanned(
+        attr,
+        "field extras: unique or unique = rel",
+    ))
 }
 
 type Link = (Ident, String, Vec<(String, Ident)>, bool);

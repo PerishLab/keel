@@ -1,6 +1,7 @@
 use crate::atom;
 use crate::bond;
-use crate::plan::{Plan, Reign, Unit};
+use crate::plan::{Plan, Reign, Slot, Unit};
+use crate::spec::Only;
 
 pub const KEY: &str = "id";
 pub const EXPIRES: &str = "expires_at";
@@ -32,7 +33,26 @@ pub fn script(plan: &Plan) -> Vec<String> {
             }
         }
     }
+    for node in plan.units().values() {
+        for slot in node.fields() {
+            if *slot.only() != Only::Free {
+                out.push(lock(node, slot));
+            }
+        }
+    }
     out
+}
+
+fn lock(node: &Unit, slot: &Slot) -> String {
+    let place = table(node.name());
+    let cols = match slot.only() {
+        Only::Per(rel) => format!("{}, {}", side(rel), slot.name()),
+        _ => slot.name().to_string(),
+    };
+    format!(
+        "CREATE UNIQUE INDEX IF NOT EXISTS only_{place}_{} ON {place} ({cols}) WHERE {EXPIRES} IS NULL;",
+        slot.name()
+    )
 }
 
 fn form(node: &Unit) -> String {

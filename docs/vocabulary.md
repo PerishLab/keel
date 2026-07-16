@@ -105,3 +105,13 @@ so the shared meaning stays true.
   second live holder rejected (`live ref exists`, 409).
 - `lone` — engine check: no other live row holds this one2one target.
 - `point` — also: Kind method, true for single-target kinds (many2one/one2one).
+- `only` — field uniqueness seat: `Free` | `All` (`unique`) | `Per(rel)`
+  (`unique = rel`); live rows only (`docs/unique.md`).
+- `sole` / `per` — spec builder verbs for the two unique forms.
+- `solid` — engine gate: all unique slots hold before a write lands.
+- `taken` — one unique slot probe; conflict reads `field {name} taken` (409).
+- `worth` — effective value of a slot for a write (incoming else current).
+- `anchor` — effective scope ref value for a `Per` unique check.
+- `lock` — DDL second lock: partial unique index over live rows.
+- `peek` — read one live row by key (engine-internal).
+- `seek` — find one caller field value by name, `None` when absent.
