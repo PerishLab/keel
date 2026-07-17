@@ -116,6 +116,10 @@ the law.
   token, effective immediately.
 - Suspension is business state on the identity row, enforced by gate
   refusing to resolve operators for suspended rows — never engine `end`.
+- **Resolution and ceremony are separable surfaces.** `screen` is the
+  pass layer alone (credential → operator, bar honored); `wall` adds
+  the stock doors. A caller with its own ceremonies (invitation join,
+  password floor) takes `screen` and keeps gate's grounding intact.
 
 ## Grant shape
 

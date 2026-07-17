@@ -65,9 +65,12 @@ impl<S: Store + 'static> Gate<S> {
     }
 
     pub fn wall(self, router: Router) -> Router {
-        router
-            .merge(self.doors())
-            .layer(middleware::from_fn_with_state(self.clone(), pass::<S>))
+        let doors = self.doors();
+        self.screen(router.merge(doors))
+    }
+
+    pub fn screen(self, router: Router) -> Router {
+        router.layer(middleware::from_fn_with_state(self, pass::<S>))
     }
 
     fn doors(&self) -> Router {
