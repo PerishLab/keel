@@ -114,7 +114,7 @@ async fn run<S: Store>(
     let face = front(core.as_ref(), &headers, op.as_deref(), "see")?;
     let tree = crate::query::parse(&body.q).map_err(Fault::from)?;
     let units = crate::query::involved(core.plan(), &tree).map_err(Fault::from)?;
-    if units.iter().any(|name| core.plan().veiled(name)) {
+    if core.plan().shrouds(&units) {
         return Err(Fault {
             status: StatusCode::NOT_FOUND,
             note: "no such unit".into(),

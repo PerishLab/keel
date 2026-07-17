@@ -70,6 +70,12 @@ impl Plan {
     pub fn veiled(&self, name: &str) -> bool {
         self.units.get(name).is_some_and(Unit::veil)
     }
+
+    pub fn shrouds(&self, tables: &[String]) -> bool {
+        self.units
+            .values()
+            .any(|unit| unit.veil() && tables.contains(&crate::ddl::table(unit.name())))
+    }
 }
 
 impl Unit {

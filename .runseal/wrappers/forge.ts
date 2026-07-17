@@ -460,6 +460,15 @@ try {
     if (veiled.status !== 404) {
       throw new Error(`session must be veiled off the wire ${veiled.status}`);
     }
+    const asked = await fetch(`${base}/query`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: jar },
+      body: JSON.stringify({ q: "from Session" }),
+    });
+    await asked.body?.cancel();
+    if (asked.status !== 404) {
+      throw new Error(`veiled unit must not be queryable ${asked.status}`);
+    }
   });
 
   await check("logout ends the session", async () => {
