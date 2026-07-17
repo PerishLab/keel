@@ -7,15 +7,19 @@ use syn::{
 };
 
 #[proc_macro_attribute]
-pub fn resource(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn resource(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
-    match expand(input) {
+    let veil = attr
+        .to_string()
+        .split(',')
+        .any(|word| word.trim() == "veil");
+    match expand(input, veil) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),
     }
 }
 
-fn expand(input: ItemStruct) -> syn::Result<proc_macro2::TokenStream> {
+fn expand(input: ItemStruct, veil: bool) -> syn::Result<proc_macro2::TokenStream> {
     let name = &input.ident;
     let vis = &input.vis;
     let Fields::Named(fields) = &input.fields else {
@@ -46,6 +50,11 @@ fn expand(input: ItemStruct) -> syn::Result<proc_macro2::TokenStream> {
         quote! { (#(#marks),*) }
     };
     let mark = format_ident!("Mark{}", name);
+    let veil = if veil {
+        quote! { .veil() }
+    } else {
+        quote! {}
+    };
 
     Ok(quote! {
         #[allow(non_camel_case_types)]
@@ -64,6 +73,7 @@ fn expand(input: ItemStruct) -> syn::Result<proc_macro2::TokenStream> {
                 ::keel::spec::Spec::build(stringify!(#name))
                     #(#rows)*
                     #(#links)*
+                    #veil
                     .seal()
             }
         }

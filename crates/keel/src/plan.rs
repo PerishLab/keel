@@ -15,6 +15,7 @@ pub struct Unit {
     fields: Vec<Slot>,
     bonds: Vec<Edge>,
     reign: Reign,
+    veil: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -65,6 +66,10 @@ impl Plan {
     pub fn units(&self) -> &BTreeMap<String, Unit> {
         &self.units
     }
+
+    pub fn veiled(&self, name: &str) -> bool {
+        self.units.get(name).is_some_and(Unit::veil)
+    }
 }
 
 impl Unit {
@@ -83,6 +88,7 @@ impl Unit {
             fields,
             bonds: Vec::new(),
             reign: Reign::engine(),
+            veil: false,
         }
     }
 
@@ -107,6 +113,7 @@ impl Unit {
             fields,
             bonds: Vec::new(),
             reign: Reign::engine(),
+            veil: false,
         }
     }
 
@@ -121,6 +128,7 @@ impl Unit {
             }],
             bonds: Vec::new(),
             reign: Reign::engine(),
+            veil: false,
         }
     }
 
@@ -185,6 +193,7 @@ impl Unit {
             fields,
             bonds,
             reign: Reign::engine(),
+            veil: spec.veiled(),
         })
     }
 
@@ -210,6 +219,10 @@ impl Unit {
 
     pub fn reign(&self) -> &Reign {
         &self.reign
+    }
+
+    pub fn veil(&self) -> bool {
+        self.veil
     }
 }
 

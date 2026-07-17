@@ -11,6 +11,7 @@ pub struct Spec {
     name: String,
     fields: Vec<Field>,
     bonds: Vec<Bond>,
+    veil: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -51,6 +52,7 @@ pub struct Builder {
     name: String,
     fields: Vec<Field>,
     bonds: Vec<Bond>,
+    veil: bool,
 }
 
 impl Spec {
@@ -59,11 +61,16 @@ impl Spec {
             name: name.into(),
             fields: Vec::new(),
             bonds: Vec::new(),
+            veil: false,
         }
     }
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn veiled(&self) -> bool {
+        self.veil
     }
 
     pub fn fields(&self) -> &[Field] {
@@ -230,11 +237,17 @@ impl Builder {
         self
     }
 
+    pub fn veil(mut self) -> Self {
+        self.veil = true;
+        self
+    }
+
     pub fn seal(self) -> Spec {
         Spec {
             name: self.name,
             fields: self.fields,
             bonds: self.bonds,
+            veil: self.veil,
         }
     }
 }

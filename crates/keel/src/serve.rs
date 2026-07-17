@@ -112,7 +112,15 @@ async fn run<S: Store>(
     Json(body): Json<QueryBody>,
 ) -> Result<Json<Value>, Fault> {
     let face = front(core.as_ref(), &headers, op.as_deref(), "see")?;
-    let pack = face.query(&body.q).map_err(Fault::from)?;
+    let tree = crate::query::parse(&body.q).map_err(Fault::from)?;
+    let units = crate::query::involved(core.plan(), &tree).map_err(Fault::from)?;
+    if units.iter().any(|name| core.plan().veiled(name)) {
+        return Err(Fault {
+            status: StatusCode::NOT_FOUND,
+            note: "no such unit".into(),
+        });
+    }
+    let pack = face.ask(&tree).map_err(Fault::from)?;
     Ok(Json(pack_json(&pack)))
 }
 
@@ -281,7 +289,14 @@ async fn detach<S: Store>(
 }
 
 fn unit_name<S: Store>(core: &Core<S>, route: &str) -> Result<String, Fault> {
-    crate::query::resolve(core.plan(), route).map_err(Fault::from)
+    let name = crate::query::resolve(core.plan(), route).map_err(Fault::from)?;
+    if core.plan().veiled(&name) {
+        return Err(Fault {
+            status: StatusCode::NOT_FOUND,
+            note: "no such route".into(),
+        });
+    }
+    Ok(name)
 }
 
 fn bond_name<S: Store>(core: &Core<S>, unit: &str, bond: &str) -> Result<String, Fault> {

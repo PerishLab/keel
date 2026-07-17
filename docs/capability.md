@@ -252,6 +252,30 @@ A visibility boundary must be a **unit boundary**. Fields never carry their
 own visibility; a field that needs different visibility than its row is a
 different unit with its own root chain. No field-level grants, ever.
 
+## Veil (ceremony-only units)
+
+A unit marked **`veil`** (`#[resource(veil)]`) is kept in the graph and
+governed by the engine, but is **removed from the generic HTTP
+projection**: no `/{unit}` routes and no `/query` reach it. It is written
+and read only by app code through the six Face verbs — its *ceremonies*.
+
+The reason is a real composition hazard: generic projection and root-chain
+subtree grants are each correct alone, but together they let an operator
+who holds a grant over its own subtree **author its own credential rows**
+(mint a bearer token, set a password hash) through the generic routes,
+bypassing the ceremony that is supposed to be the only writer. Veil is the
+seam: a credential unit (session, token, password, invite, refresh) roots
+at its owner for lifecycle, yet is authored only by ceremony.
+
+- Veil bounds the **wire**, not the Face. Root-chain self-service still
+  holds *through ceremonies*: logout ends the session, a rotate replaces a
+  token — the app exposes those, the generic `PUT /Session` does not.
+- Veil is not visibility. A veiled unit the operator could `see` is still
+  invisible on the wire; a non-veiled unit still obeys grant coverage. The
+  two boundaries compose.
+- Engine units (`@grant`, `@seal`, `@pulse`) are never veiled: `@grant` is
+  deliberately writable on the wire (that is how grant/revoke happen).
+
 ## Settled package
 
 | Id | Choice |
@@ -277,6 +301,7 @@ different unit with its own root chain. No field-level grants, ever.
 | C-16 | `see` pred scopes cover the subtree via the matching ancestor; write preds never descend |
 | C-D | `gate` default credential package: caller space, enumerable grant authority, possession only at identity birth |
 | C-17 | `allows`: enforcement-point probe; one decision procedure with the verbs; reading not ticket; fail-closed on unwritten data |
+| C-18 | `veil`: credential units off the generic projection; ceremony-written via Faces, never authorable on the wire; bounds the wire not the Face |
 
 ## Open
 
@@ -302,5 +327,7 @@ different unit with its own root chain. No field-level grants, ever.
   meta level.
 - A probe that grants: no reservation, ticket, or lock behind `allows`.
 - A second decision procedure for `allows` beside the one the verbs run.
+- A credential unit (session, token, password, refresh, invite) authorable
+  through the generic projection instead of a ceremony — it must be veiled.
 - A credential package holding wildcard or sudo for steady-state
   operation (possession is for identity birth only).
