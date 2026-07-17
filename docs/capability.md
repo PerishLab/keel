@@ -214,6 +214,34 @@ A row the operator cannot `see` does not exist for it:
 The engine ships `check` and honest `@grant` enumeration; it does not
 promise a reverse audit or simulator.
 
+## Enforcement points (the probe)
+
+Bytes may live outside keel while their authority lives inside — blob
+objects (`keel-blob`), git repositories, any app-owned byte plane. The
+app code serving those bytes is an **enforcement point**: it must ask
+what an operator may do without doing it.
+
+`Face::allows(verb, unit, key) -> bool` is that question: **would this
+face's operator be authorized for `verb` on this row, now.** It is the
+read face of the capability system — the operator-side projection of
+`check` (the audit side keeps its explicit `who`). One decision
+procedure serves the six verbs, `check`, and `allows`; a divergence
+between them is a bug in law, not a tuning knob.
+
+- `allows` is **not a seventh verb**. It takes a verb as an argument,
+  performs nothing, mints nothing, journals nothing, and needs no grant
+  to call: the caller learns only what its own attempts would already
+  reveal (404 / 403 / success).
+- The answer is a **reading, not a ticket**: true at evaluation time,
+  conferring nothing. An enforcement point that stretches an answer
+  across time (a presigned URL, a session) owns that window — keel
+  promised the instant, not the interval.
+- **The probe never speculates about unwritten data.** For `put`, `key`
+  anchors the prospective root and the probe answers from row and
+  subtree scopes; a pred scope whose truth depends on the candidate row
+  contributes `false` (fail closed). `set` probes answer the
+  precondition half only.
+
 ## Modeling law
 
 A visibility boundary must be a **unit boundary**. Fields never carry their
@@ -244,6 +272,7 @@ different unit with its own root chain. No field-level grants, ever.
 | C-15 | Uniform check across all six verbs, `put` included |
 | C-16 | `see` pred scopes cover the subtree via the matching ancestor; write preds never descend |
 | C-D | `gate` default credential package: caller space, enumerable grant authority, possession only at identity birth |
+| C-17 | `allows`: enforcement-point probe; one decision procedure with the verbs; reading not ticket; fail-closed on unwritten data |
 
 ## Open
 
@@ -267,5 +296,7 @@ different unit with its own root chain. No field-level grants, ever.
 - A grant with an unparseable pred granting anything (must fail closed).
 - Engine checks that bypass `@grant` semantics outside the one grounded
   meta level.
+- A probe that grants: no reservation, ticket, or lock behind `allows`.
+- A second decision procedure for `allows` beside the one the verbs run.
 - A credential package holding wildcard or sudo for steady-state
   operation (possession is for identity birth only).
