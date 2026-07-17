@@ -111,9 +111,11 @@ the law.
 - Registration rides the **anon face** so mint goes to the created row
   (§ mint); a credential package must never create identity rows through
   its own face.
-- Self-service is root chain, not gate code: logout = `end` own session;
-  password change = `set` own credential row; revocation = `end` own
-  token, effective immediately.
+- Self-service is a ceremony over the root chain: `logout` ends the
+  caller's session, `revoke` ends the caller's token — each a door that
+  ends a veiled row through the Face, effective immediately. The rows
+  are veiled (C-18), so the ceremony is the only path; the generic
+  `DELETE /{unit}` never touches a credential.
 - Suspension is business state on the identity row, enforced by gate
   refusing to resolve operators for suspended rows — never engine `end`.
 - **Resolution and ceremony are separable surfaces.** `screen` is the

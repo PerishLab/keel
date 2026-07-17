@@ -453,14 +453,12 @@ try {
     if (seen.status !== 200) {
       throw new Error(`cookie auth ${seen.status}`);
     }
-    const mine = await (await fetch(`${base}/session`, {
+    const veiled = await fetch(`${base}/session`, {
       headers: { cookie: jar },
-    })).json();
-    if (!Array.isArray(mine) || mine.length !== 1) {
-      throw new Error("expected own session row");
-    }
-    if (typeof mine[0].expires_at !== "number") {
-      throw new Error("session must ride reign");
+    });
+    await veiled.body?.cancel();
+    if (veiled.status !== 404) {
+      throw new Error(`session must be veiled off the wire ${veiled.status}`);
     }
   });
 
@@ -481,13 +479,13 @@ try {
   });
 
   await check("token revoke is self service", async () => {
-    const rows = await (await fetch(`${base}/token`, { headers: bear }))
-      .json();
-    if (!Array.isArray(rows) || rows.length !== 1) {
-      throw new Error("expected own token row");
+    const veiled = await fetch(`${base}/token`, { headers: bear });
+    await veiled.body?.cancel();
+    if (veiled.status !== 404) {
+      throw new Error(`token must be veiled off the wire ${veiled.status}`);
     }
-    const gone = await fetch(`${base}/token/${rows[0].id}`, {
-      method: "DELETE",
+    const gone = await fetch(`${base}/revoke`, {
+      method: "POST",
       headers: bear,
     });
     if (gone.status !== 204) {

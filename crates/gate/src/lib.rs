@@ -86,6 +86,7 @@ impl<S: Store + 'static> Gate<S> {
             .route("/register", post(register::<S>))
             .route("/login", post(login::<S>))
             .route("/logout", post(logout::<S>))
+            .route("/revoke", post(revoke::<S>))
             .with_state(self.clone())
     }
 }
@@ -242,6 +243,30 @@ async fn logout<S: Store + 'static>(
     gate.core
         .of(key)
         .end("Session", row.key())
+        .map_err(Deny::from)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn revoke<S: Store + 'static>(
+    State(gate): State<Gate<S>>,
+    headers: HeaderMap,
+) -> Result<StatusCode, Deny> {
+    let token = bearer(&headers).ok_or(Deny::misfit())?;
+    let face = gate.core.of(gate.svc);
+    let q = format!(r#"from Token where hash = "{}""#, digest(&token));
+    let pack = face.query(&q).map_err(Deny::from)?;
+    let Some(row) = pack.rows().first() else {
+        return Err(Deny {
+            status: StatusCode::NOT_FOUND,
+            note: "no token".into(),
+        });
+    };
+    let Some(key) = actor(row) else {
+        return Err(Deny::misfit());
+    };
+    gate.core
+        .of(key)
+        .end("Token", row.key())
         .map_err(Deny::from)?;
     Ok(StatusCode::NO_CONTENT)
 }

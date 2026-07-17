@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! gate {
     ($actor:ident) => {
-        #[::keel::resource]
+        #[::keel::resource(veil)]
         pub struct Token {
             #[field(string)]
             name: ::keel::atom::string,
@@ -11,7 +11,7 @@ macro_rules! gate {
             actor: $actor,
         }
 
-        #[::keel::resource]
+        #[::keel::resource(veil)]
         pub struct Session {
             #[field(string, unique)]
             hash: ::keel::atom::string,
