@@ -6,21 +6,21 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
-use keel::store::Store;
+use keel::Wire;
 use keel::{Cell, Core, Operator};
 use serde_json::{Map, Value, json};
 use std::sync::Arc;
 
 pub const TTL: i64 = 60 * 60 * 24 * 14;
 
-pub struct Gate<S: Store> {
-    core: Arc<Core<S>>,
+pub struct Gate<W: Wire> {
+    core: Arc<Core<W>>,
     svc: i64,
     bar: Option<String>,
     secure: bool,
 }
 
-impl<S: Store> Clone for Gate<S> {
+impl<W: Wire> Clone for Gate<W> {
     fn clone(&self) -> Self {
         Self {
             core: self.core.clone(),
@@ -31,10 +31,12 @@ impl<S: Store> Clone for Gate<S> {
     }
 }
 
-impl<S: Store + 'static> Gate<S> {
-    pub fn rise(core: Arc<Core<S>>, svc: i64) -> Result<Self, keel::adapt::Error> {
+impl<W: Wire + 'static> Gate<W> {
+    pub async fn rise(core: Arc<Core<W>>, svc: i64) -> Result<Self, keel::adapt::Error> {
         let sudo = core.sudo();
-        let held = sudo.query(&format!(r#"from @grant where who = "{svc}" count"#))?;
+        let held = sudo
+            .query(&format!(r#"from @grant where who = "{svc}" count"#))
+            .await?;
         if held.count() == Some(0) {
             let whom = core.identity().unwrap_or("").to_string();
             for (verb, unit) in [
@@ -51,7 +53,8 @@ impl<S: Store + 'static> Gate<S> {
                         ("unit", unit),
                         ("scope", "all"),
                     ],
-                )?;
+                )
+                .await?;
             }
         }
         Ok(Self {
@@ -78,50 +81,50 @@ impl<S: Store + 'static> Gate<S> {
     }
 
     pub fn screen(self, router: Router) -> Router {
-        router.layer(middleware::from_fn_with_state(self, pass::<S>))
+        router.layer(middleware::from_fn_with_state(self, pass::<W>))
     }
 
     fn doors(&self) -> Router {
         Router::new()
-            .route("/register", post(register::<S>))
-            .route("/login", post(login::<S>))
-            .route("/logout", post(logout::<S>))
-            .route("/revoke", post(revoke::<S>))
+            .route("/register", post(register::<W>))
+            .route("/login", post(login::<W>))
+            .route("/logout", post(logout::<W>))
+            .route("/revoke", post(revoke::<W>))
             .with_state(self.clone())
     }
 }
 
-async fn pass<S: Store + 'static>(
-    State(gate): State<Gate<S>>,
+async fn pass<W: Wire + 'static>(
+    State(gate): State<Gate<W>>,
     mut req: Request,
     next: Next,
 ) -> Response {
-    if let Some(key) = whom(&gate, req.headers()) {
+    if let Some(key) = whom(&gate, req.headers()).await {
         req.extensions_mut().insert(Operator(key));
     }
     next.run(req).await
 }
 
-fn whom<S: Store>(gate: &Gate<S>, headers: &HeaderMap) -> Option<i64> {
-    let key = resolve(gate, headers)?;
-    if barred(gate, key) {
+async fn whom<W: Wire>(gate: &Gate<W>, headers: &HeaderMap) -> Option<i64> {
+    let key = resolve(gate, headers).await?;
+    if barred(gate, key).await {
         return None;
     }
     Some(key)
 }
 
-fn resolve<S: Store>(gate: &Gate<S>, headers: &HeaderMap) -> Option<i64> {
+async fn resolve<W: Wire>(gate: &Gate<W>, headers: &HeaderMap) -> Option<i64> {
     let face = gate.core.of(gate.svc);
     if let Some(token) = bearer(headers) {
         let q = format!(r#"from Token where hash = "{}""#, digest(&token));
-        return actor(face.query(&q).ok()?.rows().first()?);
+        return actor(face.query(&q).await.ok()?.rows().first()?);
     }
     let sid = crumb(headers)?;
     let q = format!(r#"from Session where hash = "{}""#, digest(&sid));
-    actor(face.query(&q).ok()?.rows().first()?)
+    actor(face.query(&q).await.ok()?.rows().first()?)
 }
 
-fn barred<S: Store>(gate: &Gate<S>, key: i64) -> bool {
+async fn barred<W: Wire>(gate: &Gate<W>, key: i64) -> bool {
     let Some(field) = gate.bar.as_ref() else {
         return false;
     };
@@ -129,7 +132,7 @@ fn barred<S: Store>(gate: &Gate<S>, key: i64) -> bool {
         return false;
     };
     let q = format!(r#"from {whom} where id = "{key}""#);
-    let Ok(pack) = gate.core.of(gate.svc).query(&q) else {
+    let Ok(pack) = gate.core.of(gate.svc).query(&q).await else {
         return false;
     };
     match pack.rows().first() {
@@ -162,8 +165,8 @@ fn crumb(headers: &HeaderMap) -> Option<String> {
         .map(str::to_string)
 }
 
-async fn register<S: Store + 'static>(
-    State(gate): State<Gate<S>>,
+async fn register<W: Wire + 'static>(
+    State(gate): State<Gate<W>>,
     Json(body): Json<Map<String, Value>>,
 ) -> Result<(StatusCode, Json<Value>), Deny> {
     let whom = gate.core.identity().ok_or(Deny::misfit())?.to_string();
@@ -172,7 +175,12 @@ async fn register<S: Store + 'static>(
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
-    let key = gate.core.anon().put(&whom, &pairs).map_err(Deny::from)?;
+    let key = gate
+        .core
+        .anon()
+        .put(&whom, &pairs)
+        .await
+        .map_err(Deny::from)?;
     let token = wild();
     gate.core
         .put(
@@ -183,6 +191,7 @@ async fn register<S: Store + 'static>(
                 ("actor", &key.to_string()),
             ],
         )
+        .await
         .map_err(Deny::from)?;
     Ok((
         StatusCode::CREATED,
@@ -190,8 +199,8 @@ async fn register<S: Store + 'static>(
     ))
 }
 
-async fn login<S: Store + 'static>(
-    State(gate): State<Gate<S>>,
+async fn login<W: Wire + 'static>(
+    State(gate): State<Gate<W>>,
     Json(body): Json<Map<String, Value>>,
 ) -> Result<(StatusCode, HeaderMap, Json<Value>), Deny> {
     let token = body
@@ -200,7 +209,7 @@ async fn login<S: Store + 'static>(
         .ok_or(Deny::misfit())?;
     let face = gate.core.of(gate.svc);
     let q = format!(r#"from Token where hash = "{}""#, digest(token));
-    let pack = face.query(&q).map_err(Deny::from)?;
+    let pack = face.query(&q).await.map_err(Deny::from)?;
     let Some(key) = pack.rows().first().and_then(actor) else {
         return Err(Deny {
             status: StatusCode::UNAUTHORIZED,
@@ -213,9 +222,11 @@ async fn login<S: Store + 'static>(
             "Session",
             &[("hash", &digest(&sid)), ("actor", &key.to_string())],
         )
+        .await
         .map_err(Deny::from)?;
     gate.core
         .lease("Session", row, now() + TTL)
+        .await
         .map_err(Deny::from)?;
     let mut headers = HeaderMap::new();
     let jar = bake(&sid, gate.secure);
@@ -223,14 +234,14 @@ async fn login<S: Store + 'static>(
     Ok((StatusCode::CREATED, headers, Json(json!({ "id": row }))))
 }
 
-async fn logout<S: Store + 'static>(
-    State(gate): State<Gate<S>>,
+async fn logout<W: Wire + 'static>(
+    State(gate): State<Gate<W>>,
     headers: HeaderMap,
 ) -> Result<StatusCode, Deny> {
     let sid = crumb(&headers).ok_or(Deny::misfit())?;
     let face = gate.core.of(gate.svc);
     let q = format!(r#"from Session where hash = "{}""#, digest(&sid));
-    let pack = face.query(&q).map_err(Deny::from)?;
+    let pack = face.query(&q).await.map_err(Deny::from)?;
     let Some(row) = pack.rows().first() else {
         return Err(Deny {
             status: StatusCode::NOT_FOUND,
@@ -243,18 +254,19 @@ async fn logout<S: Store + 'static>(
     gate.core
         .of(key)
         .end("Session", row.key())
+        .await
         .map_err(Deny::from)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn revoke<S: Store + 'static>(
-    State(gate): State<Gate<S>>,
+async fn revoke<W: Wire + 'static>(
+    State(gate): State<Gate<W>>,
     headers: HeaderMap,
 ) -> Result<StatusCode, Deny> {
     let token = bearer(&headers).ok_or(Deny::misfit())?;
     let face = gate.core.of(gate.svc);
     let q = format!(r#"from Token where hash = "{}""#, digest(&token));
-    let pack = face.query(&q).map_err(Deny::from)?;
+    let pack = face.query(&q).await.map_err(Deny::from)?;
     let Some(row) = pack.rows().first() else {
         return Err(Deny {
             status: StatusCode::NOT_FOUND,
@@ -267,6 +279,7 @@ async fn revoke<S: Store + 'static>(
     gate.core
         .of(key)
         .end("Token", row.key())
+        .await
         .map_err(Deny::from)?;
     Ok(StatusCode::NO_CONTENT)
 }

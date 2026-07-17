@@ -51,7 +51,7 @@ struct Issue {
 async fn main() {
     let root = env::args().nth(1).unwrap_or_else(|| ".".into());
     let cfg = config::load(Path::new(&root));
-    let store = match cfg.open() {
+    let store = match cfg.open().await {
         Ok(store) => store,
         Err(err) => {
             eprintln!("forge: config: {err}");
@@ -63,6 +63,7 @@ async fn main() {
     plug(&mut graph);
     wire(&mut graph);
     let made = bind(graph, store)
+        .await
         .and_then(|core| core.identify("Actor"))
         .map(|core| match cfg.cache.kind {
             keel::config::Hold::Memory => core,
@@ -75,21 +76,21 @@ async fn main() {
             std::process::exit(1);
         }
     };
-    let svc = match core.put("Actor", &[("login", "gate")]) {
+    let svc = match core.put("Actor", &[("login", "gate")]).await {
         Ok(svc) => svc,
         Err(err) => {
             eprintln!("forge: svc: {err}");
             std::process::exit(1);
         }
     };
-    let post = match core.put("Actor", &[("login", "relay")]) {
+    let post = match core.put("Actor", &[("login", "relay")]).await {
         Ok(post) => post,
         Err(err) => {
             eprintln!("forge: relay svc: {err}");
             std::process::exit(1);
         }
     };
-    let mail = match Relay::rise(core.clone(), post) {
+    let mail = match Relay::rise(core.clone(), post).await {
         Ok(mail) => mail,
         Err(err) => {
             eprintln!("forge: relay: {err}");
@@ -97,7 +98,7 @@ async fn main() {
         }
     };
     mail.run();
-    let door = match Gate::rise(core.clone(), svc) {
+    let door = match Gate::rise(core.clone(), svc).await {
         Ok(door) => door,
         Err(err) => {
             eprintln!("forge: rise: {err}");
@@ -129,15 +130,15 @@ async fn gate(State(core): State<Arc<Core<Sqlite>>>, mut req: Request, next: Nex
         .and_then(|value| value.to_str().ok())
         .map(str::to_string);
     if let Some(login) = login
-        && let Some(key) = whom(&core, &login)
+        && let Some(key) = whom(&core, &login).await
     {
         req.extensions_mut().insert(Operator(key));
     }
     next.run(req).await
 }
 
-fn whom(core: &Core<Sqlite>, login: &str) -> Option<i64> {
-    let rows = core.live("Actor").ok()?;
+async fn whom(core: &Core<Sqlite>, login: &str) -> Option<i64> {
+    let rows = core.live("Actor").await.ok()?;
     rows.iter()
         .find(|row| row.cells().get("login").map(Cell::text) == Some(login))
         .map(|row| row.key())

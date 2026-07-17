@@ -2,10 +2,10 @@ use crate::adapt::Error;
 use crate::atom;
 use crate::ddl;
 use crate::face::Who;
-use crate::life::{Cell, Row};
+use crate::life::{Cell, Row, Work};
 use crate::plan::{Plan, Unit};
 use crate::query;
-use crate::store::Store;
+use crate::wire::Wire;
 use std::collections::BTreeMap;
 
 pub const GRANT: &str = "@grant";
@@ -20,17 +20,18 @@ pub struct Mark<'a> {
     pub cells: &'a BTreeMap<String, Cell>,
 }
 
-pub fn genesis<S: Store>(plan: &Plan, store: &S) -> Result<Option<String>, Error> {
-    if !store.live(plan, SEAL)?.is_empty() {
+pub async fn genesis<W: Wire>(plan: &Plan, wire: &mut W) -> Result<Option<String>, Error> {
+    let mut work = Work::new(wire);
+    if !work.live(plan, SEAL).await?.is_empty() {
         return Ok(None);
     }
     let token = wild();
-    store.put(plan, SEAL, &[("hash", &digest(&token))])?;
+    work.put(plan, SEAL, &[("hash", &digest(&token))]).await?;
     Ok(Some(token))
 }
 
-pub fn sealed<S: Store>(plan: &Plan, store: &S, token: &str) -> Result<bool, Error> {
-    let rows = store.live(plan, SEAL)?;
+pub async fn sealed<W: Wire>(plan: &Plan, wire: &mut W, token: &str) -> Result<bool, Error> {
+    let rows = Work::new(wire).live(plan, SEAL).await?;
     let want = digest(token);
     Ok(rows.first().is_some_and(|row| cell(row, "hash") == want))
 }
@@ -115,32 +116,36 @@ fn scope(unit: Option<&str>, value: &str) -> Result<(), Error> {
     ))
 }
 
-pub fn check<S: Store>(
+pub async fn check<W: Wire>(
     plan: &Plan,
-    store: &S,
+    wire: &mut W,
     who: Who,
     verb: &str,
     unit: &str,
     mark: &Mark<'_>,
 ) -> Result<bool, Error> {
-    let chain = anchors(plan, store, unit, mark)?;
-    for deed in store.live(plan, GRANT)? {
-        if held(plan, store, &deed, who, verb, unit, mark, &chain)? {
+    let mut work = Work::new(wire);
+    let chain = anchors(plan, &mut work, unit, mark).await?;
+    for deed in work.live(plan, GRANT).await? {
+        if held(plan, &mut work, &deed, who, verb, unit, mark, &chain).await? {
             return Ok(true);
         }
     }
     Ok(false)
 }
 
-pub fn broad<S: Store>(
+pub async fn broad<W: Wire>(
     plan: &Plan,
-    store: &S,
+    wire: &mut W,
     who: Who,
     verb: &str,
     unit: &str,
 ) -> Result<bool, Error> {
-    for deed in store.live(plan, GRANT)? {
-        if !bearer(plan, store, cell(&deed, "who"), who)? || !verb_hit(cell(&deed, "verb"), verb) {
+    let mut work = Work::new(wire);
+    for deed in work.live(plan, GRANT).await? {
+        if !bearer(plan, &mut work, cell(&deed, "who"), who).await?
+            || !verb_hit(cell(&deed, "verb"), verb)
+        {
             continue;
         }
         let place = cell(&deed, "unit");
@@ -153,9 +158,9 @@ pub fn broad<S: Store>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn held<S: Store>(
+async fn held<W: Wire>(
     plan: &Plan,
-    store: &S,
+    work: &mut Work<'_, W>,
     deed: &Row,
     who: Who,
     verb: &str,
@@ -163,7 +168,7 @@ fn held<S: Store>(
     mark: &Mark<'_>,
     chain: &[(String, i64)],
 ) -> Result<bool, Error> {
-    if !bearer(plan, store, cell(deed, "who"), who)? || !verb_hit(cell(deed, "verb"), verb) {
+    if !bearer(plan, work, cell(deed, "who"), who).await? || !verb_hit(cell(deed, "verb"), verb) {
         return Ok(false);
     }
     let place = cell(deed, "unit");
@@ -186,15 +191,14 @@ fn held<S: Store>(
         if verb != "see" {
             return Ok(false);
         }
-        return descend(plan, store, place, &anchor, pred, who, chain);
+        return descend(plan, work, place, &anchor, pred, who, chain).await;
     }
     Ok(false)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn descend<S: Store>(
+async fn descend<W: Wire>(
     plan: &Plan,
-    store: &S,
+    work: &mut Work<'_, W>,
     place: &str,
     anchor: &str,
     pred: &str,
@@ -205,7 +209,7 @@ fn descend<S: Store>(
         if up != anchor {
             continue;
         }
-        let Some(row) = store.one(plan, place, *id)? else {
+        let Some(row) = work.one(plan, place, *id).await? else {
             continue;
         };
         let seat = Mark {
@@ -242,7 +246,12 @@ fn who_hit(deed: &str, who: Who) -> bool {
     }
 }
 
-fn bearer<S: Store>(plan: &Plan, store: &S, deed: &str, who: Who) -> Result<bool, Error> {
+async fn bearer<W: Wire>(
+    plan: &Plan,
+    work: &mut Work<'_, W>,
+    deed: &str,
+    who: Who,
+) -> Result<bool, Error> {
     if who_hit(deed, who) {
         return Ok(true);
     }
@@ -261,7 +270,7 @@ fn bearer<S: Store>(plan: &Plan, store: &S, deed: &str, who: Who) -> Result<bool
     let Some(edge) = node.crew() else {
         return Ok(false);
     };
-    let ties = store.ties(plan, node.name(), edge.name(), id)?;
+    let ties = work.ties(plan, node.name(), edge.name(), id).await?;
     Ok(ties.iter().any(|tie| tie.right() == op))
 }
 
@@ -269,9 +278,9 @@ fn verb_hit(deed: &str, verb: &str) -> bool {
     deed == "*" || deed == verb
 }
 
-fn anchors<S: Store>(
+async fn anchors<W: Wire>(
     plan: &Plan,
-    store: &S,
+    work: &mut Work<'_, W>,
     unit: &str,
     mark: &Mark<'_>,
 ) -> Result<Vec<(String, i64)>, Error> {
@@ -293,7 +302,7 @@ fn anchors<S: Store>(
         };
         let target = ddl::table(edge.target());
         out.push((target.clone(), up));
-        let Some(row) = store.one(plan, edge.target(), up)? else {
+        let Some(row) = work.one(plan, edge.target(), up).await? else {
             break;
         };
         name = target;

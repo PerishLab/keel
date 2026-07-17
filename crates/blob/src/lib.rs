@@ -5,7 +5,7 @@ use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use keel::store::Store;
+use keel::Wire;
 use keel::{Core, Operator};
 use rusty_s3::actions::S3Action;
 use rusty_s3::{Bucket, Credentials, UrlStyle};
@@ -16,13 +16,13 @@ use url::Url;
 
 pub const TTL: u64 = 60 * 10;
 
-pub struct Vault<S: Store> {
-    core: Arc<Core<S>>,
+pub struct Vault<W: Wire> {
+    core: Arc<Core<W>>,
     bucket: Bucket,
     creds: Credentials,
 }
 
-impl<S: Store> Clone for Vault<S> {
+impl<W: Wire> Clone for Vault<W> {
     fn clone(&self) -> Self {
         Self {
             core: self.core.clone(),
@@ -32,9 +32,9 @@ impl<S: Store> Clone for Vault<S> {
     }
 }
 
-impl<S: Store + 'static> Vault<S> {
+impl<W: Wire + 'static> Vault<W> {
     pub fn open(
-        core: Arc<Core<S>>,
+        core: Arc<Core<W>>,
         endpoint: &str,
         name: &str,
         region: &str,
@@ -60,8 +60,8 @@ impl<S: Store + 'static> Vault<S> {
 
     fn doors(&self) -> Router {
         Router::new()
-            .route("/asset", post(stow::<S>))
-            .route("/asset/{id}", get(fetch::<S>))
+            .route("/asset", post(stow::<W>))
+            .route("/asset/{id}", get(fetch::<W>))
             .with_state(self.clone())
     }
 
@@ -82,8 +82,8 @@ fn object(id: i64) -> String {
     format!("asset/{id}")
 }
 
-async fn stow<S: Store + 'static>(
-    State(vault): State<Vault<S>>,
+async fn stow<W: Wire + 'static>(
+    State(vault): State<Vault<W>>,
     op: Option<axum::Extension<Operator>>,
     Json(body): Json<Map<String, Value>>,
 ) -> Result<(StatusCode, Json<Value>), Fault> {
@@ -99,6 +99,7 @@ async fn stow<S: Store + 'static>(
         .core
         .of(who)
         .put("Asset", &pairs)
+        .await
         .map_err(Fault::from)?;
     Ok((
         StatusCode::CREATED,
@@ -106,8 +107,8 @@ async fn stow<S: Store + 'static>(
     ))
 }
 
-async fn fetch<S: Store + 'static>(
-    State(vault): State<Vault<S>>,
+async fn fetch<W: Wire + 'static>(
+    State(vault): State<Vault<W>>,
     Path(id): Path<i64>,
     op: Option<axum::Extension<Operator>>,
 ) -> Result<Response, Fault> {
@@ -117,11 +118,13 @@ async fn fetch<S: Store + 'static>(
             .core
             .of(who)
             .query(&format!(r#"from Asset where id = "{id}""#))
+            .await
             .map_err(Fault::from)?,
         None => vault
             .core
             .anon()
             .query(&format!(r#"from Asset where id = "{id}""#))
+            .await
             .map_err(Fault::from)?,
     };
     if seen.rows().first().map(|row| row.key()) != Some(id) {

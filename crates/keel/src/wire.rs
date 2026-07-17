@@ -1,4 +1,6 @@
 use crate::adapt::Error;
+use crate::ddl::Grain;
+use std::future::Future;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Val {
@@ -31,9 +33,15 @@ impl Val {
     }
 }
 
-pub trait Wire {
-    fn run(&self, sql: &str, args: &[Val]) -> Result<u64, Error>;
-    fn plant(&self, sql: &str, args: &[Val]) -> Result<i64, Error>;
-    fn rows(&self, sql: &str, args: &[Val]) -> Result<Vec<Vec<Val>>, Error>;
-    fn script(&self, sql: &str) -> Result<(), Error>;
+pub trait Wire: Send {
+    fn grain(&self) -> Grain;
+    fn run(&mut self, sql: &str, args: &[Val]) -> impl Future<Output = Result<u64, Error>> + Send;
+    fn plant(&mut self, sql: &str, args: &[Val])
+    -> impl Future<Output = Result<i64, Error>> + Send;
+    fn rows(
+        &mut self,
+        sql: &str,
+        args: &[Val],
+    ) -> impl Future<Output = Result<Vec<Vec<Val>>, Error>> + Send;
+    fn script(&mut self, sql: &str) -> impl Future<Output = Result<(), Error>> + Send;
 }

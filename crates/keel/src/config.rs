@@ -106,9 +106,9 @@ pub fn load(root: impl AsRef<Path>) -> Config {
 }
 
 impl Config {
-    pub fn open(&self) -> Result<Sqlite, Error> {
+    pub async fn open(&self) -> Result<Sqlite, Error> {
         match self.store.kind {
-            Kind::Memory => Ok(Sqlite::memory()),
+            Kind::Memory => Sqlite::memory().await,
             Kind::File => {
                 if self.store.path.trim().is_empty() {
                     return Err(Error::Adapt("store.kind=file requires store.path".into()));
@@ -124,7 +124,7 @@ impl Config {
                     std::fs::create_dir_all(parent)
                         .map_err(|e| Error::Adapt(format!("store path: {e}")))?;
                 }
-                Ok(Sqlite::file(path.to_string_lossy()))
+                Sqlite::file(path).await
             }
         }
     }

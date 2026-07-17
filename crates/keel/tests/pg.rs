@@ -27,25 +27,31 @@ fn url() -> String {
         .unwrap_or_else(|_| "host=127.0.0.1 port=5433 user=keel password=keel dbname=keel".into())
 }
 
-fn reset() {
-    let mut client = postgres::Client::connect(&url(), postgres::NoTls).expect("connect");
-    client
-        .batch_execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+async fn reset() -> Postgres {
+    use keel::Wire as _;
+    let mut store = Postgres::at(url()).await.expect("connect");
+    store
+        .script("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+        .await
         .expect("reset");
+    store
 }
 
-#[test]
-fn portable() {
-    reset();
-    let store = Postgres::at(url());
+#[tokio::test]
+async fn portable() {
+    let store = reset().await;
     let mut graph = Graph::new();
     graph.plug::<Course>().plug::<Student>();
-    let core = bind(graph, store).expect("bind");
+    let core = bind(graph, store).await.expect("bind");
 
-    let algo = core.put("Course", &[("code", "CS101")]).expect("course");
-    assert!(core.put("Course", &[("code", "CS101")]).is_err());
+    let algo = core
+        .put("Course", &[("code", "CS101")])
+        .await
+        .expect("course");
+    assert!(core.put("Course", &[("code", "CS101")]).await.is_err());
     let ada = core
         .put("Student", &[("no", "S01"), ("name", "ada")])
+        .await
         .expect("ada");
     core.tie(
         "Student",
@@ -56,10 +62,12 @@ fn portable() {
         },
         &[("grade", "A")],
     )
+    .await
     .expect("enroll");
 
     let pack = core
         .query(r#"from Student where no = "S01" link courses"#)
+        .await
         .expect("pack");
     assert_eq!(pack.rows().len(), 1);
     let ties = pack.bond("student.courses").expect("bag");
@@ -68,12 +76,15 @@ fn portable() {
 
     let count = core
         .query(r#"from Student where courses has "1" count"#)
+        .await
         .expect("count");
     assert_eq!(count.count(), Some(1));
 
-    assert!(core.end("Course", algo).is_err());
-    core.set("Student", ada, &[("name", "ada2")]).expect("set");
-    let after = core.live("Student").expect("live");
+    assert!(core.end("Course", algo).await.is_err());
+    core.set("Student", ada, &[("name", "ada2")])
+        .await
+        .expect("set");
+    let after = core.live("Student").await.expect("live");
     assert_eq!(
         after[0].cells().get("name"),
         Some(&Cell::Text("ada2".into()))

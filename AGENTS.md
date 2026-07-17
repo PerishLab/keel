@@ -23,7 +23,7 @@ engine projections, not business authoring surfaces.
 - **Trigger**: `docs/trigger.md` — landed: `@pulse` stream, who-attributed
   events, coverage-bound `flow`, `keel-relay` webhooks (S4 of spec).
 - No reverse relation generation.
-- No field validation yet (later on Store trait).
+- No field validation yet (later on the engine seam).
 
 ## Growth order
 

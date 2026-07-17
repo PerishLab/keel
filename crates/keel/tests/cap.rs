@@ -29,11 +29,13 @@ struct Issue {
     author: Actor,
 }
 
-#[test]
-fn grant() {
+#[tokio::test]
+async fn grant() {
     let mut graph = Graph::new();
     graph.plug::<Actor>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let sudo = core.sudo();
     assert_eq!(sudo.who(), Who::Sudo);
 
@@ -47,27 +49,30 @@ fn grant() {
                 ("scope", "all"),
             ],
         )
+        .await
         .expect("seed");
-    let rows = sudo.live("@grant").expect("live");
+    let rows = sudo.live("@grant").await.expect("live");
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].key(), row);
 
-    let pack = sudo.query("from @grant count").expect("audit");
+    let pack = sudo.query("from @grant count").await.expect("audit");
     assert_eq!(pack.count(), Some(1));
 
-    sudo.end("@grant", row).expect("revoke");
-    assert_eq!(sudo.live("@grant").expect("live").len(), 0);
+    sudo.end("@grant", row).await.expect("revoke");
+    assert_eq!(sudo.live("@grant").await.expect("live").len(), 0);
 
-    assert!(sudo.set("@grant", row, &[("verb", "put")]).is_err());
+    assert!(sudo.set("@grant", row, &[("verb", "put")]).await.is_err());
 }
 
-#[test]
-fn vet() {
+#[tokio::test]
+async fn vet() {
     let mut graph = Graph::new();
     graph.plug::<Actor>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let sudo = core.sudo();
-    let seed = |who: &str, verb: &str, unit: &str, scope: &str| {
+    let seed = async |who: &str, verb: &str, unit: &str, scope: &str| {
         sudo.put(
             "@grant",
             &[
@@ -77,38 +82,56 @@ fn vet() {
                 ("scope", scope),
             ],
         )
+        .await
     };
-    assert!(seed("anon", "grow", "Actor", "all").is_err());
-    assert!(seed("someone", "see", "Actor", "all").is_err());
-    assert!(seed("anon", "see", "Ghost", "all").is_err());
-    assert!(seed("anon", "see", "Actor", "sometimes").is_err());
-    assert!(seed("anon", "see", "*", r#"pred login = "a""#).is_err());
-    assert!(seed("anon", "see", "Actor", "row x").is_err());
-    seed("all", "*", "*", "all").expect("wildcard");
-    seed("7", "put", "Actor", "row 3").expect("row scope");
-    seed("7", "set", "Actor", r#"pred login = "@me""#).expect("pred scope");
+    assert!(seed("anon", "grow", "Actor", "all").await.is_err());
+    assert!(seed("someone", "see", "Actor", "all").await.is_err());
+    assert!(seed("anon", "see", "Ghost", "all").await.is_err());
+    assert!(seed("anon", "see", "Actor", "sometimes").await.is_err());
+    assert!(
+        seed("anon", "see", "*", r#"pred login = "a""#)
+            .await
+            .is_err()
+    );
+    assert!(seed("anon", "see", "Actor", "row x").await.is_err());
+    seed("all", "*", "*", "all").await.expect("wildcard");
+    seed("7", "put", "Actor", "row 3").await.expect("row scope");
+    seed("7", "set", "Actor", r#"pred login = "@me""#)
+        .await
+        .expect("pred scope");
 }
 
-#[test]
-fn faces() {
+#[tokio::test]
+async fn faces() {
     let mut graph = Graph::new();
     graph.plug::<Actor>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
-    let ada = core.put("Actor", &[("login", "ada")]).expect("ada");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    let ada = core.put("Actor", &[("login", "ada")]).await.expect("ada");
 
     let op = core.of(ada);
     assert_eq!(op.who(), Who::Op(ada));
-    assert!(op.put("Actor", &[("login", "eve")]).is_err());
-    assert_eq!(op.live("Actor").expect("live").len(), 0);
-    assert_eq!(core.anon().query("from Actor").expect("q").rows().len(), 0);
+    assert!(op.put("Actor", &[("login", "eve")]).await.is_err());
+    assert_eq!(op.live("Actor").await.expect("live").len(), 0);
+    assert_eq!(
+        core.anon()
+            .query("from Actor")
+            .await
+            .expect("q")
+            .rows()
+            .len(),
+        0
+    );
     assert_eq!(core.anon().who(), Who::Anon);
 }
 
-#[test]
-fn birth() {
+#[tokio::test]
+async fn birth() {
     let mut graph = Graph::new();
     graph.plug::<Actor>();
-    let core = bind(graph, Sqlite::memory())
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
         .expect("bind")
         .identify("Actor")
         .expect("identify");
@@ -122,32 +145,38 @@ fn birth() {
             ("scope", "all"),
         ],
     )
+    .await
     .expect("register seed");
 
     let eve = core
         .anon()
         .put("Actor", &[("login", "eve")])
+        .await
         .expect("register");
     let own = core.of(eve);
     own.set("Actor", eve, &[("login", "eva")])
+        .await
         .expect("newborn owns itself");
-    assert_eq!(own.live("Actor").expect("live").len(), 1);
+    assert_eq!(own.live("Actor").await.expect("live").len(), 1);
     assert!(
         core.of(eve + 1)
             .set("Actor", eve, &[("login", "x")])
+            .await
             .is_err()
     );
 }
 
-#[test]
-fn cover() {
+#[tokio::test]
+async fn cover() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let sudo = core.sudo();
-    let ada = sudo.put("Actor", &[("login", "ada")]).expect("ada");
-    let bob = sudo.put("Actor", &[("login", "bob")]).expect("bob");
-    let seed = |who: &str, verb: &str, unit: &str, scope: &str| {
+    let ada = sudo.put("Actor", &[("login", "ada")]).await.expect("ada");
+    let bob = sudo.put("Actor", &[("login", "bob")]).await.expect("bob");
+    let seed = async |who: &str, verb: &str, unit: &str, scope: &str| {
         sudo.put(
             "@grant",
             &[
@@ -157,13 +186,14 @@ fn cover() {
                 ("scope", scope),
             ],
         )
+        .await
         .expect("seed");
     };
-    seed(&ada.to_string(), "put", "Repo", "all");
-    seed("anon", "see", "Repo", r#"pred visibility = "public""#);
-    seed("all", "put", "Issue", r#"pred author = "@me""#);
-    seed("all", "set", "Issue", r#"pred author = "@me""#);
-    seed("all", "see", "Issue", r#"pred author = "@me""#);
+    seed(&ada.to_string(), "put", "Repo", "all").await;
+    seed("anon", "see", "Repo", r#"pred visibility = "public""#).await;
+    seed("all", "put", "Issue", r#"pred author = "@me""#).await;
+    seed("all", "set", "Issue", r#"pred author = "@me""#).await;
+    seed("all", "see", "Issue", r#"pred author = "@me""#).await;
 
     let her = core.of(ada);
     let him = core.of(bob);
@@ -177,6 +207,7 @@ fn cover() {
                 ("owner", &ada.to_string()),
             ],
         )
+        .await
         .expect("mint on put");
     assert!(
         him.put(
@@ -187,19 +218,21 @@ fn cover() {
                 ("owner", &bob.to_string()),
             ],
         )
+        .await
         .is_err()
     );
 
-    assert_eq!(her.live("Repo").expect("live").len(), 1);
-    assert_eq!(him.live("Repo").expect("live").len(), 0);
+    assert_eq!(her.live("Repo").await.expect("live").len(), 1);
+    assert_eq!(him.live("Repo").await.expect("live").len(), 0);
     her.set("Repo", repo, &[("visibility", "public")])
+        .await
         .expect("owner sets");
-    assert_eq!(him.live("Repo").expect("live").len(), 1);
+    assert_eq!(him.live("Repo").await.expect("live").len(), 1);
     assert_eq!(
-        him.query("from Repo count").expect("count").count(),
+        him.query("from Repo count").await.expect("count").count(),
         Some(1)
     );
-    assert!(him.set("Repo", repo, &[("name", "grab")]).is_err());
+    assert!(him.set("Repo", repo, &[("name", "grab")]).await.is_err());
 
     let task = him
         .put(
@@ -210,6 +243,7 @@ fn cover() {
                 ("author", &bob.to_string()),
             ],
         )
+        .await
         .expect("pred put");
     assert!(
         him.put(
@@ -220,12 +254,17 @@ fn cover() {
                 ("author", &ada.to_string()),
             ],
         )
+        .await
         .is_err()
     );
-    him.set("Issue", task, &[("title", "hey")]).expect("own");
+    him.set("Issue", task, &[("title", "hey")])
+        .await
+        .expect("own");
     him.set("Issue", task, &[("author", &ada.to_string())])
+        .await
         .expect("mint outranks pred scopes on own row");
     him.set("Issue", task, &[("author", &bob.to_string())])
+        .await
         .expect("back");
 
     let mine = her
@@ -237,10 +276,13 @@ fn cover() {
                 ("author", &ada.to_string()),
             ],
         )
+        .await
         .expect("her issue");
     her.set("Issue", mine, &[("title", "subtree")])
+        .await
         .expect("subtree set");
     her.set("Issue", task, &[("title", "mod")])
+        .await
         .expect("subtree covers bob issue");
 
     her.put(
@@ -252,6 +294,7 @@ fn cover() {
             ("scope", &format!("row {repo}")),
         ],
     )
+    .await
     .expect("attenuated grant");
     assert!(
         him.put(
@@ -263,6 +306,7 @@ fn cover() {
                 ("scope", "all"),
             ],
         )
+        .await
         .is_err()
     );
     assert!(
@@ -275,22 +319,25 @@ fn cover() {
                 ("scope", "all"),
             ],
         )
+        .await
         .is_err()
     );
 
-    assert_eq!(her.live("Issue").expect("live").len(), 2);
-    assert_eq!(him.live("Issue").expect("live").len(), 2);
-    assert_eq!(core.anon().live("Issue").expect("live").len(), 2);
+    assert_eq!(her.live("Issue").await.expect("live").len(), 2);
+    assert_eq!(him.live("Issue").await.expect("live").len(), 2);
+    assert_eq!(core.anon().live("Issue").await.expect("live").len(), 2);
 }
 
-#[test]
-fn descend() {
+#[tokio::test]
+async fn descend() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let sudo = core.sudo();
-    let ada = sudo.put("Actor", &[("login", "ada")]).expect("ada");
-    let bob = sudo.put("Actor", &[("login", "bob")]).expect("bob");
+    let ada = sudo.put("Actor", &[("login", "ada")]).await.expect("ada");
+    let bob = sudo.put("Actor", &[("login", "bob")]).await.expect("bob");
     sudo.put(
         "@grant",
         &[
@@ -300,6 +347,7 @@ fn descend() {
             ("scope", r#"pred visibility = "public""#),
         ],
     )
+    .await
     .expect("seed");
 
     let shut = sudo
@@ -311,6 +359,7 @@ fn descend() {
                 ("owner", &ada.to_string()),
             ],
         )
+        .await
         .expect("shut");
     let open = sudo
         .put(
@@ -321,6 +370,7 @@ fn descend() {
                 ("owner", &ada.to_string()),
             ],
         )
+        .await
         .expect("open");
     sudo.put(
         "Issue",
@@ -330,6 +380,7 @@ fn descend() {
             ("author", &ada.to_string()),
         ],
     )
+    .await
     .expect("hidden");
     let shown = sudo
         .put(
@@ -340,25 +391,29 @@ fn descend() {
                 ("author", &ada.to_string()),
             ],
         )
+        .await
         .expect("shown");
 
-    let seen = core.of(bob).live("Issue").expect("live");
+    let seen = core.of(bob).live("Issue").await.expect("live");
     assert_eq!(seen.len(), 1);
     assert_eq!(seen[0].key(), shown);
 
     sudo.set("Repo", open, &[("visibility", "private")])
+        .await
         .expect("close");
-    assert_eq!(core.of(bob).live("Issue").expect("live").len(), 0);
+    assert_eq!(core.of(bob).live("Issue").await.expect("live").len(), 0);
 }
 
-#[test]
-fn confine() {
+#[tokio::test]
+async fn confine() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let sudo = core.sudo();
-    let ada = sudo.put("Actor", &[("login", "ada")]).expect("ada");
-    let bob = sudo.put("Actor", &[("login", "bob")]).expect("bob");
+    let ada = sudo.put("Actor", &[("login", "ada")]).await.expect("ada");
+    let bob = sudo.put("Actor", &[("login", "bob")]).await.expect("bob");
     sudo.put(
         "@grant",
         &[
@@ -368,6 +423,7 @@ fn confine() {
             ("scope", r#"pred visibility = "public""#),
         ],
     )
+    .await
     .expect("seed");
     let open = sudo
         .put(
@@ -378,15 +434,19 @@ fn confine() {
                 ("owner", &ada.to_string()),
             ],
         )
+        .await
         .expect("open");
 
-    let out = core.of(bob).put(
-        "Issue",
-        &[
-            ("title", "x"),
-            ("repo", &open.to_string()),
-            ("author", &bob.to_string()),
-        ],
-    );
+    let out = core
+        .of(bob)
+        .put(
+            "Issue",
+            &[
+                ("title", "x"),
+                ("repo", &open.to_string()),
+                ("author", &bob.to_string()),
+            ],
+        )
+        .await;
     assert!(out.is_err());
 }

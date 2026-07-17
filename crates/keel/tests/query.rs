@@ -21,8 +21,8 @@ struct Student {
     classes: Class,
 }
 
-#[test]
-fn parse() {
+#[tokio::test]
+async fn parse() {
     let tree = query::parse("from Student").expect("parse");
     assert_eq!(tree.from(), "Student");
     assert_eq!(tree.slice(), Slice::Live);
@@ -95,30 +95,38 @@ fn parse() {
     assert!(query::parse("from Student limit 1 order by nickname").is_err());
 }
 
-#[test]
-fn run() {
+#[tokio::test]
+async fn run() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let ada = core
         .put(
             "Student",
             &[("nickname", "ada"), ("avatar", "https://a.example/a")],
         )
+        .await
         .expect("put ada");
     let bob = core
         .put(
             "Student",
             &[("nickname", "bob"), ("avatar", "https://b.example/b")],
         )
+        .await
         .expect("put bob");
     let cy = core
         .put(
             "Student",
             &[("nickname", "cy"), ("avatar", "https://c.example/c")],
         )
+        .await
         .expect("put cy");
-    let math = core.put("Class", &[("title", "math")]).expect("put math");
+    let math = core
+        .put("Class", &[("title", "math")])
+        .await
+        .expect("put math");
     let tie = core
         .tie(
             "Student",
@@ -129,27 +137,30 @@ fn run() {
             },
             &[],
         )
+        .await
         .expect("tie");
 
-    let pack = core.query("from Student").expect("all");
+    let pack = core.query("from Student").await.expect("all");
     assert_eq!(pack.root(), "student");
     assert_eq!(pack.rows().len(), 3);
     assert_eq!(pack.rows()[0].key(), ada);
     assert_eq!(pack.bags().len(), 1);
     assert_eq!(pack.count(), None);
 
-    let pack = core.query("from Student count").expect("count");
+    let pack = core.query("from Student count").await.expect("count");
     assert_eq!(pack.count(), Some(3));
     assert!(pack.bags().is_empty());
     let pack = core
         .query(r#"from Student where nickname != "ada" count"#)
+        .await
         .expect("count pred");
     assert_eq!(pack.count(), Some(2));
-    assert!(core.query("from Student count limit 1").is_err());
-    assert!(core.query("from Student count link classes").is_err());
+    assert!(core.query("from Student count limit 1").await.is_err());
+    assert!(core.query("from Student count link classes").await.is_err());
 
     let pack = core
         .query(r#"from Student where nickname = "ada""#)
+        .await
         .expect("filter");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(
@@ -159,22 +170,26 @@ fn run() {
 
     let pack = core
         .query(r#"from Student where nickname != "ada""#)
+        .await
         .expect("ne");
     assert_eq!(pack.rows().len(), 2);
 
     let pack = core
         .query(r#"from Student where nickname in ("ada", "cy")"#)
+        .await
         .expect("in");
     assert_eq!(pack.rows().len(), 2);
 
     let pack = core
         .query(r#"from Student where nickname like "A""#)
+        .await
         .expect("like");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(pack.rows()[0].key(), ada);
 
     let pack = core
         .query("from Student order by nickname desc")
+        .await
         .expect("desc");
     assert_eq!(
         pack.rows()
@@ -184,17 +199,18 @@ fn run() {
         vec!["cy", "bob", "ada"]
     );
 
-    let pack = core.query("from Student limit 2").expect("limit");
+    let pack = core.query("from Student limit 2").await.expect("limit");
     assert_eq!(pack.rows().len(), 2);
     assert_eq!(pack.rows()[0].key(), ada);
 
     let pack = core
         .query(&format!(r#"from Student limit 1 after "{ada}""#))
+        .await
         .expect("after");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(pack.rows()[0].key(), bob);
 
-    let pack = core.query("from Student link classes").expect("link");
+    let pack = core.query("from Student link classes").await.expect("link");
     assert_eq!(pack.root(), "student");
     assert_eq!(pack.rows().len(), 3);
     let bonds = pack.bond("student.classes").expect("bond bag");
@@ -206,29 +222,34 @@ fn run() {
 
     let pack = core
         .query(r#"from Student where nickname = "bob" link classes"#)
+        .await
         .expect("empty bond");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(pack.bond("student.classes").expect("bag").len(), 0);
 
     let pack = core
         .query(r#"from Student where nickname = "ada" link classes"#)
+        .await
         .expect("one");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(pack.bond("student.classes").expect("bag").len(), 1);
 
     let pack = core
         .query(&format!(r#"from Student where id = "{ada}""#))
+        .await
         .expect("id eq");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(pack.rows()[0].key(), ada);
 
     let pack = core
         .query(&format!(r#"from Student where id in ("{ada}", "{cy}")"#))
+        .await
         .expect("id in");
     assert_eq!(pack.rows().len(), 2);
 
     let pack = core
         .query(&format!(r#"from Class where id = "{math}""#))
+        .await
         .expect("target");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(
@@ -238,16 +259,21 @@ fn run() {
 
     let pack = core
         .query("from Student order by id desc")
+        .await
         .expect("id order");
     assert_eq!(pack.rows()[0].key(), cy);
 
-    let pack = core.query("from Student LINK Classes").expect("case");
+    let pack = core.query("from Student LINK Classes").await.expect("case");
     assert!(pack.bond("student.classes").is_some());
 
-    assert!(core.query(r#"from Student where id = "x""#).is_err());
-    assert!(core.query("from Student link missing").is_err());
-    assert!(core.query(r#"from Student where missing = "x""#).is_err());
-    assert!(core.query("from Ghost").is_err());
+    assert!(core.query(r#"from Student where id = "x""#).await.is_err());
+    assert!(core.query("from Student link missing").await.is_err());
+    assert!(
+        core.query(r#"from Student where missing = "x""#)
+            .await
+            .is_err()
+    );
+    assert!(core.query("from Ghost").await.is_err());
     let _ = bob;
 }
 
@@ -261,34 +287,45 @@ struct Score {
     passed: bool,
 }
 
-#[test]
-fn cast() {
+#[tokio::test]
+async fn cast() {
     let mut graph = Graph::new();
     graph.plug::<Score>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let low = core
         .put(
             "Score",
             &[("name", "low"), ("points", "2"), ("passed", "false")],
         )
+        .await
         .expect("put low");
     let mid = core
         .put(
             "Score",
             &[("name", "mid"), ("points", "10"), ("passed", "true")],
         )
+        .await
         .expect("put mid");
     let top = core
         .put(
             "Score",
             &[("name", "top"), ("points", "42"), ("passed", "true")],
         )
+        .await
         .expect("put top");
 
-    let pack = core.query(r#"from Score where points > "5""#).expect("gt");
+    let pack = core
+        .query(r#"from Score where points > "5""#)
+        .await
+        .expect("gt");
     assert_eq!(pack.rows().len(), 2);
 
-    let pack = core.query("from Score order by points desc").expect("ord");
+    let pack = core
+        .query("from Score order by points desc")
+        .await
+        .expect("ord");
     assert_eq!(
         pack.rows().iter().map(Row::key).collect::<Vec<_>>(),
         vec![top, mid, low]
@@ -296,6 +333,7 @@ fn cast() {
 
     let pack = core
         .query(r#"from Score where passed = "true""#)
+        .await
         .expect("flag");
     assert_eq!(pack.rows().len(), 2);
     assert_eq!(pack.rows()[0].cells().get("points"), Some(&Cell::Int(10)));
@@ -304,9 +342,12 @@ fn cast() {
         Some(&Cell::Bool(true))
     );
 
-    core.set("Score", low, &[("points", "77")]).expect("set");
+    core.set("Score", low, &[("points", "77")])
+        .await
+        .expect("set");
     let pack = core
         .query(r#"from Score where points >= "77""#)
+        .await
         .expect("ge");
     assert_eq!(pack.rows().len(), 1);
 
@@ -315,6 +356,7 @@ fn cast() {
             "Score",
             &[("name", "x"), ("points", "x"), ("passed", "true")]
         )
+        .await
         .is_err()
     );
     assert!(
@@ -322,9 +364,18 @@ fn cast() {
             "Score",
             &[("name", "x"), ("points", "1"), ("passed", "yep")]
         )
+        .await
         .is_err()
     );
-    assert!(core.set("Score", low, &[("passed", "1")]).is_err());
-    assert!(core.query(r#"from Score where points = "x""#).is_err());
-    assert!(core.query(r#"from Score where passed = "x""#).is_err());
+    assert!(core.set("Score", low, &[("passed", "1")]).await.is_err());
+    assert!(
+        core.query(r#"from Score where points = "x""#)
+            .await
+            .is_err()
+    );
+    assert!(
+        core.query(r#"from Score where passed = "x""#)
+            .await
+            .is_err()
+    );
 }

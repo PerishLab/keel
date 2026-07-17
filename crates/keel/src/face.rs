@@ -1,10 +1,11 @@
 use crate::adapt::Error;
 use crate::cap;
 use crate::ddl;
-use crate::life::{Ends, Row, Tie};
+use crate::ddl::Grain;
+use crate::life::{Ends, Row, Tie, Work};
 use crate::plan::Plan;
 use crate::query::{self, Pack, Tree};
-use crate::store::Store;
+use crate::wire::{Val, Wire};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -84,6 +85,12 @@ impl Stash {
             },
         );
     }
+
+    fn spoil(&self) {
+        if let Ok(mut deals) = self.deals.lock() {
+            deals.clear();
+        }
+    }
 }
 
 fn horizon(pack: &Pack) -> Option<i64> {
@@ -100,18 +107,38 @@ fn horizon(pack: &Pack) -> Option<i64> {
     edge
 }
 
-pub struct Core<S: Store> {
+pub(crate) struct Seat<W: Wire> {
+    wire: W,
+    dirty: bool,
+}
+
+impl<W: Wire> Seat<W> {
+    async fn open(&mut self) -> Result<(), Error> {
+        self.wire.script("BEGIN").await?;
+        self.dirty = true;
+        Ok(())
+    }
+
+    async fn close(&mut self, keep: bool) -> Result<(), Error> {
+        let word = if keep { "COMMIT" } else { "ROLLBACK" };
+        self.wire.script(word).await?;
+        self.dirty = false;
+        Ok(())
+    }
+}
+
+pub struct Core<W: Wire> {
     plan: Plan,
-    store: S,
+    seat: tokio::sync::Mutex<Seat<W>>,
     identity: Option<String>,
     stash: Stash,
 }
 
-impl<S: Store> Core<S> {
-    pub(crate) fn new(plan: Plan, store: S) -> Self {
+impl<W: Wire> Core<W> {
+    pub(crate) fn new(plan: Plan, wire: W) -> Self {
         Self {
             plan,
-            store,
+            seat: tokio::sync::Mutex::new(Seat { wire, dirty: false }),
             identity: None,
             stash: Stash {
                 on: true,
@@ -139,217 +166,154 @@ impl<S: Store> Core<S> {
         &self.plan
     }
 
-    pub fn store(&self) -> &S {
-        &self.store
-    }
-
-    pub fn put(&self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
-        self.craft(Who::Sudo, name, fields)
-    }
-
-    pub(crate) fn craft(
-        &self,
-        who: Who,
-        name: &str,
-        fields: &[(&str, &str)],
-    ) -> Result<i64, Error> {
-        let unit = query::resolve(&self.plan, name)?;
-        let key = self.store.put(&self.plan, &unit, fields)?;
-        self.beat(who, "put", &ddl::table(&unit), key);
-        Ok(key)
-    }
-
-    pub(crate) fn beat(&self, who: Who, verb: &str, unit: &str, key: i64) {
-        self.stash.bump(unit);
-        if unit == ddl::table(cap::PULSE) || unit == ddl::table(cap::SEAL) {
-            return;
+    async fn seize(&self) -> Result<tokio::sync::MutexGuard<'_, Seat<W>>, Error> {
+        let mut seat = self.seat.lock().await;
+        if seat.dirty {
+            seat.wire.script("ROLLBACK").await?;
+            seat.dirty = false;
         }
-        let told = label(who);
-        if let Err(err) = self.store.pulse(&self.plan, verb, unit, key, &told) {
-            eprintln!("keel: pulse: {err}");
-        }
+        Ok(seat)
     }
 
-    pub fn set(&self, name: &str, key: i64, fields: &[(&str, &str)]) -> Result<(), Error> {
-        self.shift(Who::Sudo, name, key, fields)
+    pub async fn put(&self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
+        self.sudo().put(name, fields).await
     }
 
-    pub(crate) fn shift(
-        &self,
-        who: Who,
-        name: &str,
-        key: i64,
-        fields: &[(&str, &str)],
-    ) -> Result<(), Error> {
-        let unit = query::resolve(&self.plan, name)?;
-        self.store.set(&self.plan, &unit, key, fields)?;
-        self.beat(who, "set", &ddl::table(&unit), key);
-        Ok(())
+    pub async fn set(&self, name: &str, key: i64, fields: &[(&str, &str)]) -> Result<(), Error> {
+        self.sudo().set(name, key, fields).await
     }
 
-    pub fn live(&self, name: &str) -> Result<Vec<Row>, Error> {
-        let pack = self.ask(&query::form(name))?;
-        Ok(pack.rows().to_vec())
+    pub async fn live(&self, name: &str) -> Result<Vec<Row>, Error> {
+        self.sudo().live(name).await
     }
 
-    pub fn query(&self, text: &str) -> Result<Pack, Error> {
-        let tree = query::parse(text)?;
-        self.ask(&tree)
+    pub async fn query(&self, text: &str) -> Result<Pack, Error> {
+        self.sudo().query(text).await
     }
 
-    pub fn ask(&self, tree: &Tree) -> Result<Pack, Error> {
-        let key = query::digest(tree);
-        let units = query::involved(&self.plan, tree)?;
-        if let Some(pack) = self.stash.read(&key, &units) {
-            return Ok(pack);
-        }
-        let pack = query::run(&self.plan, &self.store, tree)?;
-        self.stash.keep(key, &units, &pack);
-        Ok(pack)
+    pub async fn ask(&self, tree: &Tree) -> Result<Pack, Error> {
+        self.sudo().ask(tree).await
     }
 
-    pub fn end(&self, name: &str, key: i64) -> Result<(), Error> {
-        self.fell(Who::Sudo, name, key, None)
+    pub async fn end(&self, name: &str, key: i64) -> Result<(), Error> {
+        self.sudo().end(name, key).await
     }
 
-    pub fn lease(&self, name: &str, key: i64, at: i64) -> Result<(), Error> {
-        self.fell(Who::Sudo, name, key, Some(at))
+    pub async fn lease(&self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+        self.sudo().lease(name, key, at).await
     }
 
-    pub(crate) fn fell(
-        &self,
-        who: Who,
-        name: &str,
-        key: i64,
-        at: Option<i64>,
-    ) -> Result<(), Error> {
-        let unit = query::resolve(&self.plan, name)?;
-        match at {
-            Some(at) => self.store.lease(&self.plan, &unit, key, at)?,
-            None => self.store.end(&self.plan, &unit, key)?,
-        }
-        self.beat(who, "end", &ddl::table(&unit), key);
-        Ok(())
-    }
-
-    pub fn tie(
+    pub async fn tie(
         &self,
         owner: &str,
         bond: &str,
         ends: Ends,
         fields: &[(&str, &str)],
     ) -> Result<i64, Error> {
-        self.knot(Who::Sudo, owner, bond, ends, fields)
+        self.sudo().tie(owner, bond, ends, fields).await
     }
 
-    pub(crate) fn knot(
-        &self,
-        who: Who,
-        owner: &str,
-        bond: &str,
-        ends: Ends,
-        fields: &[(&str, &str)],
-    ) -> Result<i64, Error> {
-        let unit = query::resolve(&self.plan, owner)?;
-        let key = self.store.tie(&self.plan, &unit, bond, ends, fields)?;
-        self.beat(who, "tie", &lane(&unit, bond), key);
-        Ok(key)
-    }
-
-    pub fn set_tie(
+    pub async fn set_tie(
         &self,
         owner: &str,
         bond: &str,
         key: i64,
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
-        self.bend(Who::Sudo, owner, bond, key, fields)
+        self.sudo().set_tie(owner, bond, key, fields).await
     }
 
-    pub(crate) fn bend(
+    pub async fn ties(&self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
+        self.sudo().ties(owner, bond, left).await
+    }
+
+    pub async fn cut(&self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
+        self.sudo().cut(owner, bond, key).await
+    }
+
+    pub async fn flow(&self, cursor: i64) -> Result<Vec<Row>, Error> {
+        self.sudo().flow(cursor).await
+    }
+
+    pub async fn has(&self, name: &str) -> Result<bool, Error> {
+        let mut seat = self.seize().await?;
+        let table = ddl::table(name);
+        let rows = match seat.wire.grain() {
+            Grain::Lite => {
+                seat.wire
+                    .rows(
+                        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                        &[Val::Text(table)],
+                    )
+                    .await?
+            }
+            Grain::Pg => {
+                seat.wire
+                    .rows(
+                        "SELECT 1 FROM information_schema.tables WHERE table_name = ?1",
+                        &[Val::Text(table)],
+                    )
+                    .await?
+            }
+        };
+        Ok(!rows.is_empty())
+    }
+
+    pub async fn cols(&self, name: &str) -> Result<Vec<String>, Error> {
+        let mut seat = self.seize().await?;
+        let table = ddl::table(name);
+        match seat.wire.grain() {
+            Grain::Lite => {
+                let rows = seat
+                    .wire
+                    .rows(&format!("PRAGMA table_info({table})"), &[])
+                    .await?;
+                Ok(rows.into_iter().map(|line| line[1].text()).collect())
+            }
+            Grain::Pg => {
+                let rows = seat
+                    .wire
+                    .rows(
+                        "SELECT column_name FROM information_schema.columns WHERE table_name = ?1 ORDER BY ordinal_position",
+                        &[Val::Text(table)],
+                    )
+                    .await?;
+                Ok(rows.into_iter().map(|line| line[0].text()).collect())
+            }
+        }
+    }
+
+    pub async fn seal(&self, token: &str) -> Result<bool, Error> {
+        let mut seat = self.seize().await?;
+        cap::sealed(&self.plan, &mut seat.wire, token).await
+    }
+
+    pub async fn batch<T>(
         &self,
-        who: Who,
-        owner: &str,
-        bond: &str,
-        key: i64,
-        fields: &[(&str, &str)],
-    ) -> Result<(), Error> {
-        let unit = query::resolve(&self.plan, owner)?;
-        self.store.set_tie(&self.plan, &unit, bond, key, fields)?;
-        self.beat(who, "tie", &lane(&unit, bond), key);
-        Ok(())
-    }
-
-    pub fn ties(&self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
-        self.store.ties(&self.plan, owner, bond, left)
-    }
-
-    pub fn cut(&self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
-        self.snip(Who::Sudo, owner, bond, key)
-    }
-
-    pub(crate) fn snip(&self, who: Who, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
-        let unit = query::resolve(&self.plan, owner)?;
-        self.store.cut(&self.plan, &unit, bond, key)?;
-        self.beat(who, "cut", &lane(&unit, bond), key);
-        Ok(())
-    }
-
-    pub fn flow(&self, cursor: i64) -> Result<Vec<Row>, Error> {
-        let rows = self.store.live(&self.plan, cap::PULSE)?;
-        if let Some(first) = rows.first()
-            && cursor + 1 < first.key()
-        {
-            return Err(Error::Adapt("cursor past window".into()));
-        }
-        Ok(rows.into_iter().filter(|row| row.key() > cursor).collect())
-    }
-
-    pub fn has(&self, name: &str) -> Result<bool, Error> {
-        self.store.has(name)
-    }
-
-    pub fn cols(&self, name: &str) -> Result<Vec<String>, Error> {
-        self.store.cols(name)
-    }
-
-    pub fn seal(&self, token: &str) -> Result<bool, Error> {
-        cap::sealed(&self.plan, &self.store, token)
-    }
-
-    pub fn batch<T>(&self, run: impl FnOnce(&Self) -> Result<T, Error>) -> Result<T, Error> {
-        self.store.begin()?;
-        match run(self) {
-            Ok(value) => {
-                self.store.commit()?;
-                Ok(value)
-            }
-            Err(err) => {
-                let _ = self.store.undo();
-                Err(err)
-            }
-        }
+        run: impl AsyncFnOnce(&mut Tx<'_, W>) -> Result<T, Error>,
+    ) -> Result<T, Error> {
+        self.sudo().batch(run).await
     }
 
     pub fn share(self) -> Arc<Self> {
         Arc::new(self)
     }
 
-    pub fn sudo(&self) -> Face<'_, S> {
+    pub fn sudo(&self) -> Face<'_, W> {
         Face {
             core: self,
             who: Who::Sudo,
         }
     }
 
-    pub fn of(&self, operator: i64) -> Face<'_, S> {
+    pub fn of(&self, operator: i64) -> Face<'_, W> {
         Face {
             core: self,
             who: Who::Op(operator),
         }
     }
 
-    pub fn anon(&self) -> Face<'_, S> {
+    pub fn anon(&self) -> Face<'_, W> {
         Face {
             core: self,
             who: Who::Anon,
@@ -364,12 +328,132 @@ pub enum Who {
     Anon,
 }
 
-pub struct Face<'a, S: Store> {
-    core: &'a Core<S>,
+pub struct Face<'a, W: Wire> {
+    core: &'a Core<W>,
     who: Who,
 }
 
-impl<S: Store> Face<'_, S> {
+impl<W: Wire> Face<'_, W> {
+    pub fn who(&self) -> Who {
+        self.who
+    }
+
+    async fn read<T>(
+        &self,
+        run: impl AsyncFnOnce(&mut Tx<'_, W>) -> Result<T, Error>,
+    ) -> Result<T, Error> {
+        let mut seat = self.core.seize().await?;
+        let mut tx = Tx {
+            core: self.core,
+            seat: &mut *seat,
+            who: self.who,
+        };
+        run(&mut tx).await
+    }
+
+    async fn write<T>(
+        &self,
+        run: impl AsyncFnOnce(&mut Tx<'_, W>) -> Result<T, Error>,
+    ) -> Result<T, Error> {
+        let mut seat = self.core.seize().await?;
+        seat.open().await?;
+        let mut tx = Tx {
+            core: self.core,
+            seat: &mut *seat,
+            who: self.who,
+        };
+        let out = run(&mut tx).await;
+        match out {
+            Ok(value) => {
+                seat.close(true).await?;
+                Ok(value)
+            }
+            Err(err) => {
+                let _ = seat.close(false).await;
+                self.core.stash.spoil();
+                Err(err)
+            }
+        }
+    }
+
+    pub async fn put(&self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
+        self.write(async |tx| tx.put(name, fields).await).await
+    }
+
+    pub async fn set(&self, name: &str, key: i64, fields: &[(&str, &str)]) -> Result<(), Error> {
+        self.write(async |tx| tx.set(name, key, fields).await).await
+    }
+
+    pub async fn end(&self, name: &str, key: i64) -> Result<(), Error> {
+        self.write(async |tx| tx.end(name, key).await).await
+    }
+
+    pub async fn lease(&self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+        self.write(async |tx| tx.lease(name, key, at).await).await
+    }
+
+    pub async fn tie(
+        &self,
+        owner: &str,
+        bond: &str,
+        ends: Ends,
+        fields: &[(&str, &str)],
+    ) -> Result<i64, Error> {
+        self.write(async |tx| tx.tie(owner, bond, ends, fields).await)
+            .await
+    }
+
+    pub async fn set_tie(
+        &self,
+        owner: &str,
+        bond: &str,
+        key: i64,
+        fields: &[(&str, &str)],
+    ) -> Result<(), Error> {
+        self.write(async |tx| tx.set_tie(owner, bond, key, fields).await)
+            .await
+    }
+
+    pub async fn cut(&self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
+        self.write(async |tx| tx.cut(owner, bond, key).await).await
+    }
+
+    pub async fn live(&self, name: &str) -> Result<Vec<Row>, Error> {
+        self.read(async |tx| tx.live(name).await).await
+    }
+
+    pub async fn query(&self, text: &str) -> Result<Pack, Error> {
+        let tree = query::parse(text)?;
+        self.ask(&tree).await
+    }
+
+    pub async fn ask(&self, tree: &Tree) -> Result<Pack, Error> {
+        self.read(async |tx| tx.ask(tree).await).await
+    }
+
+    pub async fn ties(&self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
+        self.read(async |tx| tx.ties(owner, bond, left).await).await
+    }
+
+    pub async fn flow(&self, cursor: i64) -> Result<Vec<Row>, Error> {
+        self.read(async |tx| tx.flow(cursor).await).await
+    }
+
+    pub async fn batch<T>(
+        &self,
+        run: impl AsyncFnOnce(&mut Tx<'_, W>) -> Result<T, Error>,
+    ) -> Result<T, Error> {
+        self.write(run).await
+    }
+}
+
+pub struct Tx<'a, W: Wire> {
+    core: &'a Core<W>,
+    seat: &'a mut Seat<W>,
+    who: Who,
+}
+
+impl<W: Wire> Tx<'_, W> {
     pub fn who(&self) -> Who {
         self.who
     }
@@ -382,61 +466,165 @@ impl<S: Store> Face<'_, S> {
         self.core.plan()
     }
 
-    fn seen(&self, unit: &str, key: i64) -> Result<Row, Error> {
-        let row = self
-            .core
-            .store()
-            .one(self.plan(), unit, key)?
+    async fn craft(&mut self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
+        let plan = self.core.plan();
+        let unit = query::resolve(plan, name)?;
+        let key = Work::new(&mut self.seat.wire)
+            .put(plan, &unit, fields)
+            .await?;
+        self.beat("put", &ddl::table(&unit), key).await;
+        Ok(key)
+    }
+
+    async fn beat(&mut self, verb: &str, unit: &str, key: i64) {
+        self.core.stash.bump(unit);
+        if unit == ddl::table(cap::PULSE) || unit == ddl::table(cap::SEAL) {
+            return;
+        }
+        let told = label(self.who);
+        let plan = self.core.plan();
+        if let Err(err) = Work::new(&mut self.seat.wire)
+            .pulse(plan, verb, unit, key, &told)
+            .await
+        {
+            eprintln!("keel: pulse: {err}");
+        }
+    }
+
+    async fn shift(&mut self, name: &str, key: i64, fields: &[(&str, &str)]) -> Result<(), Error> {
+        let plan = self.core.plan();
+        let unit = query::resolve(plan, name)?;
+        Work::new(&mut self.seat.wire)
+            .set(plan, &unit, key, fields)
+            .await?;
+        self.beat("set", &ddl::table(&unit), key).await;
+        Ok(())
+    }
+
+    async fn fell(&mut self, name: &str, key: i64, at: Option<i64>) -> Result<(), Error> {
+        let plan = self.core.plan();
+        let unit = query::resolve(plan, name)?;
+        match at {
+            Some(at) => {
+                Work::new(&mut self.seat.wire)
+                    .lease(plan, &unit, key, at)
+                    .await?
+            }
+            None => Work::new(&mut self.seat.wire).end(plan, &unit, key).await?,
+        }
+        self.beat("end", &ddl::table(&unit), key).await;
+        Ok(())
+    }
+
+    async fn knot(
+        &mut self,
+        owner: &str,
+        bond: &str,
+        ends: Ends,
+        fields: &[(&str, &str)],
+    ) -> Result<i64, Error> {
+        let plan = self.core.plan();
+        let unit = query::resolve(plan, owner)?;
+        let key = Work::new(&mut self.seat.wire)
+            .tie(plan, &unit, bond, ends, fields)
+            .await?;
+        self.beat("tie", &lane(&unit, bond), key).await;
+        Ok(key)
+    }
+
+    async fn bend(
+        &mut self,
+        owner: &str,
+        bond: &str,
+        key: i64,
+        fields: &[(&str, &str)],
+    ) -> Result<(), Error> {
+        let plan = self.core.plan();
+        let unit = query::resolve(plan, owner)?;
+        Work::new(&mut self.seat.wire)
+            .set_tie(plan, &unit, bond, key, fields)
+            .await?;
+        self.beat("tie", &lane(&unit, bond), key).await;
+        Ok(())
+    }
+
+    async fn snip(&mut self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
+        let plan = self.core.plan();
+        let unit = query::resolve(plan, owner)?;
+        Work::new(&mut self.seat.wire)
+            .cut(plan, &unit, bond, key)
+            .await?;
+        self.beat("cut", &lane(&unit, bond), key).await;
+        Ok(())
+    }
+
+    async fn sight(&mut self, tree: &Tree) -> Result<Pack, Error> {
+        let key = query::digest(tree);
+        let units = query::involved(self.core.plan(), tree)?;
+        if let Some(pack) = self.core.stash.read(&key, &units) {
+            return Ok(pack);
+        }
+        let pack = query::run(self.core.plan(), &mut self.seat.wire, tree).await?;
+        self.core.stash.keep(key, &units, &pack);
+        Ok(pack)
+    }
+
+    async fn seen(&mut self, unit: &str, key: i64) -> Result<Row, Error> {
+        let plan = self.core.plan();
+        let row = Work::new(&mut self.seat.wire)
+            .one(plan, unit, key)
+            .await?
             .ok_or_else(|| Error::Adapt(format!("missing row {key}")))?;
         let mark = cap::Mark {
             key: Some(key),
             cells: row.cells(),
         };
-        if !self.held("see", unit, &mark)? {
+        if !self.held("see", unit, &mark).await? {
             return Err(Error::Adapt(format!("missing row {key}")));
         }
         Ok(row)
     }
 
-    fn held(&self, verb: &str, unit: &str, mark: &cap::Mark<'_>) -> Result<bool, Error> {
+    async fn held(&mut self, verb: &str, unit: &str, mark: &cap::Mark<'_>) -> Result<bool, Error> {
         cap::check(
-            self.plan(),
-            self.core.store(),
+            self.core.plan(),
+            &mut self.seat.wire,
             self.who,
             verb,
             &ddl::table(unit),
             mark,
         )
+        .await
     }
 
-    fn may(&self, verb: &str, unit: &str, mark: &cap::Mark<'_>) -> Result<(), Error> {
-        if self.held(verb, unit, mark)? {
+    async fn may(&mut self, verb: &str, unit: &str, mark: &cap::Mark<'_>) -> Result<(), Error> {
+        if self.held(verb, unit, mark).await? {
             return Ok(());
         }
         Err(Error::Adapt(format!("refused {verb}")))
     }
 
-    pub fn put(&self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
+    pub async fn put(&mut self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
         if self.free() {
-            return self.core.put(name, fields);
+            return self.craft(name, fields).await;
         }
         let unit = query::resolve(self.plan(), name)?;
         if unit == cap::GRANT {
-            self.narrow(fields)?;
-            return self.core.craft(self.who, &unit, fields);
+            self.narrow(fields).await?;
+            return self.craft(&unit, fields).await;
         }
         let cells = cap::mold(self.plan(), &unit, fields);
         let mark = cap::Mark {
             key: None,
             cells: &cells,
         };
-        self.may("put", &unit, &mark)?;
-        let key = self.core.craft(self.who, &unit, fields)?;
-        self.mint(&unit, key)?;
+        self.may("put", &unit, &mark).await?;
+        let key = self.craft(&unit, fields).await?;
+        self.mint(&unit, key).await?;
         Ok(key)
     }
 
-    fn mint(&self, unit: &str, key: i64) -> Result<(), Error> {
+    async fn mint(&mut self, unit: &str, key: i64) -> Result<(), Error> {
         if unit == cap::GRANT {
             return Ok(());
         }
@@ -445,8 +633,7 @@ impl<S: Store> Face<'_, S> {
             Who::Anon if self.core.identity() == Some(unit) => key,
             _ => return Ok(()),
         };
-        self.core.craft(
-            self.who,
+        self.craft(
             cap::GRANT,
             &[
                 ("who", &who.to_string()),
@@ -454,15 +641,16 @@ impl<S: Store> Face<'_, S> {
                 ("unit", unit),
                 ("scope", &format!("row {key}")),
             ],
-        )?;
+        )
+        .await?;
         Ok(())
     }
 
-    fn revoke(&self, key: i64) -> Result<(), Error> {
-        let row = self
-            .core
-            .store()
-            .one(self.plan(), cap::GRANT, key)?
+    async fn revoke(&mut self, key: i64) -> Result<(), Error> {
+        let plan = self.core.plan();
+        let row = Work::new(&mut self.seat.wire)
+            .one(plan, cap::GRANT, key)
+            .await?
             .ok_or_else(|| Error::Adapt(format!("missing row {key}")))?;
         let verb = row
             .cells()
@@ -479,11 +667,12 @@ impl<S: Store> Face<'_, S> {
             .get("scope")
             .map(|c| c.show())
             .unwrap_or_default();
-        self.narrow(&[("verb", &verb), ("unit", &unit), ("scope", &span)])?;
-        self.core.fell(self.who, cap::GRANT, key, None)
+        self.narrow(&[("verb", &verb), ("unit", &unit), ("scope", &span)])
+            .await?;
+        self.fell(cap::GRANT, key, None).await
     }
 
-    fn narrow(&self, fields: &[(&str, &str)]) -> Result<(), Error> {
+    async fn narrow(&mut self, fields: &[(&str, &str)]) -> Result<(), Error> {
         let verb = cap::field(fields, "verb");
         let unit = cap::field(fields, "unit");
         let span = cap::field(fields, "scope");
@@ -497,109 +686,117 @@ impl<S: Store> Face<'_, S> {
             vec![verb]
         };
         for verb in verbs {
-            self.beneath(verb, &unit, span)?;
+            self.beneath(verb, &unit, span).await?;
         }
         Ok(())
     }
 
-    fn beneath(&self, verb: &str, unit: &str, span: &str) -> Result<(), Error> {
+    async fn beneath(&mut self, verb: &str, unit: &str, span: &str) -> Result<(), Error> {
         if let Some(id) = span.strip_prefix("row ") {
             let key = id
                 .parse::<i64>()
                 .map_err(|_| Error::Adapt("row scope needs id".into()))?;
-            let row = self
-                .core
-                .store()
-                .one(self.plan(), unit, key)?
+            let plan = self.core.plan();
+            let row = Work::new(&mut self.seat.wire)
+                .one(plan, unit, key)
+                .await?
                 .ok_or_else(|| Error::Adapt("refused put".into()))?;
             let mark = cap::Mark {
                 key: Some(key),
                 cells: row.cells(),
             };
-            return self.may(verb, unit, &mark);
+            return self.may(verb, unit, &mark).await;
         }
         if cap::broad(
-            self.plan(),
-            self.core.store(),
+            self.core.plan(),
+            &mut self.seat.wire,
             self.who,
             verb,
             &ddl::table(unit),
-        )? {
+        )
+        .await?
+        {
             return Ok(());
         }
         Err(Error::Adapt("refused put".into()))
     }
 
-    pub fn set(&self, name: &str, key: i64, fields: &[(&str, &str)]) -> Result<(), Error> {
+    pub async fn set(
+        &mut self,
+        name: &str,
+        key: i64,
+        fields: &[(&str, &str)],
+    ) -> Result<(), Error> {
         if self.free() {
-            return self.core.set(name, key, fields);
+            return self.shift(name, key, fields).await;
         }
         let unit = query::resolve(self.plan(), name)?;
-        let pre = self.seen(&unit, key)?;
+        let pre = self.seen(&unit, key).await?;
         let mark = cap::Mark {
             key: Some(key),
             cells: pre.cells(),
         };
-        self.may("set", &unit, &mark)?;
+        self.may("set", &unit, &mark).await?;
         let mut post = pre.cells().clone();
         cap::blend(self.plan(), &unit, &mut post, fields);
         let after = cap::Mark {
             key: Some(key),
             cells: &post,
         };
-        self.may("set", &unit, &after)?;
-        self.core.shift(self.who, &unit, key, fields)
+        self.may("set", &unit, &after).await?;
+        self.shift(&unit, key, fields).await
     }
 
-    pub fn end(&self, name: &str, key: i64) -> Result<(), Error> {
+    pub async fn end(&mut self, name: &str, key: i64) -> Result<(), Error> {
         if self.free() {
-            return self.core.end(name, key);
+            return self.fell(name, key, None).await;
         }
         let unit = query::resolve(self.plan(), name)?;
         if unit == cap::GRANT {
-            return self.revoke(key);
+            return self.revoke(key).await;
         }
-        let row = self.seen(&unit, key)?;
+        let row = self.seen(&unit, key).await?;
         let mark = cap::Mark {
             key: Some(key),
             cells: row.cells(),
         };
-        self.may("end", &unit, &mark)?;
-        self.core.fell(self.who, &unit, key, None)
+        self.may("end", &unit, &mark).await?;
+        self.fell(&unit, key, None).await
     }
 
-    pub fn lease(&self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+    pub async fn lease(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
         if self.free() {
-            return self.core.lease(name, key, at);
+            return self.fell(name, key, Some(at)).await;
         }
         let unit = query::resolve(self.plan(), name)?;
-        let row = self.seen(&unit, key)?;
+        let row = self.seen(&unit, key).await?;
         let mark = cap::Mark {
             key: Some(key),
             cells: row.cells(),
         };
-        self.may("end", &unit, &mark)?;
-        self.core.fell(self.who, &unit, key, Some(at))
+        self.may("end", &unit, &mark).await?;
+        self.fell(&unit, key, Some(at)).await
     }
 
-    pub fn live(&self, name: &str) -> Result<Vec<Row>, Error> {
-        if self.free() {
-            return self.core.live(name);
-        }
+    pub async fn live(&mut self, name: &str) -> Result<Vec<Row>, Error> {
         let unit = query::resolve(self.plan(), name)?;
-        let mut rows = self.core.live(&unit)?;
-        self.sift(&unit, &mut rows)?;
+        let pack = self.sight(&query::form(&unit)).await?;
+        let mut rows = pack.rows().to_vec();
+        if self.free() {
+            return Ok(rows);
+        }
+        self.sift(&unit, &mut rows).await?;
         Ok(rows)
     }
 
-    fn sift(&self, unit: &str, rows: &mut Vec<Row>) -> Result<(), Error> {
+    async fn sift(&mut self, unit: &str, rows: &mut Vec<Row>) -> Result<(), Error> {
         let mut keep = Vec::new();
         for row in rows.iter() {
             let mark = cap::Mark {
                 key: Some(row.key()),
                 cells: row.cells(),
             };
-            if self.held("see", unit, &mark)? {
+            if self.held("see", unit, &mark).await? {
                 keep.push(row.key());
             }
         }
@@ -607,33 +804,33 @@ impl<S: Store> Face<'_, S> {
         Ok(())
     }
 
-    pub fn query(&self, text: &str) -> Result<Pack, Error> {
+    pub async fn query(&mut self, text: &str) -> Result<Pack, Error> {
         let tree = query::parse(text)?;
-        self.ask(&tree)
+        self.ask(&tree).await
     }
 
-    pub fn ask(&self, tree: &Tree) -> Result<Pack, Error> {
+    pub async fn ask(&mut self, tree: &Tree) -> Result<Pack, Error> {
         if self.free() {
-            return self.core.ask(tree);
+            return self.sight(tree).await;
         }
         let unit = query::resolve(self.plan(), tree.from())?;
         if tree.tally() {
             let flat = query::bare(tree);
-            let pack = self.core.ask(&flat)?;
+            let pack = self.sight(&flat).await?;
             let mut rows = pack.rows().to_vec();
-            self.sift(&unit, &mut rows)?;
+            self.sift(&unit, &mut rows).await?;
             return Ok(Pack::tallied(ddl::table(&unit), rows.len()));
         }
-        let mut pack = self.core.ask(tree)?;
-        self.strain(&unit, &mut pack)?;
+        let mut pack = self.sight(tree).await?;
+        self.strain(&unit, &mut pack).await?;
         Ok(pack)
     }
 
-    fn strain(&self, unit: &str, pack: &mut Pack) -> Result<(), Error> {
+    async fn strain(&mut self, unit: &str, pack: &mut Pack) -> Result<(), Error> {
         let root = ddl::table(unit);
         let mut kept: Vec<i64> = Vec::new();
         if let Some(crate::query::Bag::Unit(rows)) = pack.bags_mut().get_mut(&root) {
-            self.sift(unit, rows)?;
+            self.sift(unit, rows).await?;
             kept = rows.iter().map(Row::key).collect();
         }
         let node = self
@@ -655,7 +852,7 @@ impl<S: Store> Face<'_, S> {
                 if !kept.contains(&tie.left()) {
                     continue;
                 }
-                if self.spot(&target, tie.right())? {
+                if self.spot(&target, tie.right()).await? {
                     hold.push(tie.key());
                 }
             }
@@ -664,109 +861,124 @@ impl<S: Store> Face<'_, S> {
         Ok(())
     }
 
-    fn spot(&self, unit: &str, key: i64) -> Result<bool, Error> {
-        let Some(row) = self.core.store().one(self.plan(), unit, key)? else {
+    async fn spot(&mut self, unit: &str, key: i64) -> Result<bool, Error> {
+        let plan = self.core.plan();
+        let Some(row) = Work::new(&mut self.seat.wire).one(plan, unit, key).await? else {
             return Ok(false);
         };
         let mark = cap::Mark {
             key: Some(key),
             cells: row.cells(),
         };
-        self.held("see", unit, &mark)
+        self.held("see", unit, &mark).await
     }
 
-    pub fn tie(
-        &self,
+    pub async fn tie(
+        &mut self,
         owner: &str,
         bond: &str,
         ends: Ends,
         fields: &[(&str, &str)],
     ) -> Result<i64, Error> {
         if self.free() {
-            return self.core.tie(owner, bond, ends, fields);
+            return self.knot(owner, bond, ends, fields).await;
         }
         let unit = query::resolve(self.plan(), owner)?;
         let target = self.target(&unit, bond)?;
-        let left = self.seen(&unit, ends.left)?;
+        let left = self.seen(&unit, ends.left).await?;
         let mark = cap::Mark {
             key: Some(ends.left),
             cells: left.cells(),
         };
-        self.may("tie", &unit, &mark)?;
-        if !self.spot(&target, ends.right)? {
+        self.may("tie", &unit, &mark).await?;
+        if !self.spot(&target, ends.right).await? {
             return Err(Error::Adapt(format!("missing row {}", ends.right)));
         }
-        self.core.knot(self.who, &unit, bond, ends, fields)
+        self.knot(&unit, bond, ends, fields).await
     }
 
-    pub fn set_tie(
-        &self,
+    pub async fn set_tie(
+        &mut self,
         owner: &str,
         bond: &str,
         key: i64,
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
         if self.free() {
-            return self.core.set_tie(owner, bond, key, fields);
+            return self.bend(owner, bond, key, fields).await;
         }
         let unit = query::resolve(self.plan(), owner)?;
-        let tie = self.grip(&unit, bond, key)?;
-        let left = self.seen(&unit, tie.left())?;
+        let tie = self.grip(&unit, bond, key).await?;
+        let left = self.seen(&unit, tie.left()).await?;
         let mark = cap::Mark {
             key: Some(tie.left()),
             cells: left.cells(),
         };
-        self.may("tie", &unit, &mark)?;
-        self.core.bend(self.who, &unit, bond, key, fields)
+        self.may("tie", &unit, &mark).await?;
+        self.bend(&unit, bond, key, fields).await
     }
 
-    pub fn ties(&self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
+    pub async fn ties(&mut self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
+        let plan = self.core.plan();
         if self.free() {
-            return self.core.ties(owner, bond, left);
+            return Work::new(&mut self.seat.wire)
+                .ties(plan, owner, bond, left)
+                .await;
         }
-        let unit = query::resolve(self.plan(), owner)?;
-        let _ = self.seen(&unit, left)?;
+        let unit = query::resolve(plan, owner)?;
+        let _ = self.seen(&unit, left).await?;
         let target = self.target(&unit, bond)?;
-        let ties = self.core.ties(&unit, bond, left)?;
+        let ties = Work::new(&mut self.seat.wire)
+            .ties(plan, &unit, bond, left)
+            .await?;
         let mut out = Vec::new();
         for tie in ties {
-            if self.spot(&target, tie.right())? {
+            if self.spot(&target, tie.right()).await? {
                 out.push(tie);
             }
         }
         Ok(out)
     }
 
-    pub fn cut(&self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
+    pub async fn cut(&mut self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
         if self.free() {
-            return self.core.cut(owner, bond, key);
+            return self.snip(owner, bond, key).await;
         }
         let unit = query::resolve(self.plan(), owner)?;
-        let tie = self.grip(&unit, bond, key)?;
-        let left = self.seen(&unit, tie.left())?;
+        let tie = self.grip(&unit, bond, key).await?;
+        let left = self.seen(&unit, tie.left()).await?;
         let mark = cap::Mark {
             key: Some(tie.left()),
             cells: left.cells(),
         };
-        self.may("cut", &unit, &mark)?;
-        self.core.snip(self.who, &unit, bond, key)
+        self.may("cut", &unit, &mark).await?;
+        self.snip(&unit, bond, key).await
     }
 
-    pub fn flow(&self, cursor: i64) -> Result<Vec<Row>, Error> {
-        let rows = self.core.flow(cursor)?;
+    pub async fn flow(&mut self, cursor: i64) -> Result<Vec<Row>, Error> {
+        let plan = self.core.plan();
+        let rows = Work::new(&mut self.seat.wire)
+            .live(plan, cap::PULSE)
+            .await?;
+        if let Some(first) = rows.first()
+            && cursor + 1 < first.key()
+        {
+            return Err(Error::Adapt("cursor past window".into()));
+        }
+        let rows: Vec<Row> = rows.into_iter().filter(|row| row.key() > cursor).collect();
         if self.free() {
             return Ok(rows);
         }
         let mut out = Vec::new();
         for row in rows {
-            if self.heard(&row)? {
+            if self.heard(&row).await? {
                 out.push(row);
             }
         }
         Ok(out)
     }
 
-    fn heard(&self, event: &Row) -> Result<bool, Error> {
+    async fn heard(&mut self, event: &Row) -> Result<bool, Error> {
         let place = event
             .cells()
             .get("unit")
@@ -777,60 +989,51 @@ impl<S: Store> Face<'_, S> {
             _ => return Ok(false),
         };
         if let Some((owner, bond)) = place.split_once('.') {
-            return self.caught(owner, bond, key);
+            return self.caught(owner, bond, key).await;
         }
         let Ok(unit) = query::resolve(self.plan(), &place) else {
             return Ok(false);
         };
-        match self.core.store().one(self.plan(), &unit, key)? {
+        let plan = self.core.plan();
+        match Work::new(&mut self.seat.wire).one(plan, &unit, key).await? {
             Some(row) => {
                 let mark = cap::Mark {
                     key: Some(key),
                     cells: row.cells(),
                 };
-                self.held("see", &unit, &mark)
+                self.held("see", &unit, &mark).await
             }
-            None => cap::broad(
-                self.plan(),
-                self.core.store(),
-                self.who,
-                "see",
-                &ddl::table(&unit),
-            ),
+            None => {
+                cap::broad(
+                    self.core.plan(),
+                    &mut self.seat.wire,
+                    self.who,
+                    "see",
+                    &ddl::table(&unit),
+                )
+                .await
+            }
         }
     }
 
-    fn caught(&self, owner: &str, bond: &str, key: i64) -> Result<bool, Error> {
+    async fn caught(&mut self, owner: &str, bond: &str, key: i64) -> Result<bool, Error> {
         let Ok(unit) = query::resolve(self.plan(), owner) else {
             return Ok(false);
         };
-        if let Ok(tie) = self.grip(&unit, bond, key) {
-            return Ok(self.seen(&unit, tie.left()).is_ok());
+        if let Ok(tie) = self.grip(&unit, bond, key).await {
+            return Ok(self.seen(&unit, tie.left()).await.is_ok());
         }
         cap::broad(
-            self.plan(),
-            self.core.store(),
+            self.core.plan(),
+            &mut self.seat.wire,
             self.who,
             "see",
             &ddl::table(&unit),
         )
+        .await
     }
 
-    pub fn batch<T>(&self, run: impl FnOnce(&Self) -> Result<T, Error>) -> Result<T, Error> {
-        self.core.store().begin()?;
-        match run(self) {
-            Ok(value) => {
-                self.core.store().commit()?;
-                Ok(value)
-            }
-            Err(err) => {
-                let _ = self.core.store().undo();
-                Err(err)
-            }
-        }
-    }
-
-    fn grip(&self, unit: &str, bond: &str, key: i64) -> Result<Tie, Error> {
+    async fn grip(&mut self, unit: &str, bond: &str, key: i64) -> Result<Tie, Error> {
         let node = self
             .plan()
             .units()
@@ -842,9 +1045,13 @@ impl<S: Store> Face<'_, S> {
             .find(|e| e.name().eq_ignore_ascii_case(bond))
             .map(|e| e.name().to_string())
             .ok_or_else(|| Error::Adapt(format!("missing bond {bond}")))?;
-        let lefts = self.core.live(unit)?;
+        let pack = self.sight(&query::form(unit)).await?;
+        let lefts = pack.rows().to_vec();
         for row in lefts {
-            let ties = self.core.ties(unit, &name, row.key())?;
+            let plan = self.core.plan();
+            let ties = Work::new(&mut self.seat.wire)
+                .ties(plan, unit, &name, row.key())
+                .await?;
             if let Some(tie) = ties.into_iter().find(|t| t.key() == key) {
                 return Ok(tie);
             }

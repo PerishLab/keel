@@ -13,16 +13,15 @@ path = "src/lib.rs"
 
 [features]
 default = ["http"]
-http = ["dep:axum", "dep:tokio", "dep:serde_json"]
-pg = ["dep:postgres"]
+http = ["dep:axum", "dep:serde_json"]
+pg = ["sqlx/postgres"]
 
 [dependencies]
 axum = { workspace = true, optional = true }
 keel-macro = { workspace = true }
-postgres = { workspace = true, optional = true }
-rusqlite = { workspace = true }
 serde = { workspace = true }
 sha2 = { workspace = true }
 serde_json = { workspace = true, optional = true }
-tokio = { workspace = true, optional = true }
+tokio = { workspace = true }
 toml = { workspace = true }
+sqlx = { workspace = true }

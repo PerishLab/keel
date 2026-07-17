@@ -3,7 +3,7 @@ pub mod http;
 #[cfg(feature = "pg")]
 pub mod pg;
 
-use crate::store::Store;
+use crate::wire::Wire;
 
 pub use db::Sqlite;
 
@@ -24,11 +24,25 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-pub fn bind<S: Store>(graph: crate::graph::Graph, store: S) -> Result<crate::face::Core<S>, Error> {
+pub async fn bind<W: Wire>(
+    graph: crate::graph::Graph,
+    mut wire: W,
+) -> Result<crate::face::Core<W>, Error> {
     let plan = crate::plan::Plan::lift(&graph)?;
-    store.wire(&plan)?;
-    if let Some(token) = crate::cap::genesis(&plan, &store)? {
+    if plan.units().is_empty() {
+        return Err(Error::Adapt("db plan is empty".into()));
+    }
+    for unit in plan.units().values() {
+        let reign = unit.reign();
+        if !reign.expires() || !reign.created() || !reign.updated() {
+            return Err(Error::Adapt("reign incomplete".into()));
+        }
+    }
+    for stmt in crate::ddl::script(&plan, wire.grain()) {
+        wire.script(&stmt).await?;
+    }
+    if let Some(token) = crate::cap::genesis(&plan, &mut wire).await? {
         eprintln!("keel: sudo token {token}");
     }
-    Ok(crate::face::Core::new(plan, store))
+    Ok(crate::face::Core::new(plan, wire))
 }

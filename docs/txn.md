@@ -39,22 +39,38 @@ batch([Deed…]) -> ids   -- all-or-nothing; writes only; no reads returned
   the write-then-emit atomicity gap that single verbs still carry as debt
   (see § single-verb note).
 
+## Serialization (v0.2.0)
+
+The async engine makes the concurrency contract explicit:
+
+- The engine serializes all SQL on **one connection**; each face op
+  acquires it once at entry and holds it for the op's whole duration.
+- Every write op is one transaction — a single verb is a batch of one.
+  The old check-then-insert race (unique/serial probes vs insert under
+  concurrent handlers) is closed structurally: no other SQL can land
+  between a write op's checks and its commit.
+- No other SQL can interleave inside an open transaction — a
+  transaction owns the connection BEGIN→COMMIT, so uncommitted state is
+  never observable outside its own op.
+- **Cancellation**: a future dropped mid-transaction (client
+  disconnect) leaves the connection marked dirty; the next op issues
+  ROLLBACK before proceeding. A cancelled write is a rolled-back write.
+
 ## Mechanism (default engine, non-normative)
 
-The store gains a transaction-scoped connection view. Single verbs open and
-commit their own transaction (behavior identical to today). A batch opens
-one transaction, threads the same connection through every verb and every
-capability read, then commits or rolls back once. Capability reads inside a
-batch see uncommitted rows because they share the connection — there is no
-second lock to reenter.
+One `tokio::Mutex` guards the connection. A batch opens one
+transaction, threads the same `&mut` connection through every verb and
+every capability read, then commits or rolls back once. Capability
+reads inside a batch see uncommitted rows because they share the
+connection — there is no second lock to reenter. A failed or cancelled
+transaction also drops the query cache (uncommitted packs must not
+survive a rollback).
 
 ## Single-verb note
 
-Single verbs keep their current shape. Their write-then-emit sequence is
-two statements on one connection; a crash between them can still lose an
-event (recorded debt). Wrapping every single verb in an explicit
-transaction to close that gap is a permitted engine improvement, not a law
-change — the observable contract is already "atomic per verb".
+Resolved in v0.2.0: single verbs run inside their own transaction, so
+the write-then-emit sequence commits atomically — the crash-between-
+statements event-loss debt is closed.
 
 ## Settled package
 
@@ -66,6 +82,8 @@ change — the observable contract is already "atomic per verb".
 | X-4 | Batch carries write verbs only; returns put/tie ids in order |
 | X-5 | Operator-scoped: every verb checked under the one face |
 | X-6 | Pulse emission is inside the transaction; rollback emits nothing |
+| X-7 | One connection, op-scoped hold; every write op is one transaction |
+| X-8 | Cancellation-safe: a dropped mid-txn op rolls back before the next op runs |
 
 ## Must not
 

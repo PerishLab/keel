@@ -27,21 +27,25 @@ struct Repo {
     owner: Actor,
 }
 
-#[test]
-fn group() {
+#[tokio::test]
+async fn group() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Team>().plug::<Repo>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let sudo = core.sudo();
-    let boss = sudo.put("Actor", &[("login", "boss")]).expect("boss");
-    let ada = sudo.put("Actor", &[("login", "ada")]).expect("ada");
-    let bob = sudo.put("Actor", &[("login", "bob")]).expect("bob");
+    let boss = sudo.put("Actor", &[("login", "boss")]).await.expect("boss");
+    let ada = sudo.put("Actor", &[("login", "ada")]).await.expect("ada");
+    let bob = sudo.put("Actor", &[("login", "bob")]).await.expect("bob");
 
     let crew = sudo
         .put("Team", &[("name", "core"), ("org", &boss.to_string())])
+        .await
         .expect("team");
     let vault = sudo
         .put("Repo", &[("name", "vault"), ("owner", &boss.to_string())])
+        .await
         .expect("repo");
     sudo.put(
         "@grant",
@@ -52,9 +56,10 @@ fn group() {
             ("scope", &format!("row {vault}")),
         ],
     )
+    .await
     .expect("group grant");
 
-    assert_eq!(core.of(ada).live("Repo").expect("pre").len(), 0);
+    assert_eq!(core.of(ada).live("Repo").await.expect("pre").len(), 0);
     sudo.tie(
         "Team",
         "members",
@@ -64,13 +69,16 @@ fn group() {
         },
         &[],
     )
+    .await
     .expect("join");
-    assert_eq!(core.of(ada).live("Repo").expect("member").len(), 1);
-    assert_eq!(core.of(bob).live("Repo").expect("stranger").len(), 0);
+    assert_eq!(core.of(ada).live("Repo").await.expect("member").len(), 1);
+    assert_eq!(core.of(bob).live("Repo").await.expect("stranger").len(), 0);
 
-    let ties = sudo.ties("Team", "members", crew).expect("ties");
-    sudo.cut("Team", "members", ties[0].key()).expect("leave");
-    assert_eq!(core.of(ada).live("Repo").expect("left").len(), 0);
+    let ties = sudo.ties("Team", "members", crew).await.expect("ties");
+    sudo.cut("Team", "members", ties[0].key())
+        .await
+        .expect("leave");
+    assert_eq!(core.of(ada).live("Repo").await.expect("left").len(), 0);
 
     assert!(
         sudo.put(
@@ -82,6 +90,7 @@ fn group() {
                 ("scope", "all"),
             ],
         )
+        .await
         .is_err()
     );
 }

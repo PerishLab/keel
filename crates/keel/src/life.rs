@@ -110,16 +110,21 @@ impl Tie {
     }
 }
 
-pub struct Work<'a> {
-    wire: &'a dyn Wire,
+pub struct Work<'a, W: Wire> {
+    wire: &'a mut W,
 }
 
-impl<'a> Work<'a> {
-    pub fn new(wire: &'a dyn Wire) -> Self {
+impl<'a, W: Wire> Work<'a, W> {
+    pub fn new(wire: &'a mut W) -> Self {
         Self { wire }
     }
 
-    pub fn put(&self, plan: &Plan, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
+    pub async fn put(
+        &mut self,
+        plan: &Plan,
+        name: &str,
+        fields: &[(&str, &str)],
+    ) -> Result<i64, Error> {
         let unit = find(plan, name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
@@ -149,7 +154,7 @@ impl<'a> Work<'a> {
         let mut vals: Vec<Val> = Vec::new();
         for slot in unit.fields() {
             if let Some(scope) = slot.serial() {
-                vals.push(self.next(unit, slot, scope, fields)?);
+                vals.push(self.next(unit, slot, scope, fields).await?);
                 continue;
             }
             let hit = pluck(fields, slot.name());
@@ -157,17 +162,17 @@ impl<'a> Work<'a> {
         }
         for edge in refs(unit) {
             let hit = pluck(fields, edge.name());
-            vals.push(self.point(plan, unit, edge, hit, None)?);
+            vals.push(self.point(plan, unit, edge, hit, None).await?);
         }
         vals.push(Val::Null);
         vals.push(Val::Int(tick));
         vals.push(Val::Int(tick));
-        self.solid(unit, fields, None)?;
-        self.wire.plant(&text, &vals)
+        self.solid(unit, fields, None).await?;
+        self.wire.plant(&text, &vals).await
     }
 
-    fn solid(
-        &self,
+    async fn solid(
+        &mut self,
         unit: &Unit,
         fields: &[(&str, &str)],
         myself: Option<(i64, &Row)>,
@@ -176,13 +181,13 @@ impl<'a> Work<'a> {
             if *slot.only() == Only::Free {
                 continue;
             }
-            self.taken(unit, slot, fields, myself)?;
+            self.taken(unit, slot, fields, myself).await?;
         }
         Ok(())
     }
 
-    fn taken(
-        &self,
+    async fn taken(
+        &mut self,
         unit: &Unit,
         slot: &Slot,
         fields: &[(&str, &str)],
@@ -212,14 +217,14 @@ impl<'a> Work<'a> {
             }
         }
         text.push_str(" LIMIT 1");
-        if !self.wire.rows(&text, &vals)?.is_empty() {
+        if !self.wire.rows(&text, &vals).await?.is_empty() {
             return Err(Error::Adapt(format!("field {} taken", slot.name())));
         }
         Ok(())
     }
 
-    fn point(
-        &self,
+    async fn point(
+        &mut self,
         plan: &Plan,
         unit: &Unit,
         edge: &Edge,
@@ -235,20 +240,20 @@ impl<'a> Work<'a> {
         let key = value
             .parse::<i64>()
             .map_err(|_| Error::Adapt(format!("ref {} needs id", edge.name())))?;
-        if !self.live_has(plan, edge.target(), key)? {
+        if !self.live_has(plan, edge.target(), key).await? {
             return Err(Error::Adapt("right not live".into()));
         }
-        if !self.fresh(plan, edge.target(), key)? {
+        if !self.fresh(plan, edge.target(), key).await? {
             return Err(Error::Adapt(format!("ref {} leased", edge.name())));
         }
         if edge.kind() == bond::Kind::One2one {
-            self.lone(unit, edge, key, myself)?;
+            self.lone(unit, edge, key, myself).await?;
         }
         Ok(Val::Int(key))
     }
 
-    fn next(
-        &self,
+    async fn next(
+        &mut self,
         unit: &Unit,
         slot: &Slot,
         scope: &str,
@@ -261,12 +266,18 @@ impl<'a> Work<'a> {
             ddl::seat(unit.name())
         );
         let hold = anchor(fields, None, scope)?;
-        let rows = self.wire.rows(&text, &[hold])?;
+        let rows = self.wire.rows(&text, &[hold]).await?;
         let key = rows.first().map(|line| line[0].int()).unwrap_or(1);
         Ok(Val::Int(key))
     }
 
-    fn lone(&self, unit: &Unit, edge: &Edge, key: i64, myself: Option<i64>) -> Result<(), Error> {
+    async fn lone(
+        &mut self,
+        unit: &Unit,
+        edge: &Edge,
+        key: i64,
+        myself: Option<i64>,
+    ) -> Result<(), Error> {
         let tick = now();
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} != ?2 AND ({} IS NULL OR {} > ?3) LIMIT 1",
@@ -277,14 +288,14 @@ impl<'a> Work<'a> {
             ddl::EXPIRES
         );
         let args = [Val::Int(key), Val::Int(myself.unwrap_or(0)), Val::Int(tick)];
-        if !self.wire.rows(&text, &args)?.is_empty() {
+        if !self.wire.rows(&text, &args).await?.is_empty() {
             return Err(Error::Adapt("live ref exists".into()));
         }
         Ok(())
     }
 
-    fn entry(
-        &self,
+    async fn entry(
+        &mut self,
         plan: &Plan,
         unit: &Unit,
         col: &str,
@@ -292,22 +303,22 @@ impl<'a> Work<'a> {
         myself: i64,
     ) -> Result<(String, Val), Error> {
         if let Some(edge) = refs(unit).find(|e| e.name() == col) {
-            let cell = self.point(plan, unit, edge, val, Some(myself))?;
+            let cell = self.point(plan, unit, edge, val, Some(myself)).await?;
             return Ok((ddl::side(edge.name()), cell));
         }
         Ok((col.to_string(), fit(unit.fields(), col, val)?))
     }
 
-    pub fn one(&self, plan: &Plan, name: &str, key: i64) -> Result<Option<Row>, Error> {
+    pub async fn one(&mut self, plan: &Plan, name: &str, key: i64) -> Result<Option<Row>, Error> {
         let unit = find(plan, name)?;
-        match self.peek(unit, key) {
+        match self.peek(unit, key).await {
             Ok(row) => Ok(Some(row)),
             Err(Error::Adapt(note)) if note.starts_with("missing row") => Ok(None),
             Err(err) => Err(err),
         }
     }
 
-    fn peek(&self, unit: &Unit, key: i64) -> Result<Row, Error> {
+    async fn peek(&mut self, unit: &Unit, key: i64) -> Result<Row, Error> {
         let tick = now();
         let text = format!(
             "SELECT {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2)",
@@ -317,14 +328,17 @@ impl<'a> Work<'a> {
             ddl::EXPIRES,
             ddl::EXPIRES
         );
-        let rows = self.wire.rows(&text, &[Val::Int(key), Val::Int(tick)])?;
+        let rows = self
+            .wire
+            .rows(&text, &[Val::Int(key), Val::Int(tick)])
+            .await?;
         match rows.first() {
             Some(line) => read(unit, line),
             None => Err(Error::Adapt(format!("missing row {key}"))),
         }
     }
 
-    pub fn live(&self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error> {
+    pub async fn live(&mut self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error> {
         let unit = find(plan, name)?;
         let tick = now();
         let text = format!(
@@ -336,17 +350,17 @@ impl<'a> Work<'a> {
             ddl::KEY
         );
         let mut out = Vec::new();
-        for line in self.wire.rows(&text, &[Val::Int(tick)])? {
+        for line in self.wire.rows(&text, &[Val::Int(tick)]).await? {
             out.push(read(unit, &line)?);
         }
         Ok(out)
     }
 
-    pub fn end(&self, plan: &Plan, name: &str, key: i64) -> Result<(), Error> {
-        self.lease(plan, name, key, now())
+    pub async fn end(&mut self, plan: &Plan, name: &str, key: i64) -> Result<(), Error> {
+        self.lease(plan, name, key, now()).await
     }
 
-    pub fn lease(&self, plan: &Plan, name: &str, key: i64, at: i64) -> Result<(), Error> {
+    pub async fn lease(&mut self, plan: &Plan, name: &str, key: i64, at: i64) -> Result<(), Error> {
         let unit = find(plan, name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
@@ -355,7 +369,7 @@ impl<'a> Work<'a> {
         if at < tick {
             return Err(Error::Adapt("lease is not the past".into()));
         }
-        if self.live_in(plan, unit.name(), key)? || self.live_out(unit, key)? {
+        if self.live_in(plan, unit.name(), key).await? || self.live_out(unit, key).await? {
             return Err(Error::Adapt("live ties remain".into()));
         }
         let text = format!(
@@ -369,15 +383,16 @@ impl<'a> Work<'a> {
         );
         let n = self
             .wire
-            .run(&text, &[Val::Int(at), Val::Int(tick), Val::Int(key)])?;
+            .run(&text, &[Val::Int(at), Val::Int(tick), Val::Int(key)])
+            .await?;
         if n == 0 {
             return Err(Error::Adapt(format!("missing row {key}")));
         }
         Ok(())
     }
 
-    pub fn pulse(
-        &self,
+    pub async fn pulse(
+        &mut self,
         plan: &Plan,
         verb: &str,
         unit: &str,
@@ -401,11 +416,11 @@ impl<'a> Work<'a> {
             Val::Int(key),
             Val::Int(tick),
         ];
-        self.wire.run(&text, &args)?;
-        self.trim(seat)
+        self.wire.run(&text, &args).await?;
+        self.trim(seat).await
     }
 
-    fn trim(&self, seat: &Unit) -> Result<(), Error> {
+    async fn trim(&mut self, seat: &Unit) -> Result<(), Error> {
         let text = format!(
             "DELETE FROM {} WHERE {} <= (SELECT MAX({}) FROM {}) - ?1",
             ddl::seat(seat.name()),
@@ -414,11 +429,12 @@ impl<'a> Work<'a> {
             ddl::seat(seat.name())
         );
         self.wire
-            .run(&text, &[Val::Int(crate::cap::WINDOW as i64)])?;
+            .run(&text, &[Val::Int(crate::cap::WINDOW as i64)])
+            .await?;
         Ok(())
     }
 
-    fn fresh(&self, plan: &Plan, name: &str, key: i64) -> Result<bool, Error> {
+    async fn fresh(&mut self, plan: &Plan, name: &str, key: i64) -> Result<bool, Error> {
         let unit = find(plan, name)?;
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} IS NULL LIMIT 1",
@@ -426,16 +442,16 @@ impl<'a> Work<'a> {
             ddl::KEY,
             ddl::EXPIRES
         );
-        Ok(!self.wire.rows(&text, &[Val::Int(key)])?.is_empty())
+        Ok(!self.wire.rows(&text, &[Val::Int(key)]).await?.is_empty())
     }
 
-    fn live_in(&self, plan: &Plan, target: &str, key: i64) -> Result<bool, Error> {
+    async fn live_in(&mut self, plan: &Plan, target: &str, key: i64) -> Result<bool, Error> {
         for unit in plan.units().values() {
             for edge in unit.bonds() {
                 if edge.target() != target {
                     continue;
                 }
-                if self.live_from(unit, edge, key)? {
+                if self.live_from(unit, edge, key).await? {
                     return Ok(true);
                 }
             }
@@ -443,7 +459,7 @@ impl<'a> Work<'a> {
         Ok(false)
     }
 
-    fn live_from(&self, unit: &Unit, edge: &Edge, key: i64) -> Result<bool, Error> {
+    async fn live_from(&mut self, unit: &Unit, edge: &Edge, key: i64) -> Result<bool, Error> {
         let tick = now();
         let (place, col) = if edge.kind().point() {
             (ddl::seat(unit.name()), ddl::col(&ddl::side(edge.name())))
@@ -462,11 +478,12 @@ impl<'a> Work<'a> {
         );
         Ok(!self
             .wire
-            .rows(&text, &[Val::Int(key), Val::Int(tick)])?
+            .rows(&text, &[Val::Int(key), Val::Int(tick)])
+            .await?
             .is_empty())
     }
 
-    fn live_out(&self, unit: &Unit, key: i64) -> Result<bool, Error> {
+    async fn live_out(&mut self, unit: &Unit, key: i64) -> Result<bool, Error> {
         let tick = now();
         for edge in unit.bonds() {
             if edge.kind() != bond::Kind::Many2many {
@@ -482,7 +499,8 @@ impl<'a> Work<'a> {
             );
             if !self
                 .wire
-                .rows(&text, &[Val::Int(key), Val::Int(tick)])?
+                .rows(&text, &[Val::Int(key), Val::Int(tick)])
+                .await?
                 .is_empty()
             {
                 return Ok(true);
@@ -491,8 +509,8 @@ impl<'a> Work<'a> {
         Ok(false)
     }
 
-    pub fn set(
-        &self,
+    pub async fn set(
+        &mut self,
         plan: &Plan,
         name: &str,
         key: i64,
@@ -506,8 +524,8 @@ impl<'a> Work<'a> {
             return Err(Error::Adapt("grant rows are put or end".into()));
         }
         part(unit, fields)?;
-        let base = self.peek(unit, key)?;
-        self.solid(unit, fields, Some((key, &base)))?;
+        let base = self.peek(unit, key).await?;
+        self.solid(unit, fields, Some((key, &base))).await?;
         let tick = now();
         let mut text = format!("UPDATE {} SET ", ddl::seat(unit.name()));
         let mut vals: Vec<Val> = Vec::new();
@@ -515,7 +533,7 @@ impl<'a> Work<'a> {
             if i > 0 {
                 text.push_str(", ");
             }
-            let (name, cell) = self.entry(plan, unit, col, val, key)?;
+            let (name, cell) = self.entry(plan, unit, col, val, key).await?;
             text.push_str(&ddl::col(&name));
             text.push_str(" = ?");
             text.push_str(&(i + 1).to_string());
@@ -535,15 +553,15 @@ impl<'a> Work<'a> {
         vals.push(Val::Int(tick));
         vals.push(Val::Int(key));
         vals.push(Val::Int(tick));
-        let changed = self.wire.run(&text, &vals)?;
+        let changed = self.wire.run(&text, &vals).await?;
         if changed == 0 {
             return Err(Error::Adapt(format!("missing row {key}")));
         }
         Ok(())
     }
 
-    pub fn tie(
-        &self,
+    pub async fn tie(
+        &mut self,
         plan: &Plan,
         owner: &str,
         bond: &str,
@@ -552,19 +570,22 @@ impl<'a> Work<'a> {
     ) -> Result<i64, Error> {
         let (unit, edge) = edge(plan, owner, bond)?;
         bond_part(edge, fields)?;
-        if !self.live_has(plan, unit.name(), ends.left)? {
+        if !self.live_has(plan, unit.name(), ends.left).await? {
             return Err(Error::Adapt("left not live".into()));
         }
-        if !self.live_has(plan, edge.target(), ends.right)? {
+        if !self.live_has(plan, edge.target(), ends.right).await? {
             return Err(Error::Adapt("right not live".into()));
         }
-        if !self.fresh(plan, unit.name(), ends.left)? {
+        if !self.fresh(plan, unit.name(), ends.left).await? {
             return Err(Error::Adapt("left leased".into()));
         }
-        if !self.fresh(plan, edge.target(), ends.right)? {
+        if !self.fresh(plan, edge.target(), ends.right).await? {
             return Err(Error::Adapt("right leased".into()));
         }
-        if self.live_pair(plan, owner, bond, ends.left, ends.right)? {
+        if self
+            .live_pair(plan, owner, bond, ends.left, ends.right)
+            .await?
+        {
             return Err(Error::Adapt("live pair exists".into()));
         }
         let tick = now();
@@ -599,11 +620,11 @@ impl<'a> Work<'a> {
         vals.push(Val::Null);
         vals.push(Val::Int(tick));
         vals.push(Val::Int(tick));
-        self.wire.plant(&text, &vals)
+        self.wire.plant(&text, &vals).await
     }
 
-    pub fn set_tie(
-        &self,
+    pub async fn set_tie(
+        &mut self,
         plan: &Plan,
         owner: &str,
         bond: &str,
@@ -615,11 +636,11 @@ impl<'a> Work<'a> {
         if fields.is_empty() {
             return Err(Error::Adapt("empty set".into()));
         }
-        let ends = self.tie_ends(plan, owner, bond, key)?;
-        if !self.live_has(plan, unit.name(), ends.left)? {
+        let ends = self.tie_ends(plan, owner, bond, key).await?;
+        if !self.live_has(plan, unit.name(), ends.left).await? {
             return Err(Error::Adapt("left not live".into()));
         }
-        if !self.live_has(plan, edge.target(), ends.right)? {
+        if !self.live_has(plan, edge.target(), ends.right).await? {
             return Err(Error::Adapt("right not live".into()));
         }
         let tick = now();
@@ -648,14 +669,20 @@ impl<'a> Work<'a> {
         vals.push(Val::Int(tick));
         vals.push(Val::Int(key));
         vals.push(Val::Int(tick));
-        let changed = self.wire.run(&text, &vals)?;
+        let changed = self.wire.run(&text, &vals).await?;
         if changed == 0 {
             return Err(Error::Adapt(format!("missing tie {key}")));
         }
         Ok(())
     }
 
-    fn tie_ends(&self, plan: &Plan, owner: &str, bond: &str, key: i64) -> Result<Ends, Error> {
+    async fn tie_ends(
+        &mut self,
+        plan: &Plan,
+        owner: &str,
+        bond: &str,
+        key: i64,
+    ) -> Result<Ends, Error> {
         let (unit, edge) = edge(plan, owner, bond)?;
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
@@ -669,7 +696,10 @@ impl<'a> Work<'a> {
             ddl::EXPIRES,
             ddl::EXPIRES
         );
-        let rows = self.wire.rows(&text, &[Val::Int(key), Val::Int(tick)])?;
+        let rows = self
+            .wire
+            .rows(&text, &[Val::Int(key), Val::Int(tick)])
+            .await?;
         let line = rows
             .first()
             .ok_or_else(|| Error::Adapt(format!("missing tie {key}")))?;
@@ -679,7 +709,13 @@ impl<'a> Work<'a> {
         })
     }
 
-    pub fn ties(&self, plan: &Plan, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
+    pub async fn ties(
+        &mut self,
+        plan: &Plan,
+        owner: &str,
+        bond: &str,
+        left: i64,
+    ) -> Result<Vec<Tie>, Error> {
         let (unit, edge) = edge(plan, owner, bond)?;
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
@@ -705,13 +741,23 @@ impl<'a> Work<'a> {
             ddl::KEY
         );
         let mut out = Vec::new();
-        for line in self.wire.rows(&text, &[Val::Int(left), Val::Int(tick)])? {
+        for line in self
+            .wire
+            .rows(&text, &[Val::Int(left), Val::Int(tick)])
+            .await?
+        {
             out.push(read_tie(edge, &line)?);
         }
         Ok(out)
     }
 
-    pub fn cut(&self, plan: &Plan, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
+    pub async fn cut(
+        &mut self,
+        plan: &Plan,
+        owner: &str,
+        bond: &str,
+        key: i64,
+    ) -> Result<(), Error> {
         let (unit, edge) = edge(plan, owner, bond)?;
         let tick = now();
         let text = format!(
@@ -721,14 +767,17 @@ impl<'a> Work<'a> {
             ddl::UPDATED,
             ddl::KEY
         );
-        let n = self.wire.run(&text, &[Val::Int(tick), Val::Int(key)])?;
+        let n = self
+            .wire
+            .run(&text, &[Val::Int(tick), Val::Int(key)])
+            .await?;
         if n == 0 {
             return Err(Error::Adapt(format!("missing tie {key}")));
         }
         Ok(())
     }
 
-    pub fn live_has(&self, plan: &Plan, name: &str, key: i64) -> Result<bool, Error> {
+    pub async fn live_has(&mut self, plan: &Plan, name: &str, key: i64) -> Result<bool, Error> {
         let unit = find(plan, name)?;
         let tick = now();
         let text = format!(
@@ -740,13 +789,14 @@ impl<'a> Work<'a> {
         );
         let found = !self
             .wire
-            .rows(&text, &[Val::Int(key), Val::Int(tick)])?
+            .rows(&text, &[Val::Int(key), Val::Int(tick)])
+            .await?
             .is_empty();
         Ok(found)
     }
 
-    pub fn live_pair(
-        &self,
+    pub async fn live_pair(
+        &mut self,
         plan: &Plan,
         owner: &str,
         bond: &str,
@@ -766,7 +816,7 @@ impl<'a> Work<'a> {
             ddl::EXPIRES
         );
         let args = [Val::Int(left), Val::Int(right), Val::Int(tick)];
-        let found = !self.wire.rows(&text, &args)?.is_empty();
+        let found = !self.wire.rows(&text, &args).await?.is_empty();
         Ok(found)
     }
 }

@@ -1,6 +1,6 @@
 use crate::adapt::Error;
 use crate::face::{Core, Face};
-use crate::store::Store;
+use crate::wire::Wire;
 use axum::Extension;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -16,26 +16,26 @@ use std::sync::Arc;
 const HOST: &str = "127.0.0.1";
 const PORT: u16 = 3000;
 
-pub async fn serve<S: Store + 'static>(core: Arc<Core<S>>) -> Result<(), Error> {
+pub async fn serve<W: Wire + 'static>(core: Arc<Core<W>>) -> Result<(), Error> {
     listen(core, HOST, PORT, "").await
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Operator(pub i64);
 
-pub fn app<S: Store + 'static>(core: Arc<Core<S>>, prefix: &str) -> Router {
+pub fn app<W: Wire + 'static>(core: Arc<Core<W>>, prefix: &str) -> Router {
     let api = Router::new()
         .route("/health", get(health))
-        .route("/query", post(run::<S>))
-        .route("/{unit}", get(list::<S>).post(create::<S>))
+        .route("/query", post(run::<W>))
+        .route("/{unit}", get(list::<W>).post(create::<W>))
         .route(
             "/{unit}/{id}",
-            get(one::<S>).patch(edit::<S>).delete(remove::<S>),
+            get(one::<W>).patch(edit::<W>).delete(remove::<W>),
         )
-        .route("/{unit}/{id}/{bond}", get(no_read).post(attach::<S>))
+        .route("/{unit}/{id}/{bond}", get(no_read).post(attach::<W>))
         .route(
             "/{unit}/{id}/{bond}/{tie}",
-            patch(patch_tie::<S>).delete(detach::<S>),
+            patch(patch_tie::<W>).delete(detach::<W>),
         )
         .with_state(core);
     let prefix = prefix.trim_end_matches('/');
@@ -46,17 +46,17 @@ pub fn app<S: Store + 'static>(core: Arc<Core<S>>, prefix: &str) -> Router {
     }
 }
 
-fn front<'a, S: Store>(
-    core: &'a Core<S>,
+async fn front<'a, W: Wire>(
+    core: &'a Core<W>,
     headers: &HeaderMap,
     op: Option<&Operator>,
     verb: &str,
-) -> Result<Face<'a, S>, Fault> {
+) -> Result<Face<'a, W>, Fault> {
     let told = headers
         .get("authorization")
         .and_then(|value| value.to_str().ok());
     if let Some(token) = told.and_then(|value| value.strip_prefix("sudo ")) {
-        if core.seal(token).map_err(Fault::from)? {
+        if core.seal(token).await.map_err(Fault::from)? {
             eprintln!("keel: sudo {verb}");
             return Ok(core.sudo());
         }
@@ -71,8 +71,8 @@ fn front<'a, S: Store>(
     })
 }
 
-pub async fn listen<S: Store + 'static>(
-    core: Arc<Core<S>>,
+pub async fn listen<W: Wire + 'static>(
+    core: Arc<Core<W>>,
     host: &str,
     port: u16,
     prefix: &str,
@@ -105,13 +105,13 @@ struct QueryBody {
     q: String,
 }
 
-async fn run<S: Store>(
-    State(core): State<Arc<Core<S>>>,
+async fn run<W: Wire>(
+    State(core): State<Arc<Core<W>>>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
     Json(body): Json<QueryBody>,
 ) -> Result<Json<Value>, Fault> {
-    let face = front(core.as_ref(), &headers, op.as_deref(), "see")?;
+    let face = front(core.as_ref(), &headers, op.as_deref(), "see").await?;
     let tree = crate::query::parse(&body.q).map_err(Fault::from)?;
     let units = crate::query::involved(core.plan(), &tree).map_err(Fault::from)?;
     if core.plan().shrouds(&units) {
@@ -120,25 +120,25 @@ async fn run<S: Store>(
             note: "no such unit".into(),
         });
     }
-    let pack = face.ask(&tree).map_err(Fault::from)?;
+    let pack = face.ask(&tree).await.map_err(Fault::from)?;
     Ok(Json(pack_json(&pack)))
 }
 
-async fn list<S: Store>(
-    State(core): State<Arc<Core<S>>>,
+async fn list<W: Wire>(
+    State(core): State<Arc<Core<W>>>,
     Path(unit): Path<String>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
 ) -> Result<Json<Value>, Fault> {
     let name = unit_name(core.as_ref(), &unit)?;
-    let face = front(core.as_ref(), &headers, op.as_deref(), "see")?;
-    let rows = face.live(&name).map_err(Fault::from)?;
+    let face = front(core.as_ref(), &headers, op.as_deref(), "see").await?;
+    let rows = face.live(&name).await.map_err(Fault::from)?;
     let body: Vec<Value> = rows.iter().map(row_json).collect();
     Ok(Json(Value::Array(body)))
 }
 
-async fn create<S: Store>(
-    State(core): State<Arc<Core<S>>>,
+async fn create<W: Wire>(
+    State(core): State<Arc<Core<W>>>,
     Path(unit): Path<String>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
@@ -150,21 +150,21 @@ async fn create<S: Store>(
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
-    let face = front(core.as_ref(), &headers, op.as_deref(), "put")?;
-    let key = face.put(&name, &pairs).map_err(Fault::from)?;
+    let face = front(core.as_ref(), &headers, op.as_deref(), "put").await?;
+    let key = face.put(&name, &pairs).await.map_err(Fault::from)?;
     Ok((StatusCode::CREATED, Json(json!({ "id": key }))))
 }
 
-async fn one<S: Store>(
-    State(core): State<Arc<Core<S>>>,
+async fn one<W: Wire>(
+    State(core): State<Arc<Core<W>>>,
     Path((unit, id)): Path<(String, i64)>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
 ) -> Result<Json<Value>, Fault> {
     let name = unit_name(core.as_ref(), &unit)?;
     let q = format!(r#"from {name} where id = "{id}""#);
-    let face = front(core.as_ref(), &headers, op.as_deref(), "see")?;
-    let pack = face.query(&q).map_err(Fault::from)?;
+    let face = front(core.as_ref(), &headers, op.as_deref(), "see").await?;
+    let pack = face.query(&q).await.map_err(Fault::from)?;
     match pack.rows().first() {
         Some(row) => Ok(Json(row_json(row))),
         None => Err(Fault {
@@ -174,8 +174,8 @@ async fn one<S: Store>(
     }
 }
 
-async fn edit<S: Store>(
-    State(core): State<Arc<Core<S>>>,
+async fn edit<W: Wire>(
+    State(core): State<Arc<Core<W>>>,
     Path((unit, id)): Path<(String, i64)>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
@@ -187,10 +187,10 @@ async fn edit<S: Store>(
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
-    let face = front(core.as_ref(), &headers, op.as_deref(), "set")?;
-    face.set(&name, id, &pairs).map_err(Fault::from)?;
+    let face = front(core.as_ref(), &headers, op.as_deref(), "set").await?;
+    face.set(&name, id, &pairs).await.map_err(Fault::from)?;
     let q = format!(r#"from {name} where id = "{id}""#);
-    let pack = face.query(&q).map_err(Fault::from)?;
+    let pack = face.query(&q).await.map_err(Fault::from)?;
     match pack.rows().first() {
         Some(row) => Ok(Json(row_json(row))),
         None => Err(Fault {
@@ -200,15 +200,15 @@ async fn edit<S: Store>(
     }
 }
 
-async fn remove<S: Store>(
-    State(core): State<Arc<Core<S>>>,
+async fn remove<W: Wire>(
+    State(core): State<Arc<Core<W>>>,
     Path((unit, id)): Path<(String, i64)>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
 ) -> Result<StatusCode, Fault> {
     let name = unit_name(core.as_ref(), &unit)?;
-    let face = front(core.as_ref(), &headers, op.as_deref(), "end")?;
-    face.end(&name, id).map_err(Fault::from)?;
+    let face = front(core.as_ref(), &headers, op.as_deref(), "end").await?;
+    face.end(&name, id).await.map_err(Fault::from)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -216,8 +216,8 @@ async fn no_read() -> StatusCode {
     StatusCode::NOT_FOUND
 }
 
-async fn attach<S: Store>(
-    State(core): State<Arc<Core<S>>>,
+async fn attach<W: Wire>(
+    State(core): State<Arc<Core<W>>>,
     Path((unit, id, bond)): Path<(String, i64, String)>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
@@ -234,15 +234,16 @@ async fn attach<S: Store>(
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
-    let face = front(core.as_ref(), &headers, op.as_deref(), "tie")?;
+    let face = front(core.as_ref(), &headers, op.as_deref(), "tie").await?;
     let key = face
         .tie(&name, &bond, crate::life::Ends { left: id, right }, &pairs)
+        .await
         .map_err(Fault::from)?;
     Ok((StatusCode::CREATED, Json(json!({ "id": key }))))
 }
 
-async fn patch_tie<S: Store>(
-    State(core): State<Arc<Core<S>>>,
+async fn patch_tie<W: Wire>(
+    State(core): State<Arc<Core<W>>>,
     Path((unit, id, bond, tie)): Path<(String, i64, String, i64)>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
@@ -250,8 +251,8 @@ async fn patch_tie<S: Store>(
 ) -> Result<StatusCode, Fault> {
     let name = unit_name(core.as_ref(), &unit)?;
     let bond = bond_name(core.as_ref(), &name, &bond)?;
-    let face = front(core.as_ref(), &headers, op.as_deref(), "tie")?;
-    let ties = face.ties(&name, &bond, id).map_err(Fault::from)?;
+    let face = front(core.as_ref(), &headers, op.as_deref(), "tie").await?;
+    let ties = face.ties(&name, &bond, id).await.map_err(Fault::from)?;
     if !ties.iter().any(|row| row.key() == tie) {
         return Err(Fault {
             status: StatusCode::NOT_FOUND,
@@ -264,31 +265,32 @@ async fn patch_tie<S: Store>(
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
     face.set_tie(&name, &bond, tie, &pairs)
+        .await
         .map_err(Fault::from)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn detach<S: Store>(
-    State(core): State<Arc<Core<S>>>,
+async fn detach<W: Wire>(
+    State(core): State<Arc<Core<W>>>,
     Path((unit, id, bond, tie)): Path<(String, i64, String, i64)>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
 ) -> Result<StatusCode, Fault> {
     let name = unit_name(core.as_ref(), &unit)?;
     let bond = bond_name(core.as_ref(), &name, &bond)?;
-    let face = front(core.as_ref(), &headers, op.as_deref(), "cut")?;
-    let ties = face.ties(&name, &bond, id).map_err(Fault::from)?;
+    let face = front(core.as_ref(), &headers, op.as_deref(), "cut").await?;
+    let ties = face.ties(&name, &bond, id).await.map_err(Fault::from)?;
     if !ties.iter().any(|row| row.key() == tie) {
         return Err(Fault {
             status: StatusCode::NOT_FOUND,
             note: format!("missing tie {tie}"),
         });
     }
-    face.cut(&name, &bond, tie).map_err(Fault::from)?;
+    face.cut(&name, &bond, tie).await.map_err(Fault::from)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-fn unit_name<S: Store>(core: &Core<S>, route: &str) -> Result<String, Fault> {
+fn unit_name<W: Wire>(core: &Core<W>, route: &str) -> Result<String, Fault> {
     let name = crate::query::resolve(core.plan(), route).map_err(Fault::from)?;
     if core.plan().veiled(&name) {
         return Err(Fault {
@@ -299,7 +301,7 @@ fn unit_name<S: Store>(core: &Core<S>, route: &str) -> Result<String, Fault> {
     Ok(name)
 }
 
-fn bond_name<S: Store>(core: &Core<S>, unit: &str, bond: &str) -> Result<String, Fault> {
+fn bond_name<W: Wire>(core: &Core<W>, unit: &str, bond: &str) -> Result<String, Fault> {
     let node = core
         .plan()
         .units()

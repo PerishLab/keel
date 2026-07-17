@@ -29,100 +29,121 @@ struct Card {
     owner: Author,
 }
 
-#[test]
-fn point() {
+#[tokio::test]
+async fn point() {
     let mut graph = Graph::new();
     graph.plug::<Author>().plug::<Post>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
-    let ada = core.put("Author", &[("name", "ada")]).expect("ada");
-    let bob = core.put("Author", &[("name", "bob")]).expect("bob");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    let ada = core.put("Author", &[("name", "ada")]).await.expect("ada");
+    let bob = core.put("Author", &[("name", "bob")]).await.expect("bob");
 
     let post = core
         .put("Post", &[("title", "hello"), ("author", &ada.to_string())])
+        .await
         .expect("post");
-    let rows = core.live("Post").expect("live");
+    let rows = core.live("Post").await.expect("live");
     assert_eq!(rows[0].cells().get("author"), Some(&Cell::Int(ada)));
     assert_eq!(rows[0].cells().get("editor"), None);
 
-    assert!(core.put("Post", &[("title", "x")]).is_err());
+    assert!(core.put("Post", &[("title", "x")]).await.is_err());
     assert!(
         core.put("Post", &[("title", "x"), ("author", "999")])
+            .await
             .is_err()
     );
     assert!(
         core.put("Post", &[("title", "x"), ("author", "nope")])
+            .await
             .is_err()
     );
 
     core.set("Post", post, &[("editor", &bob.to_string())])
+        .await
         .expect("set editor");
-    let rows = core.live("Post").expect("live");
+    let rows = core.live("Post").await.expect("live");
     assert_eq!(rows[0].cells().get("editor"), Some(&Cell::Int(bob)));
 
-    core.set("Post", post, &[("editor", "")]).expect("clear");
-    let rows = core.live("Post").expect("live");
+    core.set("Post", post, &[("editor", "")])
+        .await
+        .expect("clear");
+    let rows = core.live("Post").await.expect("live");
     assert_eq!(rows[0].cells().get("editor"), None);
 
-    assert!(core.set("Post", post, &[("author", "")]).is_err());
+    assert!(core.set("Post", post, &[("author", "")]).await.is_err());
 
     let pack = core
         .query(&format!(r#"from Post where author = "{ada}""#))
+        .await
         .expect("pred");
     assert_eq!(pack.rows().len(), 1);
     let pack = core
         .query(&format!(r#"from Post where author = "{bob}""#))
+        .await
         .expect("miss");
     assert_eq!(pack.rows().len(), 0);
 
-    assert!(core.end("Author", ada).is_err());
-    core.end("Post", post).expect("end post");
-    core.end("Author", ada).expect("end ada");
+    assert!(core.end("Author", ada).await.is_err());
+    core.end("Post", post).await.expect("end post");
+    core.end("Author", ada).await.expect("end ada");
 
-    assert!(core.query("from Post link author").is_err());
+    assert!(core.query("from Post link author").await.is_err());
     assert!(
         core.tie("Post", "author", keel::Ends { left: 1, right: 1 }, &[])
+            .await
             .is_err()
     );
 }
 
-#[test]
-fn lone() {
+#[tokio::test]
+async fn lone() {
     let mut graph = Graph::new();
     graph.plug::<Author>().plug::<Card>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
-    let ada = core.put("Author", &[("name", "ada")]).expect("ada");
-    let bob = core.put("Author", &[("name", "bob")]).expect("bob");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    let ada = core.put("Author", &[("name", "ada")]).await.expect("ada");
+    let bob = core.put("Author", &[("name", "bob")]).await.expect("bob");
 
     let one = core
         .put("Card", &[("label", "gold"), ("owner", &ada.to_string())])
+        .await
         .expect("one");
     assert!(
         core.put("Card", &[("label", "dup"), ("owner", &ada.to_string())])
+            .await
             .is_err()
     );
     let two = core
         .put("Card", &[("label", "iron"), ("owner", &bob.to_string())])
+        .await
         .expect("two");
 
     assert!(
         core.set("Card", two, &[("owner", &ada.to_string())])
+            .await
             .is_err()
     );
     core.set("Card", two, &[("owner", &bob.to_string())])
+        .await
         .expect("same owner ok");
 
-    core.end("Card", one).expect("end one");
+    core.end("Card", one).await.expect("end one");
     core.set("Card", two, &[("owner", &ada.to_string())])
+        .await
         .expect("freed after end");
 }
 
-#[test]
-fn mirror() {
+#[tokio::test]
+async fn mirror() {
     let mut graph = Graph::new();
     graph.plug::<Author>().plug::<Post>().plug::<Card>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
-    let ada = core.put("Author", &[("name", "ada")]).expect("ada");
-    let bob = core.put("Author", &[("name", "bob")]).expect("bob");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    let ada = core.put("Author", &[("name", "ada")]).await.expect("ada");
+    let bob = core.put("Author", &[("name", "bob")]).await.expect("bob");
 
     let tie = core
         .tie(
@@ -134,20 +155,22 @@ fn mirror() {
             },
             &[],
         )
+        .await
         .expect("self tie");
-    let ties = core.ties("Author", "follows", ada).expect("ties");
+    let ties = core.ties("Author", "follows", ada).await.expect("ties");
     assert_eq!(ties.len(), 1);
     assert_eq!(ties[0].left(), ada);
     assert_eq!(ties[0].right(), bob);
 
     let pack = core
         .query(&format!(r#"from Author where follows has "{bob}""#))
+        .await
         .expect("has");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(pack.rows()[0].key(), ada);
 
-    assert!(core.end("Author", bob).is_err());
-    assert!(core.end("Author", ada).is_err());
-    core.cut("Author", "follows", tie).expect("cut");
-    core.end("Author", bob).expect("end bob");
+    assert!(core.end("Author", bob).await.is_err());
+    assert!(core.end("Author", ada).await.is_err());
+    core.cut("Author", "follows", tie).await.expect("cut");
+    core.end("Author", bob).await.expect("end bob");
 }

@@ -22,23 +22,29 @@ struct Student {
     courses: Course,
 }
 
-#[test]
-fn select() {
+#[tokio::test]
+async fn select() {
     let mut graph = Graph::new();
     graph.plug::<Course>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
 
     let algo = core
         .put("Course", &[("code", "CS101"), ("title", "algo")])
+        .await
         .expect("algo");
     let db = core
         .put("Course", &[("code", "CS102"), ("title", "db")])
+        .await
         .expect("db");
     let ada = core
         .put("Student", &[("no", "S01"), ("name", "ada")])
+        .await
         .expect("ada");
     let bob = core
         .put("Student", &[("no", "S02"), ("name", "bob")])
+        .await
         .expect("bob");
 
     core.tie(
@@ -50,6 +56,7 @@ fn select() {
         },
         &[("grade", "A")],
     )
+    .await
     .expect("ada algo");
     core.tie(
         "Student",
@@ -60,6 +67,7 @@ fn select() {
         },
         &[("grade", "B")],
     )
+    .await
     .expect("ada db");
     core.tie(
         "Student",
@@ -70,10 +78,12 @@ fn select() {
         },
         &[("grade", "")],
     )
+    .await
     .expect("bob algo");
 
     let pack = core
         .query(r#"from Student where no = "S01" link courses"#)
+        .await
         .expect("ada pack");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(pack.rows()[0].key(), ada);
@@ -91,17 +101,20 @@ fn select() {
 
     let pack = core
         .query(&format!(r#"from Student where courses has "{algo}""#))
+        .await
         .expect("has");
     assert_eq!(pack.rows().len(), 2);
 
     let pack = core
         .query(r#"from Student where courses some (grade = "A")"#)
+        .await
         .expect("some grade");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(pack.rows()[0].key(), ada);
 
     let pack = core
         .query(r#"from Student where courses some (code = "CS101")"#)
+        .await
         .expect("some code");
     assert_eq!(pack.rows().len(), 2);
 
@@ -109,15 +122,20 @@ fn select() {
         .query(&format!(
             r#"from Course where id in ("{algo}", "{db}") order by code"#
         ))
+        .await
         .expect("hydrate");
     assert_eq!(pack.rows().len(), 2);
 
     let tie = ties.iter().find(|t| t.right() == db).expect("db tie");
     core.set_tie("Student", "courses", tie.key(), &[("grade", "A+")])
+        .await
         .expect("grade");
-    core.cut("Student", "courses", tie.key()).expect("drop db");
+    core.cut("Student", "courses", tie.key())
+        .await
+        .expect("drop db");
     let pack = core
         .query(r#"from Student where no = "S01" link courses"#)
+        .await
         .expect("after drop");
     assert_eq!(pack.bond("student.courses").expect("ties").len(), 1);
 
@@ -130,12 +148,14 @@ fn select() {
         },
         &[("grade", "C")],
     )
+    .await
     .expect("re-enroll");
 
-    assert!(core.end("Course", db).is_err());
+    assert!(core.end("Course", db).await.is_err());
 
     let pack = core
         .query(r#"from Student where no = "S01" link courses"#)
+        .await
         .expect("linked");
     let re = pack
         .bond("student.courses")
@@ -144,16 +164,17 @@ fn select() {
         .find(|t| t.right() == db)
         .expect("db tie")
         .key();
-    core.cut("Student", "courses", re).expect("drop re");
-    core.end("Course", db).expect("end db");
+    core.cut("Student", "courses", re).await.expect("drop re");
+    core.end("Course", db).await.expect("end db");
 
     let pack = core
         .query(r#"from Student where no = "S01" link courses"#)
+        .await
         .expect("after end");
     assert_eq!(pack.bond("student.courses").expect("ties").len(), 1);
     assert_eq!(pack.bond("student.courses").expect("ties")[0].right(), algo);
 
-    let pack = core.query("from Course").expect("live courses");
+    let pack = core.query("from Course").await.expect("live courses");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(pack.rows()[0].key(), algo);
 
@@ -167,21 +188,28 @@ fn select() {
             },
             &[("grade", "X")],
         )
+        .await
         .is_err()
     );
-    assert!(core.end("Student", ada).is_err());
-    assert!(core.end("Course", algo).is_err());
+    assert!(core.end("Student", ada).await.is_err());
+    assert!(core.end("Course", algo).await.is_err());
     let pack = core
         .query(r#"from Student where no = "S01" link courses"#)
+        .await
         .expect("last");
     let last = pack.bond("student.courses").expect("ties")[0].key();
-    core.cut("Student", "courses", last).expect("cut last");
-    assert!(core.end("Course", algo).is_err());
+    core.cut("Student", "courses", last)
+        .await
+        .expect("cut last");
+    assert!(core.end("Course", algo).await.is_err());
     let pack = core
         .query(r#"from Student where no = "S02" link courses"#)
+        .await
         .expect("bob ties");
     let bob_tie = pack.bond("student.courses").expect("ties")[0].key();
-    core.cut("Student", "courses", bob_tie).expect("cut bob");
-    core.end("Course", algo).expect("end algo");
-    core.end("Student", ada).expect("end ada");
+    core.cut("Student", "courses", bob_tie)
+        .await
+        .expect("cut bob");
+    core.end("Course", algo).await.expect("end algo");
+    core.end("Student", ada).await.expect("end ada");
 }

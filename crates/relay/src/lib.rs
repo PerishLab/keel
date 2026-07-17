@@ -1,4 +1,4 @@
-use keel::store::Store;
+use keel::Wire;
 use keel::{Cell, Core, Row};
 use serde_json::json;
 use std::sync::Arc;
@@ -29,17 +29,19 @@ macro_rules! relay {
     };
 }
 
-pub struct Relay<S: Store> {
-    core: Arc<Core<S>>,
+pub struct Relay<W: Wire> {
+    core: Arc<Core<W>>,
     svc: i64,
 }
 
-impl<S: Store + 'static> Relay<S> {
-    pub fn rise(core: Arc<Core<S>>, svc: i64) -> Result<Self, keel::adapt::Error> {
+impl<W: Wire + 'static> Relay<W> {
+    pub async fn rise(core: Arc<Core<W>>, svc: i64) -> Result<Self, keel::adapt::Error> {
         let sudo = core.sudo();
-        let held = sudo.query(&format!(
-            r#"from @grant where who = "{svc}" and unit = "Hook" count"#
-        ))?;
+        let held = sudo
+            .query(&format!(
+                r#"from @grant where who = "{svc}" and unit = "Hook" count"#
+            ))
+            .await?;
         if held.count() == Some(0) {
             sudo.put(
                 "@grant",
@@ -49,14 +51,15 @@ impl<S: Store + 'static> Relay<S> {
                     ("unit", "Hook"),
                     ("scope", "all"),
                 ],
-            )?;
+            )
+            .await?;
         }
         Ok(Self { core, svc })
     }
 
     pub fn run(self) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
-            let mut cursor = self.floor();
+            let mut cursor = self.floor().await;
             loop {
                 tokio::time::sleep(Duration::from_millis(TICK)).await;
                 cursor = self.tick(cursor).await;
@@ -64,22 +67,23 @@ impl<S: Store + 'static> Relay<S> {
         })
     }
 
-    fn floor(&self) -> i64 {
+    async fn floor(&self) -> i64 {
         self.core
             .flow(0)
+            .await
             .ok()
             .and_then(|rows| rows.last().map(Row::key))
             .unwrap_or(0)
     }
 
     async fn tick(&self, cursor: i64) -> i64 {
-        let Ok(all) = self.core.flow(cursor) else {
-            return self.floor();
+        let Ok(all) = self.core.flow(cursor).await else {
+            return self.floor().await;
         };
         let Some(last) = all.last().map(Row::key) else {
             return cursor;
         };
-        let Ok(hooks) = self.core.of(self.svc).live("Hook") else {
+        let Ok(hooks) = self.core.of(self.svc).live("Hook").await else {
             return cursor;
         };
         if self.send(&hooks, cursor).await {
@@ -100,7 +104,7 @@ impl<S: Store + 'static> Relay<S> {
         let Some(Cell::Int(owner)) = hook.cells().get("actor") else {
             return true;
         };
-        let Ok(events) = self.core.of(*owner).flow(cursor) else {
+        let Ok(events) = self.core.of(*owner).flow(cursor).await else {
             return true;
         };
         let mut whole = true;

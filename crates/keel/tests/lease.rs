@@ -28,42 +28,47 @@ fn late() -> i64 {
         + 3600
 }
 
-#[test]
-fn ride() {
+#[tokio::test]
+async fn ride() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Guest>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let at = late();
 
-    let room = core.put("Room", &[("name", "den")]).expect("room");
-    core.lease("Room", room, at).expect("lease");
-    let rows = core.live("Room").expect("live");
+    let room = core.put("Room", &[("name", "den")]).await.expect("room");
+    core.lease("Room", room, at).await.expect("lease");
+    let rows = core.live("Room").await.expect("live");
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].expires(), Some(at));
 
-    core.lease("Room", room, at + 60).expect("renew");
-    let rows = core.live("Room").expect("live");
+    core.lease("Room", room, at + 60).await.expect("renew");
+    let rows = core.live("Room").await.expect("live");
     assert_eq!(rows[0].expires(), Some(at + 60));
 
-    core.end("Room", room).expect("revoke");
-    assert_eq!(core.live("Room").expect("live").len(), 0);
-    assert!(core.lease("Room", room, at).is_err());
-    assert!(core.end("Room", room).is_err());
+    core.end("Room", room).await.expect("revoke");
+    assert_eq!(core.live("Room").await.expect("live").len(), 0);
+    assert!(core.lease("Room", room, at).await.is_err());
+    assert!(core.end("Room", room).await.is_err());
 }
 
-#[test]
-fn strict() {
+#[tokio::test]
+async fn strict() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Guest>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let at = late();
 
-    let room = core.put("Room", &[("name", "den")]).expect("room");
+    let room = core.put("Room", &[("name", "den")]).await.expect("room");
     let ada = core
         .put("Guest", &[("name", "ada"), ("home", "")])
+        .await
         .expect("ada");
 
-    assert!(core.lease("Room", room, at - 7200).is_err());
+    assert!(core.lease("Room", room, at - 7200).await.is_err());
 
     core.tie(
         "Room",
@@ -74,12 +79,15 @@ fn strict() {
         },
         &[],
     )
+    .await
     .expect("tie");
-    assert!(core.lease("Room", room, at).is_err());
-    let ties = core.ties("Room", "guests", room).expect("ties");
-    core.cut("Room", "guests", ties[0].key()).expect("cut");
+    assert!(core.lease("Room", room, at).await.is_err());
+    let ties = core.ties("Room", "guests", room).await.expect("ties");
+    core.cut("Room", "guests", ties[0].key())
+        .await
+        .expect("cut");
 
-    core.lease("Room", room, at).expect("lease");
+    core.lease("Room", room, at).await.expect("lease");
     assert!(
         core.tie(
             "Room",
@@ -90,13 +98,15 @@ fn strict() {
             },
             &[],
         )
+        .await
         .is_err()
     );
     assert!(
         core.set("Guest", ada, &[("home", &room.to_string())])
+            .await
             .is_err()
     );
 
-    let dup = core.put("Guest", &[("name", "ada"), ("home", "")]);
+    let dup = core.put("Guest", &[("name", "ada"), ("home", "")]).await;
     assert!(dup.is_err());
 }

@@ -25,23 +25,25 @@ fn tick() -> i64 {
         .unwrap_or(0)
 }
 
-#[test]
-fn unseen() {
+#[tokio::test]
+async fn unseen() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Actor>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
-    let ada = core.put("Actor", &[("login", "ada")]).expect("ada");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    let ada = core.put("Actor", &[("login", "ada")]).await.expect("ada");
 
-    let one = core.query("from Actor").expect("q1");
-    let two = core.query("from Actor").expect("q2");
+    let one = core.query("from Actor").await.expect("q1");
+    let two = core.query("from Actor").await.expect("q2");
     assert_eq!(one, two);
 
-    core.put("Actor", &[("login", "bob")]).expect("bob");
-    let three = core.query("from Actor").expect("q3");
+    core.put("Actor", &[("login", "bob")]).await.expect("bob");
+    let three = core.query("from Actor").await.expect("q3");
     assert_eq!(three.rows().len(), 2);
 
-    let den = core.put("Room", &[("name", "den")]).expect("den");
-    let before = core.query("from Actor link rooms").expect("link");
+    let den = core.put("Room", &[("name", "den")]).await.expect("den");
+    let before = core.query("from Actor link rooms").await.expect("link");
     assert_eq!(before.bond("actor.rooms").expect("bag").len(), 0);
     core.tie(
         "Actor",
@@ -52,52 +54,64 @@ fn unseen() {
         },
         &[],
     )
+    .await
     .expect("tie");
-    let after = core.query("from Actor link rooms").expect("link2");
+    let after = core.query("from Actor link rooms").await.expect("link2");
     assert_eq!(after.bond("actor.rooms").expect("bag").len(), 1);
 
-    let ties = core.ties("Actor", "rooms", ada).expect("ties");
-    core.cut("Actor", "rooms", ties[0].key()).expect("cut");
-    core.end("Room", den).expect("end");
-    let gone = core.query("from Actor link rooms").expect("link3");
+    let ties = core.ties("Actor", "rooms", ada).await.expect("ties");
+    core.cut("Actor", "rooms", ties[0].key())
+        .await
+        .expect("cut");
+    core.end("Room", den).await.expect("end");
+    let gone = core.query("from Actor link rooms").await.expect("link3");
     assert_eq!(gone.bond("actor.rooms").expect("bag").len(), 0);
 }
 
-#[test]
-fn horizon() {
+#[tokio::test]
+async fn horizon() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Actor>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
-    let den = core.put("Room", &[("name", "den")]).expect("den");
-    core.lease("Room", den, tick() + 1).expect("lease");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    let den = core.put("Room", &[("name", "den")]).await.expect("den");
+    core.lease("Room", den, tick() + 1).await.expect("lease");
 
-    let warm = core.query("from Room").expect("warm");
+    let warm = core.query("from Room").await.expect("warm");
     assert_eq!(warm.rows().len(), 1);
     std::thread::sleep(std::time::Duration::from_secs(2));
-    let cold = core.query("from Room").expect("cold");
+    let cold = core.query("from Room").await.expect("cold");
     assert_eq!(cold.rows().len(), 0);
 }
 
-#[test]
-fn twin() {
+#[tokio::test]
+async fn twin() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Actor>();
-    let live = bind(graph, Sqlite::memory()).expect("bind");
+    let live = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let mut copy = Graph::new();
     copy.plug::<Room>().plug::<Actor>();
-    let bare = bind(copy, Sqlite::memory()).expect("bind").bare();
+    let bare = bind(copy, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind")
+        .bare();
 
     for core in [&live, &bare] {
-        core.put("Actor", &[("login", "ada")]).expect("ada");
-        core.put("Actor", &[("login", "bob")]).expect("bob");
-        core.set("Actor", 1, &[("login", "ada2")]).expect("set");
+        core.put("Actor", &[("login", "ada")]).await.expect("ada");
+        core.put("Actor", &[("login", "bob")]).await.expect("bob");
+        core.set("Actor", 1, &[("login", "ada2")])
+            .await
+            .expect("set");
     }
     let q = r#"from Actor where login != "zoe" order by login desc"#;
-    let one = live.query(q).expect("live");
-    let two = bare.query(q).expect("bare");
+    let one = live.query(q).await.expect("live");
+    let two = bare.query(q).await.expect("bare");
     assert_eq!(one, two);
     assert_eq!(
-        live.query("from Actor count").expect("c1"),
-        bare.query("from Actor count").expect("c2")
+        live.query("from Actor count").await.expect("c1"),
+        bare.query("from Actor count").await.expect("c2")
     );
 }

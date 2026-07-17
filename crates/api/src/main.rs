@@ -27,7 +27,7 @@ struct Student {
 async fn main() {
     let root = env::args().nth(1).unwrap_or_else(|| ".".into());
     let cfg = config::load(Path::new(&root));
-    let store = match cfg.open() {
+    let store = match cfg.open().await {
         Ok(store) => store,
         Err(err) => {
             eprintln!("keel-api: config: {err}");
@@ -36,7 +36,7 @@ async fn main() {
     };
     let mut graph = Graph::new();
     graph.plug::<Course>().plug::<Student>();
-    let made = bind(graph, store).map(|core| match cfg.cache.kind {
+    let made = bind(graph, store).await.map(|core| match cfg.cache.kind {
         keel::config::Hold::Memory => core,
         keel::config::Hold::None => core.bare(),
     });
@@ -47,15 +47,17 @@ async fn main() {
             std::process::exit(1);
         }
     };
-    let open = core.put(
-        "@grant",
-        &[
-            ("who", "anon"),
-            ("verb", "*"),
-            ("unit", "*"),
-            ("scope", "all"),
-        ],
-    );
+    let open = core
+        .put(
+            "@grant",
+            &[
+                ("who", "anon"),
+                ("verb", "*"),
+                ("unit", "*"),
+                ("scope", "all"),
+            ],
+        )
+        .await;
     if let Err(err) = open {
         eprintln!("keel-api: open: {err}");
         std::process::exit(1);

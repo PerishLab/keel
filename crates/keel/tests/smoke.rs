@@ -21,20 +21,22 @@ struct Student {
     classes: Class,
 }
 
-#[test]
-fn wire() {
+#[tokio::test]
+async fn wire() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
     let student = core.plan().units().get("Student").expect("Student");
     assert_eq!(student.fields().len(), 2);
     assert_eq!(student.bonds().len(), 1);
     assert!(student.reign().expires());
-    assert!(core.has("Student").expect("has Student"));
-    assert!(core.has("Class").expect("has Class"));
+    assert!(core.has("Student").await.expect("has Student"));
+    assert!(core.has("Class").await.expect("has Class"));
     let link = ddl::join("Student", "classes");
-    assert!(core.has(&link).expect("has join"));
-    let cols = core.cols("Student").expect("cols");
+    assert!(core.has(&link).await.expect("has join"));
+    let cols = core.cols("Student").await.expect("cols");
     assert!(cols.iter().any(|c| c == ddl::KEY));
     assert!(cols.iter().any(|c| c == "nickname"));
     assert!(cols.iter().any(|c| c == "avatar"));
@@ -46,27 +48,31 @@ fn wire() {
     assert!(paths.iter().any(|p| p.route() == "/student"));
 }
 
-#[test]
-fn life() {
+#[tokio::test]
+async fn life() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
 
     let a = core
         .put(
             "Student",
             &[("nickname", "ada"), ("avatar", "https://a.example/a")],
         )
+        .await
         .expect("put a");
     let b = core
         .put(
             "Student",
             &[("nickname", "bob"), ("avatar", "https://b.example/b")],
         )
+        .await
         .expect("put b");
     assert_ne!(a, b);
 
-    let rows = core.live("Student").expect("live");
+    let rows = core.live("Student").await.expect("live");
     assert_eq!(rows.len(), 2);
     assert!(rows.iter().all(|row| row.expires().is_none()));
     assert!(rows.iter().all(|row| row.created() > 0));
@@ -81,8 +87,9 @@ fn life() {
     );
 
     core.set("Student", b, &[("nickname", "bobby")])
+        .await
         .expect("set b");
-    let rows = core.live("Student").expect("live after set");
+    let rows = core.live("Student").await.expect("live after set");
     let bob = rows.iter().find(|row| row.key() == b).expect("b");
     assert_eq!(bob.cells().get("nickname").map(Cell::text), Some("bobby"));
     assert_eq!(
@@ -91,35 +98,42 @@ fn life() {
     );
     assert!(bob.updated() >= bob.created());
 
-    assert!(core.set("Student", b, &[]).is_err());
-    assert!(core.set("Student", b, &[("missing", "x")]).is_err());
-    assert!(core.set("Student", b, &[("id", "9")]).is_err());
+    assert!(core.set("Student", b, &[]).await.is_err());
+    assert!(core.set("Student", b, &[("missing", "x")]).await.is_err());
+    assert!(core.set("Student", b, &[("id", "9")]).await.is_err());
 
-    core.end("Student", a).expect("end a");
-    let rows = core.live("Student").expect("live after end");
+    core.end("Student", a).await.expect("end a");
+    let rows = core.live("Student").await.expect("live after end");
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].key(), b);
     assert_eq!(
         rows[0].cells().get("nickname").map(Cell::text),
         Some("bobby")
     );
-    assert!(core.set("Student", a, &[("nickname", "gone")]).is_err());
+    assert!(
+        core.set("Student", a, &[("nickname", "gone")])
+            .await
+            .is_err()
+    );
 }
 
-#[test]
-fn bond() {
+#[tokio::test]
+async fn bond() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory()).expect("bind");
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
 
     let student = core
         .put(
             "Student",
             &[("nickname", "ada"), ("avatar", "https://a.example/a")],
         )
+        .await
         .expect("student");
-    let math = core.put("Class", &[("title", "math")]).expect("math");
-    let art = core.put("Class", &[("title", "art")]).expect("art");
+    let math = core.put("Class", &[("title", "math")]).await.expect("math");
+    let art = core.put("Class", &[("title", "art")]).await.expect("art");
 
     let t1 = core
         .tie(
@@ -131,6 +145,7 @@ fn bond() {
             },
             &[],
         )
+        .await
         .expect("tie math");
     let t2 = core
         .tie(
@@ -142,25 +157,30 @@ fn bond() {
             },
             &[],
         )
+        .await
         .expect("tie art");
     assert_ne!(t1, t2);
 
-    let ties = core.ties("Student", "classes", student).expect("ties");
+    let ties = core
+        .ties("Student", "classes", student)
+        .await
+        .expect("ties");
     assert_eq!(ties.len(), 2);
     assert!(ties.iter().all(|tie| tie.left() == student));
     assert!(ties.iter().any(|tie| tie.right() == math));
     assert!(ties.iter().any(|tie| tie.right() == art));
 
-    core.cut("Student", "classes", t1).expect("cut math");
+    core.cut("Student", "classes", t1).await.expect("cut math");
     let ties = core
         .ties("Student", "classes", student)
+        .await
         .expect("ties after cut");
     assert_eq!(ties.len(), 1);
     assert_eq!(ties[0].right(), art);
 }
 
-#[test]
-fn miss() {
+#[tokio::test]
+async fn miss() {
     #[resource]
     struct Lone {
         #[relation(Ghost, many2many)]
@@ -169,7 +189,7 @@ fn miss() {
 
     let mut graph = Graph::new();
     graph.plug::<Lone>();
-    match bind(graph, Sqlite::memory()) {
+    match bind(graph, Sqlite::memory().await.expect("db")).await {
         Ok(_) => panic!("expected missing target"),
         Err(keel::adapt::Error::Missing(_)) => {}
         Err(err) => panic!("unexpected {err}"),
