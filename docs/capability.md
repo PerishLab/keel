@@ -120,6 +120,10 @@ the law.
   pass layer alone (credential → operator, bar honored); `wall` adds
   the stock doors. A caller with its own ceremonies (invitation join,
   password floor) takes `screen` and keeps gate's grounding intact.
+- **Bearer secrets from the OS CSPRNG.** Sessions and tokens draw 256
+  bits from `getrandom`, never a hash-table hasher. Session cookies are
+  `HttpOnly; SameSite=Lax; Path=/`; `.secure()` adds `Secure` behind
+  TLS. Credential units should be `veil`ed (C-18) — no wire authoring.
 
 ## Grant shape
 

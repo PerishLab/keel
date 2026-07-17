@@ -12,6 +12,7 @@ path = "src/lib.rs"
 
 [dependencies]
 axum = { workspace = true }
+getrandom = { workspace = true }
 keel = { workspace = true, features = ["http"] }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

@@ -17,6 +17,7 @@ pub struct Gate<S: Store> {
     core: Arc<Core<S>>,
     svc: i64,
     bar: Option<String>,
+    secure: bool,
 }
 
 impl<S: Store> Clone for Gate<S> {
@@ -25,6 +26,7 @@ impl<S: Store> Clone for Gate<S> {
             core: self.core.clone(),
             svc: self.svc,
             bar: self.bar.clone(),
+            secure: self.secure,
         }
     }
 }
@@ -56,11 +58,17 @@ impl<S: Store + 'static> Gate<S> {
             core,
             svc,
             bar: None,
+            secure: false,
         })
     }
 
     pub fn bar(mut self, field: &str) -> Self {
         self.bar = Some(field.to_string());
+        self
+    }
+
+    pub fn secure(mut self) -> Self {
+        self.secure = true;
         self
     }
 
@@ -209,7 +217,7 @@ async fn login<S: Store + 'static>(
         .lease("Session", row, now() + TTL)
         .map_err(Deny::from)?;
     let mut headers = HeaderMap::new();
-    let jar = format!("session={sid}; HttpOnly; Path=/");
+    let jar = bake(&sid, gate.secure);
     headers.insert("set-cookie", jar.parse().map_err(|_| Deny::misfit())?);
     Ok((StatusCode::CREATED, headers, Json(json!({ "id": row }))))
 }
@@ -253,14 +261,17 @@ fn flat(body: &Map<String, Value>) -> Result<Vec<(String, String)>, Deny> {
 }
 
 fn wild() -> String {
-    use std::collections::hash_map::RandomState;
-    use std::hash::{BuildHasher, Hasher};
-    let mut out = String::new();
-    for _ in 0..4 {
-        let word = RandomState::new().build_hasher().finish();
-        out.push_str(&format!("{word:016x}"));
+    let mut seed = [0u8; 32];
+    getrandom::fill(&mut seed).expect("os entropy");
+    seed.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn bake(sid: &str, secure: bool) -> String {
+    let mut jar = format!("session={sid}; HttpOnly; SameSite=Lax; Path=/");
+    if secure {
+        jar.push_str("; Secure");
     }
-    out
+    jar
 }
 
 fn digest(token: &str) -> String {

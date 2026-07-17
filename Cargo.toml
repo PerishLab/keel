@@ -10,6 +10,7 @@ repository = "https://git.perish.top/PerishLab/keel"
 
 [workspace.dependencies]
 axum = "0.8"
+getrandom = "0.3"
 keel = { path = "crates/keel", version = "0.1.0", registry = "perish" }
 keel-gate = { path = "crates/gate", version = "0.1.0", registry = "perish" }
 keel-macro = { path = "crates/macro", version = "0.1.0", registry = "perish" }
