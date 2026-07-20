@@ -1,4 +1,3 @@
-use super::util::*;
 use super::*;
 use crate::adapt::Error;
 use crate::bond;
@@ -12,7 +11,7 @@ impl<'a, W: Wire> Work<'a, W> {
     }
 
     pub async fn lease(&mut self, plan: &Plan, name: &str, key: i64, at: i64) -> Result<(), Error> {
-        let unit = find(plan, name)?;
+        let unit = plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
         }
@@ -50,7 +49,7 @@ impl<'a, W: Wire> Work<'a, W> {
         key: i64,
         who: &str,
     ) -> Result<(), Error> {
-        let seat = find(plan, crate::cap::PULSE)?;
+        let seat = plan.find(crate::cap::PULSE)?;
         let tick = now();
         let text = format!(
             "INSERT INTO {} (verb, unit, who, {}, {}, {}, {}) VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?5)",
@@ -86,7 +85,7 @@ impl<'a, W: Wire> Work<'a, W> {
     }
 
     pub(super) async fn fresh(&mut self, plan: &Plan, name: &str, key: i64) -> Result<bool, Error> {
-        let unit = find(plan, name)?;
+        let unit = plan.find(name)?;
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} IS NULL LIMIT 1",
             ddl::seat(unit.name()),
@@ -177,14 +176,14 @@ impl<'a, W: Wire> Work<'a, W> {
         key: i64,
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
-        let unit = find(plan, name)?;
+        let unit = plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
         }
         if unit.name() == crate::cap::GRANT {
             return Err(Error::Adapt("grant rows are put or end".into()));
         }
-        part(unit, fields)?;
+        unit.part(fields)?;
         let base = self.peek(unit, key).await?;
         self.solid(unit, fields, Some((key, &base))).await?;
         let tick = now();

@@ -18,17 +18,17 @@ impl<'a, W: Wire> Work<'a, W> {
         name: &str,
         fields: &[(&str, &str)],
     ) -> Result<i64, Error> {
-        let unit = find(plan, name)?;
+        let unit = plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
         }
         if unit.name() == crate::cap::GRANT {
             crate::cap::vet(plan, fields)?;
         }
-        check(unit, fields)?;
+        unit.check(fields)?;
         let tick = now();
         let mut cols: Vec<String> = unit.fields().iter().map(|s| ddl::col(s.name())).collect();
-        for edge in refs(unit) {
+        for edge in unit.refs() {
             cols.push(ddl::col(&ddl::side(edge.name())));
         }
         cols.push(ddl::EXPIRES.into());
@@ -51,9 +51,9 @@ impl<'a, W: Wire> Work<'a, W> {
                 continue;
             }
             let hit = pluck(fields, slot.name());
-            vals.push(bind(slot, hit)?);
+            vals.push(slot.bind(hit)?);
         }
-        for edge in refs(unit) {
+        for edge in unit.refs() {
             let hit = pluck(fields, edge.name());
             vals.push(self.point(plan, unit, edge, hit, None).await?);
         }
@@ -195,7 +195,7 @@ impl<'a, W: Wire> Work<'a, W> {
         val: &str,
         myself: i64,
     ) -> Result<(String, Val), Error> {
-        if let Some(edge) = refs(unit).find(|e| e.name() == col) {
+        if let Some(edge) = unit.refs().find(|e| e.name() == col) {
             let cell = self.point(plan, unit, edge, val, Some(myself)).await?;
             return Ok((ddl::side(edge.name()), cell));
         }
@@ -203,7 +203,7 @@ impl<'a, W: Wire> Work<'a, W> {
     }
 
     pub async fn one(&mut self, plan: &Plan, name: &str, key: i64) -> Result<Option<Row>, Error> {
-        let unit = find(plan, name)?;
+        let unit = plan.find(name)?;
         match self.peek(unit, key).await {
             Ok(row) => Ok(Some(row)),
             Err(Error::Adapt(note)) if note.starts_with("missing row") => Ok(None),
@@ -215,7 +215,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let tick = now();
         let text = format!(
             "SELECT {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2)",
-            sheet(unit),
+            unit.sheet(),
             ddl::seat(unit.name()),
             ddl::KEY,
             ddl::EXPIRES,
@@ -232,11 +232,11 @@ impl<'a, W: Wire> Work<'a, W> {
     }
 
     pub async fn live(&mut self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error> {
-        let unit = find(plan, name)?;
+        let unit = plan.find(name)?;
         let tick = now();
         let text = format!(
             "SELECT {} FROM {} WHERE {} IS NULL OR {} > ?1 ORDER BY {}",
-            sheet(unit),
+            unit.sheet(),
             ddl::seat(unit.name()),
             ddl::EXPIRES,
             ddl::EXPIRES,

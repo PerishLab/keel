@@ -154,4 +154,78 @@ impl Unit {
     pub fn veil(&self) -> bool {
         self.veil
     }
+
+    pub(crate) fn refs(&self) -> impl Iterator<Item = &Edge> {
+        self.bonds.iter().filter(|edge| edge.kind().point())
+    }
+
+    pub(crate) fn knows(&self, name: &str) -> bool {
+        self.fields.iter().any(|s| s.name() == name) || self.refs().any(|e| e.name() == name)
+    }
+
+    pub(crate) fn sheet(&self) -> String {
+        let mut cols = vec![crate::ddl::KEY.to_string()];
+        for slot in &self.fields {
+            cols.push(crate::ddl::col(slot.name()));
+        }
+        for edge in self.refs() {
+            cols.push(crate::ddl::col(&crate::ddl::side(edge.name())));
+        }
+        cols.push(crate::ddl::EXPIRES.to_string());
+        cols.push(crate::ddl::CREATED.to_string());
+        cols.push(crate::ddl::UPDATED.to_string());
+        cols.join(", ")
+    }
+
+    pub(crate) fn check(&self, fields: &[(&str, &str)]) -> Result<(), crate::adapt::Error> {
+        for slot in &self.fields {
+            if slot.serial().is_some() {
+                if fields.iter().any(|(k, _)| *k == slot.name()) {
+                    return Err(crate::adapt::Error::Adapt(format!(
+                        "serial field {}",
+                        slot.name()
+                    )));
+                }
+                continue;
+            }
+            if !fields.iter().any(|(k, _)| *k == slot.name()) {
+                return Err(crate::adapt::Error::Adapt(format!(
+                    "missing field {}",
+                    slot.name()
+                )));
+            }
+        }
+        for (k, _) in fields {
+            if !self.knows(k) {
+                return Err(crate::adapt::Error::Adapt(format!("unknown field {k}")));
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn part(&self, fields: &[(&str, &str)]) -> Result<(), crate::adapt::Error> {
+        if fields.is_empty() {
+            return Err(crate::adapt::Error::Adapt("empty set".into()));
+        }
+        for (k, _) in fields {
+            if *k == crate::ddl::KEY
+                || *k == crate::ddl::EXPIRES
+                || *k == crate::ddl::CREATED
+                || *k == crate::ddl::UPDATED
+            {
+                return Err(crate::adapt::Error::Adapt(format!("control field {k}")));
+            }
+            let held = self
+                .fields
+                .iter()
+                .any(|s| s.name() == *k && s.serial().is_some());
+            if held {
+                return Err(crate::adapt::Error::Adapt(format!("serial field {k}")));
+            }
+            if !self.knows(k) {
+                return Err(crate::adapt::Error::Adapt(format!("unknown field {k}")));
+            }
+        }
+        Ok(())
+    }
 }
