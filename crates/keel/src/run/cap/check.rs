@@ -82,13 +82,12 @@ pub(crate) async fn held<W: Wire>(
         if verb != "see" {
             return Ok(false);
         }
-        return descend(plan, work, place, &anchor, pred, who, chain).await;
+        return descend(work, place, &anchor, pred, who, chain).await;
     }
     Ok(false)
 }
 
 pub(crate) async fn descend<W: Wire>(
-    _plan: &Plan,
     work: &mut Work<'_, W>,
     place: &str,
     anchor: &str,
