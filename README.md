@@ -51,7 +51,7 @@ fn main() {
 | `query` / `ask` | text → AST → run; `ask` takes `Tree` directly |
 | AST | `from` + where + `link` + order/page → always **pack** |
 | `tie` / `ties` / `cut` | many2many write on Core; read via `link` bond bags (H0) |
-| edge law | flat pack; root-only order/page — `docs/edge.md` |
+| edge law | flat pack; root-only order/page — `docs/model/edge.md` |
 | `serve` / `listen` | axum (`http` feature) |
 
 ### HTTP surface
@@ -113,7 +113,7 @@ sidecar stop --config sidecar.toml
 ```
 
 `keel-api` is a demo binary (Student/Course selection + store/listen from
-keel.toml). `forge` is the staged scenario binary (`docs/spec.md`);
+keel.toml). `forge` is the staged scenario binary (`docs/model/spec.md`);
 `keel-gate` ships the default credential package (`gate!(Actor)` + wall).
 
 ## Operating
@@ -127,6 +127,6 @@ runseal :forge    # forge slice act 1: data completeness L2
 cargo run -p keel-api --locked
 ```
 
-Scenario notes: `docs/scenario.md`.
+Scenario notes: `docs/run/scenario.md`.
 
-Cold-start verification boundary: `docs/verify.md`.
+Cold-start verification boundary: `docs/run/verify.md`.

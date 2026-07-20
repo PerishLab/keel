@@ -25,3 +25,23 @@ serde_json = { workspace = true, optional = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 sqlx = { workspace = true }
+
+[[test]]
+name = "cap"
+path = "tests/cap/main.rs"
+
+[[test]]
+name = "query"
+path = "tests/query/main.rs"
+
+[[test]]
+name = "data"
+path = "tests/data/main.rs"
+
+[[test]]
+name = "bond"
+path = "tests/bond/main.rs"
+
+[[test]]
+name = "pulse"
+path = "tests/pulse/main.rs"
