@@ -8,22 +8,17 @@ use crate::spec::Only;
 use crate::wire::{Val, Wire};
 
 impl<'a, W: Wire> Work<'a, W> {
-    pub fn new(wire: &'a mut W) -> Self {
-        Self { wire }
+    pub fn new(wire: &'a mut W, plan: &'a Plan) -> Self {
+        Self { wire, plan }
     }
 
-    pub async fn put(
-        &mut self,
-        plan: &Plan,
-        name: &str,
-        fields: &[(&str, &str)],
-    ) -> Result<i64, Error> {
-        let unit = plan.find(name)?;
+    pub async fn put(&mut self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
+        let unit = self.plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
         }
         if unit.name() == crate::cap::GRANT {
-            crate::cap::vet(plan, fields)?;
+            crate::cap::vet(self.plan, fields)?;
         }
         unit.check(fields)?;
         let tick = now();
@@ -55,7 +50,7 @@ impl<'a, W: Wire> Work<'a, W> {
         }
         for edge in unit.refs() {
             let hit = pluck(fields, edge.name());
-            vals.push(self.point(plan, unit, edge, hit, None).await?);
+            vals.push(self.point(unit, edge, hit, None).await?);
         }
         vals.push(Val::Null);
         vals.push(Val::Int(tick));
@@ -118,7 +113,6 @@ impl<'a, W: Wire> Work<'a, W> {
 
     pub(super) async fn point(
         &mut self,
-        plan: &Plan,
         unit: &Unit,
         edge: &Edge,
         value: &str,
@@ -133,10 +127,10 @@ impl<'a, W: Wire> Work<'a, W> {
         let key = value
             .parse::<i64>()
             .map_err(|_| Error::Adapt(format!("ref {} needs id", edge.name())))?;
-        if !self.live_has(plan, edge.target(), key).await? {
+        if !self.live_has(edge.target(), key).await? {
             return Err(Error::Adapt("right not live".into()));
         }
-        if !self.fresh(plan, edge.target(), key).await? {
+        if !self.fresh(edge.target(), key).await? {
             return Err(Error::Adapt(format!("ref {} leased", edge.name())));
         }
         if edge.kind() == bond::Kind::One2one {
@@ -189,21 +183,20 @@ impl<'a, W: Wire> Work<'a, W> {
 
     pub(super) async fn entry(
         &mut self,
-        plan: &Plan,
         unit: &Unit,
         col: &str,
         val: &str,
         myself: i64,
     ) -> Result<(String, Val), Error> {
         if let Some(edge) = unit.refs().find(|e| e.name() == col) {
-            let cell = self.point(plan, unit, edge, val, Some(myself)).await?;
+            let cell = self.point(unit, edge, val, Some(myself)).await?;
             return Ok((ddl::side(edge.name()), cell));
         }
         Ok((col.to_string(), fit(unit.fields(), col, val)?))
     }
 
-    pub async fn one(&mut self, plan: &Plan, name: &str, key: i64) -> Result<Option<Row>, Error> {
-        let unit = plan.find(name)?;
+    pub async fn one(&mut self, name: &str, key: i64) -> Result<Option<Row>, Error> {
+        let unit = self.plan.find(name)?;
         match self.peek(unit, key).await {
             Ok(row) => Ok(Some(row)),
             Err(Error::Adapt(note)) if note.starts_with("missing row") => Ok(None),
@@ -231,8 +224,8 @@ impl<'a, W: Wire> Work<'a, W> {
         }
     }
 
-    pub async fn live(&mut self, plan: &Plan, name: &str) -> Result<Vec<Row>, Error> {
-        let unit = plan.find(name)?;
+    pub async fn live(&mut self, name: &str) -> Result<Vec<Row>, Error> {
+        let unit = self.plan.find(name)?;
         let tick = now();
         let text = format!(
             "SELECT {} FROM {} WHERE {} IS NULL OR {} > ?1 ORDER BY {}",

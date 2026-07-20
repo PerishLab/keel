@@ -2,36 +2,31 @@ use super::util::*;
 use super::*;
 use crate::adapt::Error;
 use crate::ddl;
-use crate::plan::Plan;
 use crate::wire::{Val, Wire};
 
 impl<'a, W: Wire> Work<'a, W> {
     pub async fn tie(
         &mut self,
-        plan: &Plan,
         owner: &str,
         bond: &str,
         ends: Ends,
         fields: &[(&str, &str)],
     ) -> Result<i64, Error> {
-        let (unit, edge) = plan.edge(owner, bond)?;
+        let (unit, edge) = self.plan.edge(owner, bond)?;
         edge.part(fields)?;
-        if !self.live_has(plan, unit.name(), ends.left).await? {
+        if !self.live_has(unit.name(), ends.left).await? {
             return Err(Error::Adapt("left not live".into()));
         }
-        if !self.live_has(plan, edge.target(), ends.right).await? {
+        if !self.live_has(edge.target(), ends.right).await? {
             return Err(Error::Adapt("right not live".into()));
         }
-        if !self.fresh(plan, unit.name(), ends.left).await? {
+        if !self.fresh(unit.name(), ends.left).await? {
             return Err(Error::Adapt("left leased".into()));
         }
-        if !self.fresh(plan, edge.target(), ends.right).await? {
+        if !self.fresh(edge.target(), ends.right).await? {
             return Err(Error::Adapt("right leased".into()));
         }
-        if self
-            .live_pair(plan, owner, bond, ends.left, ends.right)
-            .await?
-        {
+        if self.live_pair(owner, bond, ends.left, ends.right).await? {
             return Err(Error::Adapt("live pair exists".into()));
         }
         let tick = now();
@@ -71,22 +66,21 @@ impl<'a, W: Wire> Work<'a, W> {
 
     pub async fn set_tie(
         &mut self,
-        plan: &Plan,
         owner: &str,
         bond: &str,
         key: i64,
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
-        let (unit, edge) = plan.edge(owner, bond)?;
+        let (unit, edge) = self.plan.edge(owner, bond)?;
         edge.part(fields)?;
         if fields.is_empty() {
             return Err(Error::Adapt("empty set".into()));
         }
-        let ends = self.tie_ends(plan, owner, bond, key).await?;
-        if !self.live_has(plan, unit.name(), ends.left).await? {
+        let ends = self.tie_ends(owner, bond, key).await?;
+        if !self.live_has(unit.name(), ends.left).await? {
             return Err(Error::Adapt("left not live".into()));
         }
-        if !self.live_has(plan, edge.target(), ends.right).await? {
+        if !self.live_has(edge.target(), ends.right).await? {
             return Err(Error::Adapt("right not live".into()));
         }
         let tick = now();
@@ -124,12 +118,11 @@ impl<'a, W: Wire> Work<'a, W> {
 
     pub(super) async fn tie_ends(
         &mut self,
-        plan: &Plan,
         owner: &str,
         bond: &str,
         key: i64,
     ) -> Result<Ends, Error> {
-        let (unit, edge) = plan.edge(owner, bond)?;
+        let (unit, edge) = self.plan.edge(owner, bond)?;
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
         let dst = ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target()));
@@ -155,14 +148,8 @@ impl<'a, W: Wire> Work<'a, W> {
         })
     }
 
-    pub async fn ties(
-        &mut self,
-        plan: &Plan,
-        owner: &str,
-        bond: &str,
-        left: i64,
-    ) -> Result<Vec<Tie>, Error> {
-        let (unit, edge) = plan.edge(owner, bond)?;
+    pub async fn ties(&mut self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
+        let (unit, edge) = self.plan.edge(owner, bond)?;
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
         let dst = ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target()));
@@ -197,14 +184,8 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(out)
     }
 
-    pub async fn cut(
-        &mut self,
-        plan: &Plan,
-        owner: &str,
-        bond: &str,
-        key: i64,
-    ) -> Result<(), Error> {
-        let (unit, edge) = plan.edge(owner, bond)?;
+    pub async fn cut(&mut self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
+        let (unit, edge) = self.plan.edge(owner, bond)?;
         let tick = now();
         let text = format!(
             "UPDATE {} SET {} = ?1, {} = ?1 WHERE {} = ?2",
@@ -223,8 +204,8 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(())
     }
 
-    pub async fn live_has(&mut self, plan: &Plan, name: &str, key: i64) -> Result<bool, Error> {
-        let unit = plan.find(name)?;
+    pub async fn live_has(&mut self, name: &str, key: i64) -> Result<bool, Error> {
+        let unit = self.plan.find(name)?;
         let tick = now();
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
@@ -243,13 +224,12 @@ impl<'a, W: Wire> Work<'a, W> {
 
     pub async fn live_pair(
         &mut self,
-        plan: &Plan,
         owner: &str,
         bond: &str,
         left: i64,
         right: i64,
     ) -> Result<bool, Error> {
-        let (unit, edge) = plan.edge(owner, bond)?;
+        let (unit, edge) = self.plan.edge(owner, bond)?;
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
         let dst = ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target()));

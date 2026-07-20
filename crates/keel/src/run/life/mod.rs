@@ -1,3 +1,4 @@
+use crate::plan::Plan;
 use crate::wire::Wire;
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -106,6 +107,7 @@ impl Tie {
 
 pub struct Work<'a, W: Wire> {
     wire: &'a mut W,
+    plan: &'a Plan,
 }
 
 pub fn tick() -> i64 {

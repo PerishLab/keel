@@ -15,9 +15,9 @@ pub async fn check<W: Wire>(
     unit: &str,
     mark: &Mark<'_>,
 ) -> Result<bool, Error> {
-    let mut work = Work::new(wire);
+    let mut work = Work::new(wire, plan);
     let chain = anchors(plan, &mut work, unit, mark).await?;
-    for deed in work.live(plan, GRANT).await? {
+    for deed in work.live(GRANT).await? {
         if held(plan, &mut work, &deed, who, verb, unit, mark, &chain).await? {
             return Ok(true);
         }
@@ -32,8 +32,8 @@ pub async fn broad<W: Wire>(
     verb: &str,
     unit: &str,
 ) -> Result<bool, Error> {
-    let mut work = Work::new(wire);
-    for deed in work.live(plan, GRANT).await? {
+    let mut work = Work::new(wire, plan);
+    for deed in work.live(GRANT).await? {
         if !bearer(plan, &mut work, cell(&deed, "who"), who).await?
             || !verb_hit(cell(&deed, "verb"), verb)
         {
@@ -88,7 +88,7 @@ pub(crate) async fn held<W: Wire>(
 }
 
 pub(crate) async fn descend<W: Wire>(
-    plan: &Plan,
+    _plan: &Plan,
     work: &mut Work<'_, W>,
     place: &str,
     anchor: &str,
@@ -100,7 +100,7 @@ pub(crate) async fn descend<W: Wire>(
         if up != anchor {
             continue;
         }
-        let Some(row) = work.one(plan, place, *id).await? else {
+        let Some(row) = work.one(place, *id).await? else {
             continue;
         };
         let seat = Mark {
@@ -161,7 +161,7 @@ pub(crate) async fn bearer<W: Wire>(
     let Some(edge) = node.crew() else {
         return Ok(false);
     };
-    let ties = work.ties(plan, node.name(), edge.name(), id).await?;
+    let ties = work.ties(node.name(), edge.name(), id).await?;
     Ok(ties.iter().any(|tie| tie.right() == op))
 }
 
@@ -193,7 +193,7 @@ pub(crate) async fn anchors<W: Wire>(
         };
         let target = ddl::table(edge.target());
         out.push((target.clone(), up));
-        let Some(row) = work.one(plan, edge.target(), up).await? else {
+        let Some(row) = work.one(edge.target(), up).await? else {
             break;
         };
         name = target;

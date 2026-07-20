@@ -2,16 +2,16 @@ use super::*;
 use crate::adapt::Error;
 use crate::bond;
 use crate::ddl;
-use crate::plan::{Edge, Plan, Unit};
+use crate::plan::{Edge, Unit};
 use crate::wire::{Val, Wire};
 
 impl<'a, W: Wire> Work<'a, W> {
-    pub async fn end(&mut self, plan: &Plan, name: &str, key: i64) -> Result<(), Error> {
-        self.lease(plan, name, key, now()).await
+    pub async fn end(&mut self, name: &str, key: i64) -> Result<(), Error> {
+        self.lease(name, key, now()).await
     }
 
-    pub async fn lease(&mut self, plan: &Plan, name: &str, key: i64, at: i64) -> Result<(), Error> {
-        let unit = plan.find(name)?;
+    pub async fn lease(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+        let unit = self.plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
         }
@@ -19,7 +19,7 @@ impl<'a, W: Wire> Work<'a, W> {
         if at < tick {
             return Err(Error::Adapt("lease is not the past".into()));
         }
-        if self.live_in(plan, unit.name(), key).await? || self.live_out(unit, key).await? {
+        if self.live_in(unit.name(), key).await? || self.live_out(unit, key).await? {
             return Err(Error::Adapt("live ties remain".into()));
         }
         let text = format!(
@@ -43,13 +43,12 @@ impl<'a, W: Wire> Work<'a, W> {
 
     pub async fn pulse(
         &mut self,
-        plan: &Plan,
         verb: &str,
         unit: &str,
         key: i64,
         who: &str,
     ) -> Result<(), Error> {
-        let seat = plan.find(crate::cap::PULSE)?;
+        let seat = self.plan.find(crate::cap::PULSE)?;
         let tick = now();
         let text = format!(
             "INSERT INTO {} (verb, unit, who, {}, {}, {}, {}) VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?5)",
@@ -84,8 +83,8 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(())
     }
 
-    pub(super) async fn fresh(&mut self, plan: &Plan, name: &str, key: i64) -> Result<bool, Error> {
-        let unit = plan.find(name)?;
+    pub(super) async fn fresh(&mut self, name: &str, key: i64) -> Result<bool, Error> {
+        let unit = self.plan.find(name)?;
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} IS NULL LIMIT 1",
             ddl::seat(unit.name()),
@@ -95,13 +94,8 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(!self.wire.rows(&text, &[Val::Int(key)]).await?.is_empty())
     }
 
-    pub(super) async fn live_in(
-        &mut self,
-        plan: &Plan,
-        target: &str,
-        key: i64,
-    ) -> Result<bool, Error> {
-        for unit in plan.units().values() {
+    pub(super) async fn live_in(&mut self, target: &str, key: i64) -> Result<bool, Error> {
+        for unit in self.plan.units().values() {
             for edge in unit.bonds() {
                 if edge.target() != target {
                     continue;
@@ -171,12 +165,11 @@ impl<'a, W: Wire> Work<'a, W> {
 
     pub async fn set(
         &mut self,
-        plan: &Plan,
         name: &str,
         key: i64,
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
-        let unit = plan.find(name)?;
+        let unit = self.plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
         }
@@ -193,7 +186,7 @@ impl<'a, W: Wire> Work<'a, W> {
             if i > 0 {
                 text.push_str(", ");
             }
-            let (name, cell) = self.entry(plan, unit, col, val, key).await?;
+            let (name, cell) = self.entry(unit, col, val, key).await?;
             text.push_str(&ddl::col(&name));
             text.push_str(" = ?");
             text.push_str(&(i + 1).to_string());

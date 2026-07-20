@@ -55,15 +55,15 @@ impl<W: Wire> Tx<'_, W> {
     pub async fn ties(&mut self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
         let plan = self.core.plan();
         if self.free() {
-            return Work::new(&mut self.seat.wire)
-                .ties(plan, owner, bond, left)
+            return Work::new(&mut self.seat.wire, plan)
+                .ties(owner, bond, left)
                 .await;
         }
         let unit = query::resolve(plan, owner)?;
         let _ = self.seen(&unit, left).await?;
         let target = self.target(&unit, bond)?;
-        let ties = Work::new(&mut self.seat.wire)
-            .ties(plan, &unit, bond, left)
+        let ties = Work::new(&mut self.seat.wire, plan)
+            .ties(&unit, bond, left)
             .await?;
         let mut out = Vec::new();
         for tie in ties {
@@ -91,8 +91,8 @@ impl<W: Wire> Tx<'_, W> {
 
     pub async fn flow(&mut self, cursor: i64) -> Result<Vec<Row>, Error> {
         let plan = self.core.plan();
-        let rows = Work::new(&mut self.seat.wire)
-            .live(plan, cap::PULSE)
+        let rows = Work::new(&mut self.seat.wire, plan)
+            .live(cap::PULSE)
             .await?;
         if let Some(first) = rows.first()
             && cursor + 1 < first.key()
@@ -129,7 +129,7 @@ impl<W: Wire> Tx<'_, W> {
             return Ok(false);
         };
         let plan = self.core.plan();
-        match Work::new(&mut self.seat.wire).one(plan, &unit, key).await? {
+        match Work::new(&mut self.seat.wire, plan).one(&unit, key).await? {
             Some(row) => {
                 let mark = cap::Mark {
                     key: Some(key),
@@ -188,8 +188,8 @@ impl<W: Wire> Tx<'_, W> {
         let lefts = pack.rows().to_vec();
         for row in lefts {
             let plan = self.core.plan();
-            let ties = Work::new(&mut self.seat.wire)
-                .ties(plan, unit, &name, row.key())
+            let ties = Work::new(&mut self.seat.wire, plan)
+                .ties(unit, &name, row.key())
                 .await?;
             if let Some(tie) = ties.into_iter().find(|t| t.key() == key) {
                 return Ok(tie);

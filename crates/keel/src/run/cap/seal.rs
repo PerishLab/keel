@@ -5,17 +5,17 @@ use crate::plan::Plan;
 use crate::wire::Wire;
 
 pub async fn genesis<W: Wire>(plan: &Plan, wire: &mut W) -> Result<Option<String>, Error> {
-    let mut work = Work::new(wire);
-    if !work.live(plan, SEAL).await?.is_empty() {
+    let mut work = Work::new(wire, plan);
+    if !work.live(SEAL).await?.is_empty() {
         return Ok(None);
     }
     let token = wild();
-    work.put(plan, SEAL, &[("hash", &digest(&token))]).await?;
+    work.put(SEAL, &[("hash", &digest(&token))]).await?;
     Ok(Some(token))
 }
 
 pub async fn sealed<W: Wire>(plan: &Plan, wire: &mut W, token: &str) -> Result<bool, Error> {
-    let rows = Work::new(wire).live(plan, SEAL).await?;
+    let rows = Work::new(wire, plan).live(SEAL).await?;
     let want = digest(token);
     Ok(rows.first().is_some_and(|row| cell(row, "hash") == want))
 }

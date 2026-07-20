@@ -7,12 +7,12 @@ use crate::wire::Wire;
 use std::collections::BTreeMap;
 
 pub async fn run<W: Wire>(plan: &Plan, wire: &mut W, tree: &Tree) -> Result<Pack, Error> {
-    let mut work = Work::new(wire);
+    let mut work = Work::new(wire, plan);
     let name = resolve(plan, tree.from())?;
     check(plan, &name, tree.preds(), tree.sort())?;
     check_links(plan, &name, tree.links())?;
     let mut rows = match tree.slice() {
-        Slice::Live => work.live(plan, &name).await?,
+        Slice::Live => work.live(&name).await?,
     };
     if !tree.preds().is_empty() {
         rows.retain(|row| pass(row, tree.preds()));
@@ -55,7 +55,7 @@ pub async fn run<W: Wire>(plan: &Plan, wire: &mut W, tree: &Tree) -> Result<Pack
 }
 
 pub(crate) async fn pull<W: Wire>(
-    plan: &Plan,
+    _plan: &Plan,
     work: &mut Work<'_, W>,
     owner: &str,
     bond: &str,
@@ -64,9 +64,9 @@ pub(crate) async fn pull<W: Wire>(
 ) -> Result<Vec<Tie>, Error> {
     let mut ties = Vec::new();
     for &key in keys {
-        let part = work.ties(plan, owner, bond, key).await?;
+        let part = work.ties(owner, bond, key).await?;
         for tie in part {
-            if !work.live_has(plan, target, tie.right()).await? {
+            if !work.live_has(target, tie.right()).await? {
                 continue;
             }
             ties.push(tie);
@@ -133,13 +133,13 @@ pub(crate) async fn hold_has<W: Wire>(
 
 pub(crate) async fn has_right<W: Wire>(
     work: &mut Work<'_, W>,
-    plan: &Plan,
+    _plan: &Plan,
     owner: &str,
     bond: &str,
     left: i64,
     right: i64,
 ) -> bool {
-    match work.ties(plan, owner, bond, left).await {
+    match work.ties(owner, bond, left).await {
         Ok(ties) => ties.iter().any(|tie| tie.right() == right),
         Err(_) => false,
     }
@@ -185,7 +185,7 @@ pub(crate) async fn some_hit<W: Wire>(
     left: i64,
     nest: &Pred,
 ) -> Result<bool, Error> {
-    let ties = work.ties(plan, owner, bond, left).await?;
+    let ties = work.ties(owner, bond, left).await?;
     let on_bond = bond_slot(plan, owner, bond, nest.field());
     for tie in ties {
         if nest.field() == ddl::KEY {
@@ -221,7 +221,7 @@ pub(crate) async fn target_hit<W: Wire>(
     key: i64,
     nest: &Pred,
 ) -> Result<bool, Error> {
-    if !work.live_has(plan, target, key).await? {
+    if !work.live_has(target, key).await? {
         return Ok(false);
     }
     match find_live(work, plan, target, key).await? {
@@ -232,10 +232,10 @@ pub(crate) async fn target_hit<W: Wire>(
 
 pub(crate) async fn find_live<W: Wire>(
     work: &mut Work<'_, W>,
-    plan: &Plan,
+    _plan: &Plan,
     name: &str,
     key: i64,
 ) -> Result<Option<Row>, Error> {
-    let rows = work.live(plan, name).await?;
+    let rows = work.live(name).await?;
     Ok(rows.into_iter().find(|row| row.key() == key))
 }

@@ -28,8 +28,8 @@ impl<W: Wire> Tx<'_, W> {
     ) -> Result<i64, Error> {
         let plan = self.core.plan();
         let unit = query::resolve(plan, name)?;
-        let key = Work::new(&mut self.seat.wire)
-            .put(plan, &unit, fields)
+        let key = Work::new(&mut self.seat.wire, plan)
+            .put(&unit, fields)
             .await?;
         self.beat("put", &ddl::table(&unit), key).await;
         Ok(key)
@@ -42,8 +42,8 @@ impl<W: Wire> Tx<'_, W> {
         }
         let told = label(self.who);
         let plan = self.core.plan();
-        if let Err(err) = Work::new(&mut self.seat.wire)
-            .pulse(plan, verb, unit, key, &told)
+        if let Err(err) = Work::new(&mut self.seat.wire, plan)
+            .pulse(verb, unit, key, &told)
             .await
         {
             eprintln!("keel: pulse: {err}");
@@ -58,8 +58,8 @@ impl<W: Wire> Tx<'_, W> {
     ) -> Result<(), Error> {
         let plan = self.core.plan();
         let unit = query::resolve(plan, name)?;
-        Work::new(&mut self.seat.wire)
-            .set(plan, &unit, key, fields)
+        Work::new(&mut self.seat.wire, plan)
+            .set(&unit, key, fields)
             .await?;
         self.beat("set", &ddl::table(&unit), key).await;
         Ok(())
@@ -75,11 +75,11 @@ impl<W: Wire> Tx<'_, W> {
         let unit = query::resolve(plan, name)?;
         match at {
             Some(at) => {
-                Work::new(&mut self.seat.wire)
-                    .lease(plan, &unit, key, at)
+                Work::new(&mut self.seat.wire, plan)
+                    .lease(&unit, key, at)
                     .await?
             }
-            None => Work::new(&mut self.seat.wire).end(plan, &unit, key).await?,
+            None => Work::new(&mut self.seat.wire, plan).end(&unit, key).await?,
         }
         self.beat("end", &ddl::table(&unit), key).await;
         Ok(())
@@ -94,8 +94,8 @@ impl<W: Wire> Tx<'_, W> {
     ) -> Result<i64, Error> {
         let plan = self.core.plan();
         let unit = query::resolve(plan, owner)?;
-        let key = Work::new(&mut self.seat.wire)
-            .tie(plan, &unit, bond, ends, fields)
+        let key = Work::new(&mut self.seat.wire, plan)
+            .tie(&unit, bond, ends, fields)
             .await?;
         self.beat("tie", &lane(&unit, bond), key).await;
         Ok(key)
@@ -110,8 +110,8 @@ impl<W: Wire> Tx<'_, W> {
     ) -> Result<(), Error> {
         let plan = self.core.plan();
         let unit = query::resolve(plan, owner)?;
-        Work::new(&mut self.seat.wire)
-            .set_tie(plan, &unit, bond, key, fields)
+        Work::new(&mut self.seat.wire, plan)
+            .set_tie(&unit, bond, key, fields)
             .await?;
         self.beat("tie", &lane(&unit, bond), key).await;
         Ok(())
@@ -120,8 +120,8 @@ impl<W: Wire> Tx<'_, W> {
     pub(super) async fn snip(&mut self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
         let plan = self.core.plan();
         let unit = query::resolve(plan, owner)?;
-        Work::new(&mut self.seat.wire)
-            .cut(plan, &unit, bond, key)
+        Work::new(&mut self.seat.wire, plan)
+            .cut(&unit, bond, key)
             .await?;
         self.beat("cut", &lane(&unit, bond), key).await;
         Ok(())
@@ -140,8 +140,8 @@ impl<W: Wire> Tx<'_, W> {
 
     pub(super) async fn seen(&mut self, unit: &str, key: i64) -> Result<Row, Error> {
         let plan = self.core.plan();
-        let row = Work::new(&mut self.seat.wire)
-            .one(plan, unit, key)
+        let row = Work::new(&mut self.seat.wire, plan)
+            .one(unit, key)
             .await?
             .ok_or_else(|| Error::Adapt(format!("missing row {key}")))?;
         let mark = cap::Mark {
