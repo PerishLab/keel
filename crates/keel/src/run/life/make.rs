@@ -12,6 +12,10 @@ impl<'a, W: Wire> Work<'a, W> {
         Self { wire, plan }
     }
 
+    pub(crate) fn plan(&self) -> &Plan {
+        self.plan
+    }
+
     pub async fn put(&mut self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
         let unit = self.plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
