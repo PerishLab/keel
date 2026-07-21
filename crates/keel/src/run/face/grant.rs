@@ -117,15 +117,14 @@ impl<W: Wire> Tx<'_, W> {
             };
             return self.may(verb, unit, &mark).await;
         }
-        if cap::broad(
-            self.core.plan(),
-            &mut self.seat.wire,
-            self.who,
+        let deeds = self.deeds().await?;
+        let plea = cap::Plea {
+            who: self.who,
             verb,
-            &ddl::table(unit),
-        )
-        .await?
-        {
+            unit: &ddl::table(unit),
+            mark: &cap::Mark::none(),
+        };
+        if cap::broad(self.core.plan(), &mut self.seat.wire, &plea, &deeds).await? {
             return Ok(());
         }
         Err(Error::Adapt("refused put".into()))

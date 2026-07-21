@@ -13,6 +13,24 @@ pub struct Mark<'a> {
     pub cells: &'a BTreeMap<String, Cell>,
 }
 
+static BARE: BTreeMap<String, Cell> = BTreeMap::new();
+
+impl Mark<'_> {
+    pub fn none() -> Mark<'static> {
+        Mark {
+            key: None,
+            cells: &BARE,
+        }
+    }
+}
+
+pub struct Plea<'a> {
+    pub who: crate::face::Who,
+    pub verb: &'a str,
+    pub unit: &'a str,
+    pub mark: &'a Mark<'a>,
+}
+
 mod check;
 mod grant;
 mod seal;

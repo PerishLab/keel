@@ -24,13 +24,18 @@ struct Stash {
 
 impl Stash {
     fn bump(&self, unit: &str) {
-        if !self.on {
-            return;
-        }
         let owner = unit.split('.').next().unwrap_or(unit).to_string();
         if let Ok(mut gens) = self.gens.lock() {
             *gens.entry(owner).or_insert(0) += 1;
         }
+    }
+
+    fn step(&self, unit: &str) -> i64 {
+        self.gens
+            .lock()
+            .ok()
+            .and_then(|gens| gens.get(unit).copied())
+            .unwrap_or(0)
     }
 
     fn stamp(&self, units: &[String]) -> Vec<(String, i64)> {
@@ -88,6 +93,27 @@ impl Stash {
         if let Ok(mut deals) = self.deals.lock() {
             deals.clear();
         }
+    }
+}
+
+#[derive(Default)]
+struct Deeds {
+    held: Mutex<Option<(i64, Arc<Vec<Row>>)>>,
+}
+
+impl Deeds {
+    fn read(&self, step: i64) -> Option<Arc<Vec<Row>>> {
+        let held = self.held.lock().ok()?;
+        let (at, rows) = held.as_ref()?;
+        (*at == step).then(|| rows.clone())
+    }
+
+    fn keep(&self, step: i64, rows: Vec<Row>) -> Arc<Vec<Row>> {
+        let rows = Arc::new(rows);
+        if let Ok(mut held) = self.held.lock() {
+            *held = Some((step, rows.clone()));
+        }
+        rows
     }
 }
 
@@ -156,6 +182,7 @@ pub struct Core<W: Wire> {
     identity: Option<String>,
     stash: Stash,
     chart: Chart,
+    deeds: Deeds,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Who {

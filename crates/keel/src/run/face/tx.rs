@@ -156,21 +156,31 @@ impl<W: Wire> Tx<'_, W> {
         Ok(row)
     }
 
+    pub(super) async fn deeds(&mut self) -> Result<Arc<Vec<Row>>, Error> {
+        let step = self.core.stash.step(&ddl::table(cap::GRANT));
+        if let Some(rows) = self.core.deeds.read(step) {
+            return Ok(rows);
+        }
+        let plan = self.core.plan();
+        let node = plan.find(cap::GRANT)?;
+        let rows = Work::new(&mut self.seat.wire, plan).scan(node).await?;
+        Ok(self.core.deeds.keep(step, rows))
+    }
+
     pub(super) async fn held(
         &mut self,
         verb: &str,
         unit: &str,
         mark: &cap::Mark<'_>,
     ) -> Result<bool, Error> {
-        cap::check(
-            self.core.plan(),
-            &mut self.seat.wire,
-            self.who,
+        let deeds = self.deeds().await?;
+        let plea = cap::Plea {
+            who: self.who,
             verb,
-            &ddl::table(unit),
+            unit: &ddl::table(unit),
             mark,
-        )
-        .await
+        };
+        cap::check(self.core.plan(), &mut self.seat.wire, &plea, &deeds).await
     }
 
     pub(super) async fn may(

@@ -20,6 +20,7 @@ impl<W: Wire> Core<W> {
                 ..Default::default()
             },
             chart: Chart::default(),
+            deeds: Deeds::default(),
         }
     }
 

@@ -139,16 +139,7 @@ impl<W: Wire> Tx<'_, W> {
                 };
                 self.held("see", &unit, &mark).await
             }
-            None => {
-                cap::broad(
-                    self.core.plan(),
-                    &mut self.seat.wire,
-                    self.who,
-                    "see",
-                    &ddl::table(&unit),
-                )
-                .await
-            }
+            None => self.wide("see", &unit).await,
         }
     }
 
@@ -164,14 +155,18 @@ impl<W: Wire> Tx<'_, W> {
         if let Ok(tie) = self.grip(&unit, bond, key).await {
             return Ok(self.seen(&unit, tie.left()).await.is_ok());
         }
-        cap::broad(
-            self.core.plan(),
-            &mut self.seat.wire,
-            self.who,
-            "see",
-            &ddl::table(&unit),
-        )
-        .await
+        self.wide("see", &unit).await
+    }
+
+    pub(super) async fn wide(&mut self, verb: &str, unit: &str) -> Result<bool, Error> {
+        let deeds = self.deeds().await?;
+        let plea = cap::Plea {
+            who: self.who,
+            verb,
+            unit: &ddl::table(unit),
+            mark: &cap::Mark::none(),
+        };
+        cap::broad(self.core.plan(), &mut self.seat.wire, &plea, &deeds).await
     }
 
     pub(super) async fn grip(&mut self, unit: &str, bond: &str, key: i64) -> Result<Tie, Error> {

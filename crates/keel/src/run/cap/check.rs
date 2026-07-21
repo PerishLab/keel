@@ -7,19 +7,22 @@ use crate::plan::{Plan, Unit};
 use crate::query;
 use crate::wire::Wire;
 
+pub(crate) struct Hop {
+    unit: String,
+    key: i64,
+    row: Option<Row>,
+}
+
 pub async fn check<W: Wire>(
     plan: &Plan,
     wire: &mut W,
-    who: Who,
-    verb: &str,
-    unit: &str,
-    mark: &Mark<'_>,
+    plea: &Plea<'_>,
+    deeds: &[Row],
 ) -> Result<bool, Error> {
-    let deeds = plan.find(GRANT)?;
     let mut work = Work::new(wire, plan);
-    let chain = anchors(plan, &mut work, unit, mark).await?;
-    for deed in work.scan(deeds).await? {
-        if held(plan, &mut work, &deed, who, verb, unit, mark, &chain).await? {
+    let chain = anchors(plan, &mut work, plea.unit, plea.mark).await?;
+    for deed in deeds {
+        if held(plan, &mut work, deed, plea, &chain).await? {
             return Ok(true);
         }
     }
@@ -29,93 +32,79 @@ pub async fn check<W: Wire>(
 pub async fn broad<W: Wire>(
     plan: &Plan,
     wire: &mut W,
-    who: Who,
-    verb: &str,
-    unit: &str,
+    plea: &Plea<'_>,
+    deeds: &[Row],
 ) -> Result<bool, Error> {
-    let deeds = plan.find(GRANT)?;
     let mut work = Work::new(wire, plan);
-    for deed in work.scan(deeds).await? {
-        if !bearer(plan, &mut work, cell(&deed, "who"), who).await?
-            || !verb_hit(cell(&deed, "verb"), verb)
+    for deed in deeds {
+        if !bearer(plan, &mut work, cell(deed, "who"), plea.who).await?
+            || !verb_hit(cell(deed, "verb"), plea.verb)
         {
             continue;
         }
-        let place = cell(&deed, "unit");
-        let wide = place == "*" || ddl::table(place) == unit;
-        if wide && cell(&deed, "scope") == "all" {
+        let place = cell(deed, "unit");
+        let wide = place == "*" || ddl::table(place) == plea.unit;
+        if wide && cell(deed, "scope") == "all" {
             return Ok(true);
         }
     }
     Ok(false)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) async fn held<W: Wire>(
     plan: &Plan,
     work: &mut Work<'_, W>,
     deed: &Row,
-    who: Who,
-    verb: &str,
-    unit: &str,
-    mark: &Mark<'_>,
-    chain: &[(String, i64)],
+    plea: &Plea<'_>,
+    chain: &[Hop],
 ) -> Result<bool, Error> {
-    if !bearer(plan, work, cell(deed, "who"), who).await? || !verb_hit(cell(deed, "verb"), verb) {
+    if !bearer(plan, work, cell(deed, "who"), plea.who).await?
+        || !verb_hit(cell(deed, "verb"), plea.verb)
+    {
         return Ok(false);
     }
     let place = cell(deed, "unit");
     let span = cell(deed, "scope");
     if span == "all" {
-        return Ok(place == "*" || ddl::table(place) == unit);
+        return Ok(place == "*" || ddl::table(place) == plea.unit);
     }
     if let Some(id) = span.strip_prefix("row ") {
         let Ok(id) = id.parse::<i64>() else {
             return Ok(false);
         };
         let anchor = ddl::table(place);
-        return Ok(chain.iter().any(|(u, k)| *u == anchor && *k == id));
+        return Ok(chain.iter().any(|hop| hop.unit == anchor && hop.key == id));
     }
     if let Some(pred) = span.strip_prefix("pred ") {
         let anchor = ddl::table(place);
-        if anchor == unit {
-            return Ok(pred_hit(unit, pred, who, mark));
+        if anchor == plea.unit {
+            return Ok(pred_hit(plea.unit, pred, plea.who, plea.mark));
         }
-        if verb != "see" {
+        if plea.verb != "see" {
             return Ok(false);
         }
-        let Some(node) = seat(plan, &anchor) else {
-            return Ok(false);
-        };
-        return descend(work, node, &anchor, pred, who, chain).await;
+        return Ok(descend(&anchor, pred, plea.who, chain));
     }
     Ok(false)
 }
 
-pub(crate) async fn descend<W: Wire>(
-    work: &mut Work<'_, W>,
-    node: &Unit,
-    anchor: &str,
-    pred: &str,
-    who: Who,
-    chain: &[(String, i64)],
-) -> Result<bool, Error> {
-    for (up, id) in chain {
-        if up != anchor {
+pub(crate) fn descend(anchor: &str, pred: &str, who: Who, chain: &[Hop]) -> bool {
+    for hop in chain {
+        if hop.unit != anchor {
             continue;
         }
-        let Some(row) = work.one(node, *id).await? else {
+        let Some(row) = hop.row.as_ref() else {
             continue;
         };
         let mark = Mark {
-            key: Some(*id),
+            key: Some(hop.key),
             cells: row.cells(),
         };
         if pred_hit(anchor, pred, who, &mark) {
-            return Ok(true);
+            return true;
         }
     }
-    Ok(false)
+    false
 }
 
 pub(crate) fn pred_hit(unit: &str, pred: &str, who: Who, mark: &Mark<'_>) -> bool {
@@ -178,10 +167,14 @@ pub(crate) async fn anchors<W: Wire>(
     work: &mut Work<'_, W>,
     unit: &str,
     mark: &Mark<'_>,
-) -> Result<Vec<(String, i64)>, Error> {
+) -> Result<Vec<Hop>, Error> {
     let mut out = Vec::new();
     if let Some(key) = mark.key {
-        out.push((unit.to_string(), key));
+        out.push(Hop {
+            unit: unit.to_string(),
+            key,
+            row: None,
+        });
     }
     let mut name = unit.to_string();
     let mut cells = mark.cells.clone();
@@ -196,9 +189,14 @@ pub(crate) async fn anchors<W: Wire>(
             break;
         };
         let target = ddl::table(edge.target());
-        out.push((target.clone(), up));
         let mate = plan.find(edge.target())?;
-        let Some(row) = work.one(mate, up).await? else {
+        let row = work.one(mate, up).await?;
+        out.push(Hop {
+            unit: target.clone(),
+            key: up,
+            row: row.clone(),
+        });
+        let Some(row) = row else {
             break;
         };
         name = target;
