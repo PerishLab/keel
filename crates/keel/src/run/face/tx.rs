@@ -140,8 +140,9 @@ impl<W: Wire> Tx<'_, W> {
 
     pub(super) async fn seen(&mut self, unit: &str, key: i64) -> Result<Row, Error> {
         let plan = self.core.plan();
+        let node = plan.find(unit)?;
         let row = Work::new(&mut self.seat.wire, plan)
-            .one(unit, key)
+            .one(node, key)
             .await?
             .ok_or_else(|| Error::Adapt(format!("missing row {key}")))?;
         let mark = cap::Mark {

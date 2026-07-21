@@ -15,9 +15,10 @@ pub async fn check<W: Wire>(
     unit: &str,
     mark: &Mark<'_>,
 ) -> Result<bool, Error> {
+    let deeds = plan.find(GRANT)?;
     let mut work = Work::new(wire, plan);
     let chain = anchors(plan, &mut work, unit, mark).await?;
-    for deed in work.live(GRANT).await? {
+    for deed in work.scan(deeds).await? {
         if held(plan, &mut work, &deed, who, verb, unit, mark, &chain).await? {
             return Ok(true);
         }
@@ -32,8 +33,9 @@ pub async fn broad<W: Wire>(
     verb: &str,
     unit: &str,
 ) -> Result<bool, Error> {
+    let deeds = plan.find(GRANT)?;
     let mut work = Work::new(wire, plan);
-    for deed in work.live(GRANT).await? {
+    for deed in work.scan(deeds).await? {
         if !bearer(plan, &mut work, cell(&deed, "who"), who).await?
             || !verb_hit(cell(&deed, "verb"), verb)
         {
@@ -82,14 +84,17 @@ pub(crate) async fn held<W: Wire>(
         if verb != "see" {
             return Ok(false);
         }
-        return descend(work, place, &anchor, pred, who, chain).await;
+        let Some(node) = seat(plan, &anchor) else {
+            return Ok(false);
+        };
+        return descend(work, node, &anchor, pred, who, chain).await;
     }
     Ok(false)
 }
 
 pub(crate) async fn descend<W: Wire>(
     work: &mut Work<'_, W>,
-    place: &str,
+    node: &Unit,
     anchor: &str,
     pred: &str,
     who: Who,
@@ -99,14 +104,14 @@ pub(crate) async fn descend<W: Wire>(
         if up != anchor {
             continue;
         }
-        let Some(row) = work.one(place, *id).await? else {
+        let Some(row) = work.one(node, *id).await? else {
             continue;
         };
-        let seat = Mark {
+        let mark = Mark {
             key: Some(*id),
             cells: row.cells(),
         };
-        if pred_hit(anchor, pred, who, &seat) {
+        if pred_hit(anchor, pred, who, &mark) {
             return Ok(true);
         }
     }
@@ -160,7 +165,7 @@ pub(crate) async fn bearer<W: Wire>(
     let Some(edge) = node.crew() else {
         return Ok(false);
     };
-    let ties = work.ties(node.name(), edge.name(), id).await?;
+    let ties = work.ties(node, edge, id).await?;
     Ok(ties.iter().any(|tie| tie.right() == op))
 }
 
@@ -192,7 +197,8 @@ pub(crate) async fn anchors<W: Wire>(
         };
         let target = ddl::table(edge.target());
         out.push((target.clone(), up));
-        let Some(row) = work.one(edge.target(), up).await? else {
+        let mate = plan.find(edge.target())?;
+        let Some(row) = work.one(mate, up).await? else {
             break;
         };
         name = target;

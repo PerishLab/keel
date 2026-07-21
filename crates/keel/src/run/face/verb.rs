@@ -149,7 +149,8 @@ impl<W: Wire> Tx<'_, W> {
 
     pub(super) async fn spot(&mut self, unit: &str, key: i64) -> Result<bool, Error> {
         let plan = self.core.plan();
-        let Some(row) = Work::new(&mut self.seat.wire, plan).one(unit, key).await? else {
+        let node = plan.find(unit)?;
+        let Some(row) = Work::new(&mut self.seat.wire, plan).one(node, key).await? else {
             return Ok(false);
         };
         let mark = cap::Mark {

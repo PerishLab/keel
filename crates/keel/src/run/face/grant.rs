@@ -51,8 +51,9 @@ impl<W: Wire> Tx<'_, W> {
 
     pub(super) async fn revoke(&mut self, key: i64) -> Result<(), Error> {
         let plan = self.core.plan();
+        let node = plan.find(cap::GRANT)?;
         let row = Work::new(&mut self.seat.wire, plan)
-            .one(cap::GRANT, key)
+            .one(node, key)
             .await?
             .ok_or_else(|| Error::Adapt(format!("missing row {key}")))?;
         let verb = row
@@ -105,8 +106,9 @@ impl<W: Wire> Tx<'_, W> {
                 .parse::<i64>()
                 .map_err(|_| Error::Adapt("row scope needs id".into()))?;
             let plan = self.core.plan();
+            let node = plan.find(unit)?;
             let row = Work::new(&mut self.seat.wire, plan)
-                .one(unit, key)
+                .one(node, key)
                 .await?
                 .ok_or_else(|| Error::Adapt("refused put".into()))?;
             let mark = cap::Mark {

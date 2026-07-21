@@ -56,13 +56,15 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
     })
 }
 
-pub(crate) fn edge(unit: &crate::plan::Unit, bond: &str) -> Result<String, Error> {
+pub(crate) fn edge<'a>(
+    unit: &'a crate::plan::Unit,
+    bond: &str,
+) -> Result<&'a crate::plan::Edge, Error> {
     unit.bonds()
         .iter()
         .find(|edge| {
             edge.name().eq_ignore_ascii_case(bond) && edge.kind() == crate::bond::Kind::Many2many
         })
-        .map(|edge| edge.name().to_string())
         .ok_or_else(|| Error::Adapt(format!("unknown bond {bond}")))
 }
 

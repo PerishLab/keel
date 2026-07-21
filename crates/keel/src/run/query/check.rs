@@ -3,10 +3,12 @@ use crate::adapt::Error;
 use crate::atom;
 use crate::ddl;
 use crate::plan::{Plan, Unit};
+use std::collections::BTreeMap;
 
 pub(crate) struct Scope {
     unit: Unit,
     name: String,
+    range: BTreeMap<String, Unit>,
 }
 
 impl Scope {
@@ -16,6 +18,12 @@ impl Scope {
 
     pub(crate) fn name(&self) -> &str {
         &self.name
+    }
+
+    pub(crate) fn at(&self, name: &str) -> Result<&Unit, Error> {
+        self.range
+            .get(name)
+            .ok_or_else(|| Error::Missing(name.into()))
     }
 }
 
@@ -28,7 +36,41 @@ pub(crate) fn analyze(plan: &Plan, tree: &Tree) -> Result<Scope, Error> {
         .clone();
     check(plan, &name, tree.preds(), tree.sort())?;
     check_links(plan, &name, tree.links())?;
-    Ok(Scope { unit, name })
+    let range = range(plan, &unit, tree)?;
+    Ok(Scope { unit, name, range })
+}
+
+pub(crate) fn range(
+    plan: &Plan,
+    unit: &Unit,
+    tree: &Tree,
+) -> Result<BTreeMap<String, Unit>, Error> {
+    let mut out = BTreeMap::new();
+    for bond in reached(unit, tree) {
+        let target = plan
+            .units()
+            .get(bond.target())
+            .ok_or_else(|| Error::Missing(bond.target().into()))?;
+        out.insert(bond.target().to_string(), target.clone());
+    }
+    Ok(out)
+}
+
+pub(crate) fn reached<'a>(unit: &'a Unit, tree: &Tree) -> Vec<&'a crate::plan::Edge> {
+    let mut out = Vec::new();
+    for pred in tree.preds() {
+        if matches!(pred.op(), Op::Has | Op::Some)
+            && let Ok(bond) = edge(unit, pred.field())
+        {
+            out.push(bond);
+        }
+    }
+    for name in tree.links() {
+        if let Ok(bond) = edge(unit, name) {
+            out.push(bond);
+        }
+    }
+    out
 }
 
 pub fn resolve(plan: &Plan, unit: &str) -> Result<String, Error> {
@@ -82,7 +124,7 @@ pub(crate) fn check_pred(plan: &Plan, unit: &crate::plan::Unit, pred: &Pred) -> 
             let nest = pred
                 .nest()
                 .ok_or_else(|| Error::Adapt("some needs inner".into()))?;
-            check_nest(plan, unit, &bond, nest)
+            check_nest(plan, bond, nest)
         }
         _ => check_cell(unit, pred),
     }
@@ -99,20 +141,10 @@ pub(crate) fn check_cell(unit: &crate::plan::Unit, pred: &Pred) -> Result<(), Er
     Ok(())
 }
 
-pub(crate) fn check_nest(
-    plan: &Plan,
-    unit: &crate::plan::Unit,
-    bond: &str,
-    nest: &Pred,
-) -> Result<(), Error> {
+pub(crate) fn check_nest(plan: &Plan, edge: &crate::plan::Edge, nest: &Pred) -> Result<(), Error> {
     if matches!(nest.op(), Op::Has | Op::Some) {
         return Err(Error::Adapt("nested bond pred denied".into()));
     }
-    let edge = unit
-        .bonds()
-        .iter()
-        .find(|e| e.name() == bond)
-        .ok_or_else(|| Error::Adapt(format!("unknown bond {bond}")))?;
     let kind = nest_kind(plan, edge, nest.field())?;
     for value in nest.values() {
         kind.fit(value)?;
@@ -145,20 +177,8 @@ pub fn involved(plan: &Plan, tree: &Tree) -> Result<Vec<String>, Error> {
         .get(&name)
         .ok_or_else(|| Error::Missing(name.clone()))?;
     let mut out = vec![ddl::table(&name)];
-    for pred in tree.preds() {
-        if matches!(pred.op(), Op::Has | Op::Some)
-            && let Ok(bond) = edge(unit, pred.field())
-            && let Some(e) = unit.bonds().iter().find(|e| e.name() == bond)
-        {
-            out.push(ddl::table(e.target()));
-        }
-    }
-    for bond in tree.links() {
-        if let Ok(bond) = edge(unit, bond)
-            && let Some(e) = unit.bonds().iter().find(|e| e.name() == bond)
-        {
-            out.push(ddl::table(e.target()));
-        }
+    for bond in reached(unit, tree) {
+        out.push(ddl::table(bond.target()));
     }
     out.sort();
     out.dedup();

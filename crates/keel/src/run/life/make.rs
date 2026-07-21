@@ -12,10 +12,6 @@ impl<'a, W: Wire> Work<'a, W> {
         Self { wire, plan }
     }
 
-    pub(crate) fn plan(&self) -> &Plan {
-        self.plan
-    }
-
     pub async fn put(&mut self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
         let unit = self.plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
@@ -131,7 +127,8 @@ impl<'a, W: Wire> Work<'a, W> {
         let key = value
             .parse::<i64>()
             .map_err(|_| Error::Adapt(format!("ref {} needs id", edge.name())))?;
-        if !self.live_has(edge.target(), key).await? {
+        let mate = self.plan.find(edge.target())?;
+        if !self.live_has(mate, key).await? {
             return Err(Error::Adapt("right not live".into()));
         }
         if !self.fresh(edge.target(), key).await? {
@@ -199,8 +196,7 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok((col.to_string(), fit(unit.fields(), col, val)?))
     }
 
-    pub async fn one(&mut self, name: &str, key: i64) -> Result<Option<Row>, Error> {
-        let unit = self.plan.find(name)?;
+    pub async fn one(&mut self, unit: &Unit, key: i64) -> Result<Option<Row>, Error> {
         match self.peek(unit, key).await {
             Ok(row) => Ok(Some(row)),
             Err(Error::Adapt(note)) if note.starts_with("missing row") => Ok(None),
@@ -226,11 +222,6 @@ impl<'a, W: Wire> Work<'a, W> {
             Some(line) => read(unit, line),
             None => Err(Error::Adapt(format!("missing row {key}"))),
         }
-    }
-
-    pub async fn live(&mut self, name: &str) -> Result<Vec<Row>, Error> {
-        let unit = self.plan.find(name)?;
-        self.scan(unit).await
     }
 
     pub(crate) async fn scan(&mut self, unit: &Unit) -> Result<Vec<Row>, Error> {
