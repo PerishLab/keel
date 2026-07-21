@@ -32,7 +32,9 @@ pub(crate) fn whole(plan: &Plan, who: &str) -> bool {
     if id.parse::<i64>().is_err() {
         return false;
     }
-    seat(plan, &ddl::table(place)).is_some_and(|node| node.crew().is_some())
+    plan.find(&ddl::table(place))
+        .ok()
+        .is_some_and(|node| node.crew().is_some())
 }
 
 pub(crate) fn scope(unit: Option<&str>, value: &str) -> Result<(), Error> {

@@ -164,21 +164,18 @@ pub(crate) fn take(rest: &str) -> Option<(String, usize)> {
     let mut i = 1;
     let mut out = String::new();
     while i < bytes.len() {
-        let byte = bytes[i];
-        if byte == b'"' {
-            return Some((out, i + 1));
-        }
-        if byte == b'\\' {
-            i += 1;
-            if i >= bytes.len() {
-                return None;
+        match bytes[i] {
+            b'"' => return Some((out, i + 1)),
+            b'\\' => {
+                i += 1;
+                out.push(*bytes.get(i)? as char);
+                i += 1;
             }
-            out.push(bytes[i] as char);
-            i += 1;
-            continue;
+            byte => {
+                out.push(byte as char);
+                i += 1;
+            }
         }
-        out.push(byte as char);
-        i += 1;
     }
     None
 }

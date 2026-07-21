@@ -73,3 +73,16 @@ async fn parse() {
     assert!(query::parse("from Student limit 0").is_err());
     assert!(query::parse("from Student limit 1 order by nickname").is_err());
 }
+
+#[test]
+fn escapes() {
+    let tree = query::parse(r#"from Student where nickname = "a\"b\\c""#).expect("parse");
+    assert_eq!(tree.preds()[0].value(), r#"a"b\c"#);
+    assert_eq!(
+        query::digest(&tree),
+        r#"from student slice live where nickname = "a\"b\\c""#
+    );
+
+    let bare = query::parse(r#"from Student where nickname = "plain""#).expect("plain");
+    assert_eq!(bare.preds()[0].value(), "plain");
+}
