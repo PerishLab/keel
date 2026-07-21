@@ -32,21 +32,28 @@ impl<W: Wire> Clone for Vault<W> {
     }
 }
 
+pub struct Shed<'a> {
+    pub endpoint: &'a str,
+    pub name: &'a str,
+    pub region: &'a str,
+    pub key: &'a str,
+    pub secret: &'a str,
+}
+
 impl<W: Wire + 'static> Vault<W> {
-    pub fn open(
-        core: Arc<Core<W>>,
-        endpoint: &str,
-        name: &str,
-        region: &str,
-        key: &str,
-        secret: &str,
-    ) -> Result<Self, keel::adapt::Error> {
-        let base: Url = endpoint
+    pub fn open(core: Arc<Core<W>>, shed: Shed<'_>) -> Result<Self, keel::adapt::Error> {
+        let base: Url = shed
+            .endpoint
             .parse()
             .map_err(|_| keel::adapt::Error::Adapt("bad s3 endpoint".into()))?;
-        let bucket = Bucket::new(base, UrlStyle::Path, name.to_string(), region.to_string())
-            .map_err(|_| keel::adapt::Error::Adapt("bad s3 bucket".into()))?;
-        let creds = Credentials::new(key, secret);
+        let bucket = Bucket::new(
+            base,
+            UrlStyle::Path,
+            shed.name.to_string(),
+            shed.region.to_string(),
+        )
+        .map_err(|_| keel::adapt::Error::Adapt("bad s3 bucket".into()))?;
+        let creds = Credentials::new(shed.key, shed.secret);
         Ok(Self {
             core,
             bucket,
