@@ -6,7 +6,7 @@ use crate::plan::{Edge, Unit};
 use crate::wire::{Val, Wire};
 
 impl<'a, W: Wire> Work<'a, W> {
-    pub async fn tie(
+    pub(crate) async fn tie(
         &mut self,
         owner: &str,
         bond: &str,
@@ -66,7 +66,7 @@ impl<'a, W: Wire> Work<'a, W> {
         self.wire.plant(&text, &vals).await
     }
 
-    pub async fn set_tie(
+    pub(crate) async fn set_tie(
         &mut self,
         owner: &str,
         bond: &str,
@@ -151,7 +151,12 @@ impl<'a, W: Wire> Work<'a, W> {
         })
     }
 
-    pub async fn ties(&mut self, unit: &Unit, edge: &Edge, left: i64) -> Result<Vec<Tie>, Error> {
+    pub(crate) async fn ties(
+        &mut self,
+        unit: &Unit,
+        edge: &Edge,
+        left: i64,
+    ) -> Result<Vec<Tie>, Error> {
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
         let dst = ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target()));
@@ -186,7 +191,7 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(out)
     }
 
-    pub async fn cut(&mut self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
+    pub(crate) async fn cut(&mut self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
         let (unit, edge) = self.plan.edge(owner, bond)?;
         let tick = now();
         let text = format!(
@@ -206,7 +211,7 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(())
     }
 
-    pub async fn live_has(&mut self, unit: &Unit, key: i64) -> Result<bool, Error> {
+    pub(crate) async fn live_has(&mut self, unit: &Unit, key: i64) -> Result<bool, Error> {
         let tick = now();
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
@@ -223,7 +228,7 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(found)
     }
 
-    pub async fn live_pair(
+    pub(super) async fn live_pair(
         &mut self,
         owner: &str,
         bond: &str,

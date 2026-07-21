@@ -8,11 +8,11 @@ use crate::spec::Only;
 use crate::wire::{Val, Wire};
 
 impl<'a, W: Wire> Work<'a, W> {
-    pub fn new(wire: &'a mut W, plan: &'a Plan) -> Self {
+    pub(crate) fn new(wire: &'a mut W, plan: &'a Plan) -> Self {
         Self { wire, plan }
     }
 
-    pub async fn put(&mut self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
+    pub(crate) async fn put(&mut self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
         let unit = self.plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
@@ -196,7 +196,7 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok((col.to_string(), fit(unit.fields(), col, val)?))
     }
 
-    pub async fn one(&mut self, unit: &Unit, key: i64) -> Result<Option<Row>, Error> {
+    pub(crate) async fn one(&mut self, unit: &Unit, key: i64) -> Result<Option<Row>, Error> {
         match self.peek(unit, key).await {
             Ok(row) => Ok(Some(row)),
             Err(Error::Adapt(note)) if note.starts_with("missing row") => Ok(None),

@@ -6,11 +6,11 @@ use crate::plan::{Edge, Unit};
 use crate::wire::{Val, Wire};
 
 impl<'a, W: Wire> Work<'a, W> {
-    pub async fn end(&mut self, name: &str, key: i64) -> Result<(), Error> {
+    pub(crate) async fn end(&mut self, name: &str, key: i64) -> Result<(), Error> {
         self.lease(name, key, now()).await
     }
 
-    pub async fn lease(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+    pub(crate) async fn lease(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
         let unit = self.plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
@@ -41,7 +41,7 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(())
     }
 
-    pub async fn pulse(
+    pub(crate) async fn pulse(
         &mut self,
         verb: &str,
         unit: &str,
@@ -163,7 +163,7 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(false)
     }
 
-    pub async fn set(
+    pub(crate) async fn set(
         &mut self,
         name: &str,
         key: i64,

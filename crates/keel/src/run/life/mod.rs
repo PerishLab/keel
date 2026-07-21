@@ -105,7 +105,7 @@ impl Tie {
     }
 }
 
-pub struct Work<'a, W: Wire> {
+pub(crate) struct Work<'a, W: Wire> {
     wire: &'a mut W,
     plan: &'a Plan,
 }
