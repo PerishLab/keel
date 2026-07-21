@@ -230,6 +230,10 @@ impl<'a, W: Wire> Work<'a, W> {
 
     pub async fn live(&mut self, name: &str) -> Result<Vec<Row>, Error> {
         let unit = self.plan.find(name)?;
+        self.scan(unit).await
+    }
+
+    pub(crate) async fn scan(&mut self, unit: &Unit) -> Result<Vec<Row>, Error> {
         let tick = now();
         let text = format!(
             "SELECT {} FROM {} WHERE {} IS NULL OR {} > ?1 ORDER BY {}",

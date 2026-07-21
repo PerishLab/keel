@@ -2,7 +2,34 @@ use super::*;
 use crate::adapt::Error;
 use crate::atom;
 use crate::ddl;
-use crate::plan::Plan;
+use crate::plan::{Plan, Unit};
+
+pub(crate) struct Scope {
+    unit: Unit,
+    name: String,
+}
+
+impl Scope {
+    pub(crate) fn unit(&self) -> &Unit {
+        &self.unit
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+pub(crate) fn analyze(plan: &Plan, tree: &Tree) -> Result<Scope, Error> {
+    let name = resolve(plan, tree.from())?;
+    let unit = plan
+        .units()
+        .get(&name)
+        .ok_or_else(|| Error::Missing(name.clone()))?
+        .clone();
+    check(plan, &name, tree.preds(), tree.sort())?;
+    check_links(plan, &name, tree.links())?;
+    Ok(Scope { unit, name })
+}
 
 pub fn resolve(plan: &Plan, unit: &str) -> Result<String, Error> {
     let want = ddl::table(unit);
@@ -38,7 +65,7 @@ pub(crate) fn check(
         check_pred(plan, unit, pred)?;
     }
     if let Some(sort) = sort {
-        slot(unit, sort.field())?;
+        unit.kind(sort.field())?;
     }
     Ok(())
 }
@@ -62,25 +89,14 @@ pub(crate) fn check_pred(plan: &Plan, unit: &crate::plan::Unit, pred: &Pred) -> 
 }
 
 pub(crate) fn check_cell(unit: &crate::plan::Unit, pred: &Pred) -> Result<(), Error> {
-    let kind = slot(unit, pred.field())?;
+    let kind = unit.kind(pred.field())?;
     if pred.op() == Op::Like && !matches!(kind, atom::Kind::Text | atom::Kind::Link) {
         return Err(Error::Adapt("like wants a text field".into()));
     }
     for value in pred.values() {
-        fit(kind, value)?;
+        kind.fit(value)?;
     }
     Ok(())
-}
-
-pub(crate) fn fit(kind: atom::Kind, value: &str) -> Result<(), Error> {
-    match kind {
-        atom::Kind::Text | atom::Kind::Link => Ok(()),
-        atom::Kind::Int => key_text(value).map(|_| ()),
-        atom::Kind::Bool => match value {
-            "true" | "false" => Ok(()),
-            _ => Err(Error::Adapt("value needs bool".into())),
-        },
-    }
 }
 
 pub(crate) fn check_nest(
@@ -99,7 +115,7 @@ pub(crate) fn check_nest(
         .ok_or_else(|| Error::Adapt(format!("unknown bond {bond}")))?;
     let kind = nest_kind(plan, edge, nest.field())?;
     for value in nest.values() {
-        fit(kind, value)?;
+        kind.fit(value)?;
     }
     Ok(())
 }
@@ -119,24 +135,7 @@ pub(crate) fn nest_kind(
         .units()
         .get(edge.target())
         .ok_or_else(|| Error::Missing(edge.target().into()))?;
-    slot(target, field)
-}
-
-pub(crate) fn slot(unit: &crate::plan::Unit, field: &str) -> Result<atom::Kind, Error> {
-    if field == ddl::KEY {
-        return Ok(atom::Kind::Int);
-    }
-    if let Some(slot) = unit.fields().iter().find(|slot| slot.name() == field) {
-        return Ok(slot.kind());
-    }
-    let point = unit
-        .bonds()
-        .iter()
-        .any(|e| e.kind().point() && e.name() == field);
-    if point {
-        return Ok(atom::Kind::Int);
-    }
-    Err(Error::Adapt(format!("unknown field {field}")))
+    target.kind(field)
 }
 
 pub fn involved(plan: &Plan, tree: &Tree) -> Result<Vec<String>, Error> {

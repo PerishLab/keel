@@ -163,6 +163,23 @@ impl Unit {
         self.fields.iter().any(|s| s.name() == name) || self.refs().any(|e| e.name() == name)
     }
 
+    pub(crate) fn kind(&self, field: &str) -> Result<atom::Kind, crate::adapt::Error> {
+        if field == crate::ddl::KEY {
+            return Ok(atom::Kind::Int);
+        }
+        if let Some(slot) = self.fields.iter().find(|slot| slot.name() == field) {
+            return Ok(slot.kind());
+        }
+        if self
+            .bonds
+            .iter()
+            .any(|e| e.kind().point() && e.name() == field)
+        {
+            return Ok(atom::Kind::Int);
+        }
+        Err(crate::adapt::Error::Adapt(format!("unknown field {field}")))
+    }
+
     pub(crate) fn sheet(&self) -> String {
         let mut cols = vec![crate::ddl::KEY.to_string()];
         for slot in &self.fields {

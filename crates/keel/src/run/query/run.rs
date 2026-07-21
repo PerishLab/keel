@@ -7,20 +7,18 @@ use crate::wire::Wire;
 use std::collections::BTreeMap;
 
 pub async fn run<W: Wire>(plan: &Plan, wire: &mut W, tree: &Tree) -> Result<Pack, Error> {
+    let scope = analyze(plan, tree)?;
     let mut work = Work::new(wire, plan);
-    let name = resolve(plan, tree.from())?;
-    check(plan, &name, tree.preds(), tree.sort())?;
-    check_links(plan, &name, tree.links())?;
     let mut rows = match tree.slice() {
-        Slice::Live => work.live(&name).await?,
+        Slice::Live => work.scan(scope.unit()).await?,
     };
     if !tree.preds().is_empty() {
         rows.retain(|row| pass(row, tree.preds()));
     }
-    hold(plan, &mut work, &name, &mut rows, tree.preds()).await?;
+    hold(plan, &mut work, scope.name(), &mut rows, tree.preds()).await?;
     if tree.tally() {
         return Ok(Pack {
-            root: ddl::table(&name),
+            root: ddl::table(scope.name()),
             bags: BTreeMap::new(),
             count: Some(rows.len()),
         });
@@ -28,16 +26,13 @@ pub async fn run<W: Wire>(plan: &Plan, wire: &mut W, tree: &Tree) -> Result<Pack
     order(&mut rows, tree.sort());
     page(&mut rows, tree.after(), tree.limit());
     let keys: Vec<i64> = rows.iter().map(|row| row.key()).collect();
-    let root = ddl::table(&name);
+    let root = ddl::table(scope.name());
     let mut bags = BTreeMap::new();
     bags.insert(root.clone(), Bag::Unit(rows));
-    let unit = plan
-        .units()
-        .get(&name)
-        .ok_or_else(|| Error::Missing(name.clone()))?;
+    let unit = scope.unit();
     for bond in tree.links() {
         let bond = edge(unit, bond)?;
-        let ties = pull(&mut work, &name, &bond, &keys).await?;
+        let ties = pull(&mut work, scope.name(), &bond, &keys).await?;
         let key = format!("{root}.{bond}");
         bags.insert(key, Bag::Bond(ties));
     }
