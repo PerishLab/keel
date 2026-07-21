@@ -25,6 +25,86 @@ impl Scope {
             .get(name)
             .ok_or_else(|| Error::Missing(name.into()))
     }
+
+    fn check(&self, tree: &Tree) -> Result<(), Error> {
+        for pred in tree.preds() {
+            self.pred(pred)?;
+        }
+        if let Some(sort) = tree.sort() {
+            self.unit.kind(sort.field())?;
+        }
+        for bond in tree.links() {
+            edge(&self.unit, bond)?;
+        }
+        Ok(())
+    }
+
+    fn pred(&self, pred: &Pred) -> Result<(), Error> {
+        match pred.op() {
+            Op::Has => edge(&self.unit, pred.field()).map(|_| ()),
+            Op::Some => {
+                let bond = edge(&self.unit, pred.field())?;
+                self.nest(bond, inner(pred)?)
+            }
+            _ => self.cell(pred),
+        }
+    }
+
+    fn cell(&self, pred: &Pred) -> Result<(), Error> {
+        let kind = self.unit.kind(pred.field())?;
+        if pred.op() == Op::Like && !matches!(kind, atom::Kind::Text | atom::Kind::Link) {
+            return Err(Error::Adapt("like wants a text field".into()));
+        }
+        Ok(())
+    }
+
+    fn nest(&self, bond: &crate::plan::Edge, nest: &Pred) -> Result<(), Error> {
+        if matches!(nest.op(), Op::Has | Op::Some) {
+            return Err(Error::Adapt("nested bond pred denied".into()));
+        }
+        self.kind(bond, nest.field()).map(|_| ())
+    }
+
+    fn kind(&self, bond: &crate::plan::Edge, field: &str) -> Result<atom::Kind, Error> {
+        if field == ddl::KEY {
+            return Ok(atom::Kind::Int);
+        }
+        if let Some(slot) = bond.fields().iter().find(|s| s.name() == field) {
+            return Ok(slot.kind());
+        }
+        self.at(bond.target())?.kind(field)
+    }
+
+    pub(crate) fn verify(&self, tree: &Tree) -> Result<(), Error> {
+        for pred in tree.preds() {
+            self.weigh(pred)?;
+        }
+        Ok(())
+    }
+
+    fn weigh(&self, pred: &Pred) -> Result<(), Error> {
+        match pred.op() {
+            Op::Has => key(pred.value()).map(|_| ()),
+            Op::Some => {
+                let bond = edge(&self.unit, pred.field())?;
+                let nest = inner(pred)?;
+                fits(self.kind(bond, nest.field())?, nest.values())
+            }
+            _ => fits(self.unit.kind(pred.field())?, pred.values()),
+        }
+    }
+}
+
+pub(crate) fn inner(pred: &Pred) -> Result<&Pred, Error> {
+    pred.nest()
+        .ok_or_else(|| Error::Adapt("some needs inner".into()))
+}
+
+pub(crate) fn fits(kind: atom::Kind, values: &[String]) -> Result<(), Error> {
+    for value in values {
+        kind.fit(value)?;
+    }
+    Ok(())
 }
 
 pub fn analyze(plan: &Plan, tree: &Tree) -> Result<Scope, Error> {
@@ -34,10 +114,10 @@ pub fn analyze(plan: &Plan, tree: &Tree) -> Result<Scope, Error> {
         .get(&name)
         .ok_or_else(|| Error::Missing(name.clone()))?
         .clone();
-    check(plan, &name, tree.preds(), tree.sort())?;
-    check_links(plan, &name, tree.links())?;
     let range = range(plan, &unit, tree)?;
-    Ok(Scope { unit, name, range })
+    let scope = Scope { unit, name, range };
+    scope.check(tree)?;
+    Ok(scope)
 }
 
 pub(crate) fn range(
@@ -82,131 +162,19 @@ pub fn resolve(plan: &Plan, unit: &str) -> Result<String, Error> {
         .ok_or_else(|| Error::Missing(unit.into()))
 }
 
-pub(crate) fn check_links(plan: &Plan, name: &str, links: &[String]) -> Result<(), Error> {
-    let unit = plan
-        .units()
-        .get(name)
-        .ok_or_else(|| Error::Missing(name.into()))?;
-    for bond in links {
-        edge(unit, bond)?;
-    }
-    Ok(())
-}
-
-pub(crate) fn check(
-    plan: &Plan,
-    name: &str,
-    preds: &[Pred],
-    sort: Option<&Sort>,
-) -> Result<(), Error> {
-    let unit = plan
-        .units()
-        .get(name)
-        .ok_or_else(|| Error::Missing(name.into()))?;
-    for pred in preds {
-        check_pred(plan, unit, pred)?;
-    }
-    if let Some(sort) = sort {
-        unit.kind(sort.field())?;
-    }
-    Ok(())
-}
-
-pub(crate) fn check_pred(plan: &Plan, unit: &crate::plan::Unit, pred: &Pred) -> Result<(), Error> {
-    match pred.op() {
-        Op::Has => {
-            edge(unit, pred.field())?;
-            Ok(())
+impl Tree {
+    pub fn involved(&self, plan: &Plan) -> Result<Vec<String>, Error> {
+        let name = resolve(plan, self.from())?;
+        let unit = plan
+            .units()
+            .get(&name)
+            .ok_or_else(|| Error::Missing(name.clone()))?;
+        let mut out = vec![ddl::table(&name)];
+        for bond in reached(unit, self) {
+            out.push(ddl::table(bond.target()));
         }
-        Op::Some => {
-            let bond = edge(unit, pred.field())?;
-            let nest = pred
-                .nest()
-                .ok_or_else(|| Error::Adapt("some needs inner".into()))?;
-            check_nest(plan, bond, nest)
-        }
-        _ => check_cell(unit, pred),
+        out.sort();
+        out.dedup();
+        Ok(out)
     }
-}
-
-pub(crate) fn check_cell(unit: &crate::plan::Unit, pred: &Pred) -> Result<(), Error> {
-    let kind = unit.kind(pred.field())?;
-    if pred.op() == Op::Like && !matches!(kind, atom::Kind::Text | atom::Kind::Link) {
-        return Err(Error::Adapt("like wants a text field".into()));
-    }
-    Ok(())
-}
-
-pub(crate) fn check_nest(plan: &Plan, edge: &crate::plan::Edge, nest: &Pred) -> Result<(), Error> {
-    if matches!(nest.op(), Op::Has | Op::Some) {
-        return Err(Error::Adapt("nested bond pred denied".into()));
-    }
-    let target = plan
-        .units()
-        .get(edge.target())
-        .ok_or_else(|| Error::Missing(edge.target().into()))?;
-    nest_kind(edge, target, nest.field())?;
-    Ok(())
-}
-
-pub(crate) fn nest_kind(
-    edge: &crate::plan::Edge,
-    target: &Unit,
-    field: &str,
-) -> Result<atom::Kind, Error> {
-    if field == ddl::KEY {
-        return Ok(atom::Kind::Int);
-    }
-    if let Some(slot) = edge.fields().iter().find(|s| s.name() == field) {
-        return Ok(slot.kind());
-    }
-    target.kind(field)
-}
-
-pub(crate) fn verify(scope: &Scope, tree: &Tree) -> Result<(), Error> {
-    for pred in tree.preds() {
-        verify_pred(scope, pred)?;
-    }
-    Ok(())
-}
-
-pub(crate) fn verify_pred(scope: &Scope, pred: &Pred) -> Result<(), Error> {
-    let unit = scope.unit();
-    match pred.op() {
-        Op::Has => {
-            key(pred.value())?;
-            Ok(())
-        }
-        Op::Some => {
-            let bond = edge(unit, pred.field())?;
-            let nest = pred
-                .nest()
-                .ok_or_else(|| Error::Adapt("some needs inner".into()))?;
-            let kind = nest_kind(bond, scope.at(bond.target())?, nest.field())?;
-            fits(kind, nest.values())
-        }
-        _ => fits(unit.kind(pred.field())?, pred.values()),
-    }
-}
-
-pub(crate) fn fits(kind: atom::Kind, values: &[String]) -> Result<(), Error> {
-    for value in values {
-        kind.fit(value)?;
-    }
-    Ok(())
-}
-
-pub fn involved(plan: &Plan, tree: &Tree) -> Result<Vec<String>, Error> {
-    let name = resolve(plan, tree.from())?;
-    let unit = plan
-        .units()
-        .get(&name)
-        .ok_or_else(|| Error::Missing(name.clone()))?;
-    let mut out = vec![ddl::table(&name)];
-    for bond in reached(unit, tree) {
-        out.push(ddl::table(bond.target()));
-    }
-    out.sort();
-    out.dedup();
-    Ok(out)
 }

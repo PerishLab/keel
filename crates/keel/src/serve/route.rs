@@ -22,7 +22,7 @@ pub(crate) async fn run<W: Wire>(
 ) -> Result<Json<Value>, Fault> {
     let face = front(core.as_ref(), &headers, op.as_deref(), "see").await?;
     let tree = crate::query::parse(&body.q).map_err(Fault::from)?;
-    let units = crate::query::involved(core.plan(), &tree).map_err(Fault::from)?;
+    let units = tree.involved(core.plan()).map_err(Fault::from)?;
     if core.plan().shrouds(&units) {
         return Err(Fault {
             status: StatusCode::NOT_FOUND,

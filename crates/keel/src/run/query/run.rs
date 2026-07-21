@@ -12,7 +12,7 @@ pub async fn run<W: Wire>(
     tree: &Tree,
     scope: &Scope,
 ) -> Result<Pack, Error> {
-    verify(scope, tree)?;
+    scope.verify(tree)?;
     let mut work = Work::new(wire, plan);
     let mut rows = match tree.slice() {
         Slice::Live => work.scan(scope.unit()).await?,

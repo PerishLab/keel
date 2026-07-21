@@ -129,7 +129,7 @@ impl<W: Wire> Tx<'_, W> {
 
     pub(super) async fn sight(&mut self, tree: &Tree) -> Result<Pack, Error> {
         let key = query::digest(tree);
-        let units = query::involved(self.core.plan(), tree)?;
+        let units = tree.involved(self.core.plan())?;
         if let Some(pack) = self.core.stash.read(&key, &units) {
             return Ok(pack);
         }
