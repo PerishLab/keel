@@ -43,6 +43,8 @@ done when its scenario is green; no stage begins against unlanded law.
 - Cache: `docs/cache.md` (invisible; under coverage; generations+horizon).
 - Transaction: `docs/txn.md` (commit point per verb; batch all-or-nothing).
 - Lease: `docs/lease.md` (end with an instant; no resurrection; L3 edges).
+- Name: `docs/model/name.md` (flat declaration, tree identity; `{root}:{name}`;
+  full key persists, short name resolves).
 
 ## Operating
 
