@@ -8,3 +8,4 @@
 # advisory.
 
 [compound]
+into_response = "axum's IntoResponse trait method. Not a compound this codebase composed and not one it can decompose: the name belongs to a foreign trait, so the impl site binds it rather than choosing it. The only alternative that removes it — From<Fault> for Response — costs every handler its error type, degrading Result<_, Fault> to Result<_, Response> at 29 sites, because axum has no blanket impl bridging Into<Response>. One atom here, spelled with an underscore."
