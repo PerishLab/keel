@@ -44,4 +44,7 @@ pub trait Wire: Send {
         args: &[Val],
     ) -> impl Future<Output = Result<Vec<Vec<Val>>, Error>> + Send;
     fn script(&mut self, sql: &str) -> impl Future<Output = Result<(), Error>> + Send;
+    fn revive(&mut self) -> impl Future<Output = Result<(), Error>> + Send {
+        async { Ok(()) }
+    }
 }

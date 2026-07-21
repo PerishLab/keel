@@ -55,6 +55,13 @@ The async engine makes the concurrency contract explicit:
 - **Cancellation**: a future dropped mid-transaction (client
   disconnect) leaves the connection marked dirty; the next op issues
   ROLLBACK before proceeding. A cancelled write is a rolled-back write.
+- **Revival**: the one connection may die under the engine (the database
+  restarts, an operator terminates the backend). The op that meets the
+  dead connection **fails** — it is a failed op, never a replayed one.
+  The engine re-establishes the connection **between** ops, at the same
+  entry point that rolls back a dirty seat, so the next op runs on a live
+  connection. Revival is never attempted inside an op, so no statement is
+  ever re-issued and no write is ever replayed.
 
 ## Mechanism (default engine, non-normative)
 
@@ -84,6 +91,7 @@ statements event-loss debt is closed.
 | X-6 | Pulse emission is inside the transaction; rollback emits nothing |
 | X-7 | One connection, op-scoped hold; every write op is one transaction |
 | X-8 | Cancellation-safe: a dropped mid-txn op rolls back before the next op runs |
+| X-9 | Revival is between ops: the op that meets a dead connection fails; the next runs revived |
 
 ## Must not
 
@@ -92,3 +100,4 @@ statements event-loss debt is closed.
 - A verb inside a batch escaping its face's coverage.
 - Cache reads on the write path, batch included.
 - Cross-face batches (one operator per batch).
+- Reviving inside an op, or re-issuing a statement a dead connection ate.

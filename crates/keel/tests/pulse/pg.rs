@@ -22,6 +22,8 @@ struct Student {
     courses: Course,
 }
 
+static GATE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 fn url() -> String {
     std::env::var("KEEL_PG")
         .unwrap_or_else(|_| "host=127.0.0.1 port=5433 user=keel password=keel dbname=keel".into())
@@ -38,7 +40,37 @@ async fn reset() -> Postgres {
 }
 
 #[tokio::test]
+async fn revived() {
+    use keel::Wire as _;
+    let _hold = GATE.lock().await;
+    let store = reset().await;
+    let mut graph = Graph::new();
+    graph.plug::<Course>().plug::<Student>();
+    let core = bind(graph, store).await.expect("bind");
+    core.put("Course", &[("code", "CS101")])
+        .await
+        .expect("before");
+
+    let mut axe = Postgres::at(url()).await.expect("axe");
+    axe.run(
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()",
+        &[],
+    )
+    .await
+    .expect("terminate");
+
+    assert!(core.live("Course").await.is_err());
+
+    let after = core.live("Course").await.expect("after");
+    assert_eq!(after.len(), 1);
+    core.put("Course", &[("code", "CS102")])
+        .await
+        .expect("write");
+}
+
+#[tokio::test]
 async fn portable() {
+    let _hold = GATE.lock().await;
     let store = reset().await;
     let mut graph = Graph::new();
     graph.plug::<Course>().plug::<Student>();

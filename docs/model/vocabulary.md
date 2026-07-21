@@ -225,6 +225,11 @@ so the shared meaning stays true.
 - `wire` — driver-agnostic SQL seam: `Wire` trait speaks only keel's `Val`
   (Null/Int/Text); `life::Work` is generic over it, never touches a driver
   row type. `run`/`plant`/`rows`/`script` are the four calls.
+- `revive` — Wire's fifth call, defaulted to a no-op: re-establish a
+  connection that died under the engine. Called from `seize`, so it runs
+  only between ops (`docs/run/txn.md` X-9). `pg` tracks whether its last
+  call was `sound` and pings only when it was not, so a healthy path pays
+  nothing.
 - `sql` — the rusqlite `Wire` impl (in adapt::db); `cast`/`lift` convert
   Val <-> rusqlite Value.
 - `sheet` — canonical select column order for positional row reads.

@@ -3,16 +3,30 @@ use crate::ddl;
 use crate::ddl::Grain;
 use crate::wire::{Val, Wire};
 use sqlx::postgres::{PgConnectOptions, PgConnection, PgRow};
-use sqlx::{AssertSqlSafe, ConnectOptions as _, Row as _, TypeInfo as _, ValueRef as _};
+use sqlx::{
+    AssertSqlSafe, ConnectOptions as _, Connection as _, Row as _, TypeInfo as _, ValueRef as _,
+};
 
 pub struct Postgres {
     conn: PgConnection,
+    opts: PgConnectOptions,
+    sound: bool,
 }
 
 impl Postgres {
     pub async fn at(url: impl Into<String>) -> Result<Self, Error> {
-        let conn = opts(&url.into())?.connect().await.map_err(sql)?;
-        Ok(Self { conn })
+        let opts = opts(&url.into())?;
+        let conn = opts.clone().connect().await.map_err(sql)?;
+        Ok(Self {
+            conn,
+            opts,
+            sound: true,
+        })
+    }
+
+    fn mark<T>(&mut self, out: Result<T, sqlx::Error>) -> Result<T, Error> {
+        self.sound &= out.is_ok();
+        out.map_err(sql)
     }
 }
 
@@ -45,27 +59,19 @@ impl Wire for Postgres {
     }
 
     async fn run(&mut self, text: &str, args: &[Val]) -> Result<u64, Error> {
-        let done = load(&dollar(text), args)
-            .execute(&mut self.conn)
-            .await
-            .map_err(sql)?;
-        Ok(done.rows_affected())
+        let done = load(&dollar(text), args).execute(&mut self.conn).await;
+        Ok(self.mark(done)?.rows_affected())
     }
 
     async fn plant(&mut self, text: &str, args: &[Val]) -> Result<i64, Error> {
         let text = format!("{} RETURNING {}", dollar(text), ddl::KEY);
-        let row = load(&text, args)
-            .fetch_one(&mut self.conn)
-            .await
-            .map_err(sql)?;
-        row.try_get::<i64, _>(0).map_err(sql)
+        let row = load(&text, args).fetch_one(&mut self.conn).await;
+        self.mark(row)?.try_get::<i64, _>(0).map_err(sql)
     }
 
     async fn rows(&mut self, text: &str, args: &[Val]) -> Result<Vec<Vec<Val>>, Error> {
-        let rows = load(&dollar(text), args)
-            .fetch_all(&mut self.conn)
-            .await
-            .map_err(sql)?;
+        let found = load(&dollar(text), args).fetch_all(&mut self.conn).await;
+        let rows = self.mark(found)?;
         let mut out = Vec::new();
         for row in &rows {
             out.push(line(row)?);
@@ -74,11 +80,21 @@ impl Wire for Postgres {
     }
 
     async fn script(&mut self, text: &str) -> Result<(), Error> {
-        sqlx::raw_sql(AssertSqlSafe(text.to_string()))
+        let done = sqlx::raw_sql(AssertSqlSafe(text.to_string()))
             .execute(&mut self.conn)
-            .await
-            .map(|_| ())
-            .map_err(sql)
+            .await;
+        self.mark(done).map(|_| ())
+    }
+
+    async fn revive(&mut self) -> Result<(), Error> {
+        if self.sound {
+            return Ok(());
+        }
+        if self.conn.ping().await.is_err() {
+            self.conn = self.opts.clone().connect().await.map_err(sql)?;
+        }
+        self.sound = true;
+        Ok(())
     }
 }
 
