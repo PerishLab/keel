@@ -31,7 +31,7 @@ pub fn app<W: Wire + 'static>(core: Arc<Core<W>>, prefix: &str) -> Router {
         .route("/{unit}/{id}/{bond}", get(refuse).post(attach::<W>))
         .route(
             "/{unit}/{id}/{bond}/{tie}",
-            patch(retie::<W>).delete(detach::<W>),
+            patch(tune::<W>).delete(detach::<W>),
         )
         .with_state(core);
     let prefix = prefix.trim_end_matches('/');

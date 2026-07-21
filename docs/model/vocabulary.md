@@ -46,6 +46,9 @@ so the shared meaning stays true.
 - `cell` — one business field value inside a row.
 - `tie` — create one many2many edge with reign stamps.
 - `ties` — live many2many edges from one owner key.
+- `tune` — partial update of the business cells one many2many edge carries;
+  never touches its ends, its key, or reign. `tie` makes the pair, `tune`
+  revises what the pair carries, `cut` ends it.
 - `cut` — end one many2many edge via expires_at.
 - `work` — connection-scoped engine lifecycle operator.
 - `path` — one plan-derived http route descriptor.
@@ -180,7 +183,7 @@ so the shared meaning stays true.
 - `flow` — pull the stream after a cursor; floor-crossing cursor errors.
 - `trim` — prune pulse rows beyond `WINDOW` (hard delete, engine-owned).
 - `craft`/`shift`/`fell`/`knot`/`bend`/`snip` — who-attributed core verb
-  bodies (put/set/end+lease/tie/set_tie/cut) shared by Core (sudo) and
+  bodies (put/set/end+lease/tie/tune/cut) shared by Core (sudo) and
   Face (operator); `lane` names a bond event path.
 - `mate` — right join column: `{target}_id`, or `{bond}_id` when the bond
   is self-referential (fixes the `{table}_id` collision; F6 verified).

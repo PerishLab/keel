@@ -151,7 +151,7 @@ pub(crate) async fn attach<W: Wire>(
     Ok((StatusCode::CREATED, Json(json!({ "id": key }))))
 }
 
-pub(crate) async fn retie<W: Wire>(
+pub(crate) async fn tune<W: Wire>(
     State(core): State<Arc<Core<W>>>,
     Path((unit, id, bond, tie)): Path<(String, i64, String, i64)>,
     headers: HeaderMap,
@@ -173,7 +173,7 @@ pub(crate) async fn retie<W: Wire>(
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
-    face.set_tie(&name, &bond, tie, &pairs)
+    face.tune(&name, &bond, tie, &pairs)
         .await
         .map_err(Fault::from)?;
     Ok(StatusCode::NO_CONTENT)

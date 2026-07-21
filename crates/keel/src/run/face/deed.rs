@@ -74,14 +74,14 @@ impl<W: Wire> Face<'_, W> {
             .await
     }
 
-    pub async fn set_tie(
+    pub async fn tune(
         &self,
         owner: &str,
         bond: &str,
         key: i64,
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
-        self.write(async |tx| tx.set_tie(owner, bond, key, fields).await)
+        self.write(async |tx| tx.tune(owner, bond, key, fields).await)
             .await
     }
 

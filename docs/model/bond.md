@@ -84,7 +84,7 @@ Empty attrs on a field-less bond: body may be only `{ "right" }`.
 | Id | Choice |
 |----|--------|
 | M1 | **M1b** — `#[relation(Course, many2many, grade = string)]` |
-| W1 | **W1b** — attrs on `tie`; `set_tie` + HTTP PATCH on tie |
+| W1 | **W1b** — attrs on `tie`; `tune` + HTTP PATCH on tie |
 | D3 | **P1+P2** — `has` + `some (field op val)` on bond or target |
 | D4 | **K1+K3** — link hides dead targets; `end` rejects while live ties remain (in **or** out) |
 | D5 | **U1** — live-pair unique on the serialized write path (`docs/unique.md`) |
@@ -110,7 +110,7 @@ end. HTTP maps this to **409 Conflict**. K1 remains for read filtering.
 
 ### Live ends on tie (A)
 
-`tie` and `set_tie` require both endpoints live:
+`tie` and `tune` require both endpoints live:
 
 - `left not live` / `right not live` (HTTP **400**)
 - aligns write path with K1 (no new edges to retired rows)

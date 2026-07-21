@@ -111,7 +111,7 @@ impl<W: Wire> Tx<'_, W> {
         let plan = self.core.plan();
         let unit = query::resolve(plan, owner)?;
         Work::new(&mut self.seat.wire, plan)
-            .set_tie(&unit, bond, key, fields)
+            .tune(&unit, bond, key, fields)
             .await?;
         self.beat("tie", &lane(&unit, bond), key).await;
         Ok(())

@@ -90,14 +90,14 @@ impl<W: Wire> Core<W> {
         self.sudo().tie(owner, bond, ends, fields).await
     }
 
-    pub async fn set_tie(
+    pub async fn tune(
         &self,
         owner: &str,
         bond: &str,
         key: i64,
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
-        self.sudo().set_tie(owner, bond, key, fields).await
+        self.sudo().tune(owner, bond, key, fields).await
     }
 
     pub async fn ties(&self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {

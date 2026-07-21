@@ -127,7 +127,7 @@ async fn select() {
     assert_eq!(pack.rows().len(), 2);
 
     let tie = ties.iter().find(|t| t.right() == db).expect("db tie");
-    core.set_tie("Student", "courses", tie.key(), &[("grade", "A+")])
+    core.tune("Student", "courses", tie.key(), &[("grade", "A+")])
         .await
         .expect("grade");
     core.cut("Student", "courses", tie.key())

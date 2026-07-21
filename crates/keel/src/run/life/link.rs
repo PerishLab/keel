@@ -66,7 +66,7 @@ impl<'a, W: Wire> Work<'a, W> {
         self.wire.plant(&text, &vals).await
     }
 
-    pub(crate) async fn set_tie(
+    pub(crate) async fn tune(
         &mut self,
         owner: &str,
         bond: &str,

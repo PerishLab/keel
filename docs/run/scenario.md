@@ -51,7 +51,7 @@ Enrollment is pure many2many: live ties only (no grade / term on the edge).
 | No reverse bond auto | Roster needs scan or P1 filter | R0 for now; not auto reverse |
 | No edge `where` predicate | Cannot filter students by course | Open: P1/P2 in `docs/bond.md` |
 | Ended unit with live ties | cut in/out then end (409) | **K3** symmetric + **K1** |
-| Tie to dead ends | left/right must be live | **A** live ends on `tie`/`set_tie` |
+| Tie to dead ends | left/right must be live | **A** live ends on `tie`/`tune` |
 | Re-enroll after cut | UNIQUE(left,right) vs soft-cut | Open: U* in `docs/bond.md` |
 
 ### Cascading note

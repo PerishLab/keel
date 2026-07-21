@@ -31,7 +31,7 @@ impl<W: Wire> Tx<'_, W> {
         self.knot(&unit, bond, ends, fields).await
     }
 
-    pub async fn set_tie(
+    pub async fn tune(
         &mut self,
         owner: &str,
         bond: &str,

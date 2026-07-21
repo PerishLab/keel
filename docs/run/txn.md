@@ -9,7 +9,7 @@ write, and a way to widen it across several verbs — `batch`.
 
 ## Commit point
 
-- Each single verb (`put` / `set` / `end` / `tie` / `cut` / `set_tie`) is
+- Each single verb (`put` / `set` / `end` / `tie` / `cut` / `tune`) is
   its own commit: it opens, checks, writes, emits its pulse, and commits —
   observably atomic, exactly as before. No signature changes.
 - A **batch** widens the boundary: a list of verbs commits as one. All land

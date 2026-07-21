@@ -22,7 +22,7 @@ The verb set is **closed at six** and engine-owned:
 see  put  set  end  tie  cut
 ```
 
-`see` is the read verb (`live` / `query` / GET). `set_tie` checks as `tie`.
+`see` is the read verb (`live` / `query` / GET). `tune` checks as `tie`.
 No verb is ever added per unit or per deployment.
 
 ## Genesis (the window)
@@ -182,7 +182,7 @@ satisfied pred scope.
   pred scopes act as **postconditions** on the incoming row.
 - **`set`**: pred scopes must hold **before and after** the write.
 - **`tie` / `cut`**: require the verb on the **left** row's chain plus `see`
-  on the right row. `set_tie` checks as `tie`.
+  on the right row. `tune` checks as `tie`.
 - **`see` on query**: the engine conjoins the operator's coverage into the
   plan. Multiple applicable grants combine as **OR** — engine-internal only;
   the DSL keeps its and-only surface.

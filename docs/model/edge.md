@@ -237,7 +237,7 @@ truncation is forbidden.
 
 ## Bond suite (see `docs/bond.md`)
 
-Adopted: M1b attrs, W1b set_tie, P1 `has`, K1 live-target filter, U1
+Adopted: M1b attrs, W1b tune, P1 `has`, K1 live-target filter, U1
 live-unique, R0 no reverse.
 
 ## Must not
