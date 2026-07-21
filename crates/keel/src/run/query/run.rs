@@ -2,7 +2,7 @@ use super::*;
 use crate::adapt::Error;
 use crate::ddl;
 use crate::life::{Ends, Row, Tie, Work};
-use crate::plan::Plan;
+use crate::plan::{Plan, Unit};
 use crate::wire::Wire;
 use std::collections::BTreeMap;
 
@@ -15,7 +15,14 @@ pub async fn run<W: Wire>(plan: &Plan, wire: &mut W, tree: &Tree) -> Result<Pack
     if !tree.preds().is_empty() {
         rows.retain(|row| pass(row, tree.preds()));
     }
-    hold(plan, &mut work, scope.name(), &mut rows, tree.preds()).await?;
+    hold(
+        &mut work,
+        scope.unit(),
+        scope.name(),
+        &mut rows,
+        tree.preds(),
+    )
+    .await?;
     if tree.tally() {
         return Ok(Pack {
             root: ddl::table(scope.name()),
@@ -71,16 +78,12 @@ pub(crate) async fn pull<W: Wire>(
 }
 
 pub(crate) async fn hold<W: Wire>(
-    plan: &Plan,
     work: &mut Work<'_, W>,
+    unit: &Unit,
     owner: &str,
     rows: &mut Vec<Row>,
     preds: &[Pred],
 ) -> Result<(), Error> {
-    let unit = plan
-        .units()
-        .get(owner)
-        .ok_or_else(|| Error::Missing(owner.into()))?;
     for pred in preds {
         hold_one(work, unit, owner, rows, pred).await?;
     }
