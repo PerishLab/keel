@@ -2,7 +2,6 @@ import { cli, flags } from "@/lib/cli.ts";
 import { bin, exists } from "@/lib/std/cmd.ts";
 import { fs } from "@/lib/std/fs.ts";
 import { io } from "@/lib/std/io.ts";
-import { negentropy } from "@/lib/negentropy.ts";
 import { path } from "@/lib/std/path.ts";
 
 const hooks = ".runseal/hooks";
@@ -53,7 +52,6 @@ for (
 ) {
   await Check.tool(tool);
 }
-await negentropy.verify();
 io.print("ok: git, deno, cargo, runseal, negentropy, sh, bash, sed, grep");
 
 io.print("==> checking repository entrypoints");
@@ -76,7 +74,6 @@ for (
     "sidecar.toml",
     ".runseal/deno.json",
     ".runseal/deno.lock",
-    ".runseal/negentropy.version",
     ".runseal/hooks/pre-commit",
     ".runseal/hooks/commit-msg",
     ".runseal/lib/cli.ts",
