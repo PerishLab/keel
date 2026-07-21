@@ -10,7 +10,7 @@ use serde_json::{Map, Value, json};
 use std::sync::Arc;
 
 #[derive(Deserialize)]
-pub(crate) struct QueryBody {
+pub(crate) struct Body {
     q: String,
 }
 
@@ -18,7 +18,7 @@ pub(crate) async fn run<W: Wire>(
     State(core): State<Arc<Core<W>>>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
-    Json(body): Json<QueryBody>,
+    Json(body): Json<Body>,
 ) -> Result<Json<Value>, Fault> {
     let face = front(core.as_ref(), &headers, op.as_deref(), "see").await?;
     let tree = crate::query::parse(&body.q).map_err(Fault::from)?;
@@ -30,7 +30,7 @@ pub(crate) async fn run<W: Wire>(
         });
     }
     let pack = face.ask(&tree).await.map_err(Fault::from)?;
-    Ok(Json(pack_json(&pack)))
+    Ok(Json(pack.emit()))
 }
 
 pub(crate) async fn list<W: Wire>(
@@ -39,10 +39,10 @@ pub(crate) async fn list<W: Wire>(
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
 ) -> Result<Json<Value>, Fault> {
-    let name = unit_name(core.as_ref(), &unit)?;
+    let name = core.as_ref().unit(&unit)?;
     let face = front(core.as_ref(), &headers, op.as_deref(), "see").await?;
     let rows = face.live(&name).await.map_err(Fault::from)?;
-    let body: Vec<Value> = rows.iter().map(row_json).collect();
+    let body: Vec<Value> = rows.iter().map(Emit::emit).collect();
     Ok(Json(Value::Array(body)))
 }
 
@@ -53,8 +53,8 @@ pub(crate) async fn create<W: Wire>(
     op: Option<Extension<Operator>>,
     Json(body): Json<Map<String, Value>>,
 ) -> Result<(StatusCode, Json<Value>), Fault> {
-    let name = unit_name(core.as_ref(), &unit)?;
-    let fields = cells(&body)?;
+    let name = core.as_ref().unit(&unit)?;
+    let fields = cells(&body, &[])?;
     let pairs: Vec<(&str, &str)> = fields
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
@@ -70,12 +70,12 @@ pub(crate) async fn one<W: Wire>(
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
 ) -> Result<Json<Value>, Fault> {
-    let name = unit_name(core.as_ref(), &unit)?;
+    let name = core.as_ref().unit(&unit)?;
     let q = format!(r#"from {name} where id = "{id}""#);
     let face = front(core.as_ref(), &headers, op.as_deref(), "see").await?;
     let pack = face.query(&q).await.map_err(Fault::from)?;
     match pack.rows().first() {
-        Some(row) => Ok(Json(row_json(row))),
+        Some(row) => Ok(Json(row.emit())),
         None => Err(Fault {
             status: StatusCode::NOT_FOUND,
             note: format!("missing row {id}"),
@@ -90,8 +90,8 @@ pub(crate) async fn edit<W: Wire>(
     op: Option<Extension<Operator>>,
     Json(body): Json<Map<String, Value>>,
 ) -> Result<Json<Value>, Fault> {
-    let name = unit_name(core.as_ref(), &unit)?;
-    let fields = cells(&body)?;
+    let name = core.as_ref().unit(&unit)?;
+    let fields = cells(&body, &[])?;
     let pairs: Vec<(&str, &str)> = fields
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
@@ -101,7 +101,7 @@ pub(crate) async fn edit<W: Wire>(
     let q = format!(r#"from {name} where id = "{id}""#);
     let pack = face.query(&q).await.map_err(Fault::from)?;
     match pack.rows().first() {
-        Some(row) => Ok(Json(row_json(row))),
+        Some(row) => Ok(Json(row.emit())),
         None => Err(Fault {
             status: StatusCode::NOT_FOUND,
             note: format!("missing row {id}"),
@@ -115,13 +115,13 @@ pub(crate) async fn remove<W: Wire>(
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
 ) -> Result<StatusCode, Fault> {
-    let name = unit_name(core.as_ref(), &unit)?;
+    let name = core.as_ref().unit(&unit)?;
     let face = front(core.as_ref(), &headers, op.as_deref(), "end").await?;
     face.end(&name, id).await.map_err(Fault::from)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub(crate) async fn no_read() -> StatusCode {
+pub(crate) async fn refuse() -> StatusCode {
     StatusCode::NOT_FOUND
 }
 
@@ -132,13 +132,13 @@ pub(crate) async fn attach<W: Wire>(
     op: Option<Extension<Operator>>,
     Json(body): Json<Map<String, Value>>,
 ) -> Result<(StatusCode, Json<Value>), Fault> {
-    let name = unit_name(core.as_ref(), &unit)?;
-    let bond = bond_name(core.as_ref(), &name, &bond)?;
+    let name = core.as_ref().unit(&unit)?;
+    let bond = core.as_ref().bond(&name, &bond)?;
     let right = body
         .get("right")
         .and_then(|v| v.as_i64())
         .ok_or_else(|| Fault::bad("right needs integer".into()))?;
-    let fields = cells_skip(&body, &["right"])?;
+    let fields = cells(&body, &["right"])?;
     let pairs: Vec<(&str, &str)> = fields
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
@@ -151,15 +151,15 @@ pub(crate) async fn attach<W: Wire>(
     Ok((StatusCode::CREATED, Json(json!({ "id": key }))))
 }
 
-pub(crate) async fn patch_tie<W: Wire>(
+pub(crate) async fn retie<W: Wire>(
     State(core): State<Arc<Core<W>>>,
     Path((unit, id, bond, tie)): Path<(String, i64, String, i64)>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
     Json(body): Json<Map<String, Value>>,
 ) -> Result<StatusCode, Fault> {
-    let name = unit_name(core.as_ref(), &unit)?;
-    let bond = bond_name(core.as_ref(), &name, &bond)?;
+    let name = core.as_ref().unit(&unit)?;
+    let bond = core.as_ref().bond(&name, &bond)?;
     let face = front(core.as_ref(), &headers, op.as_deref(), "tie").await?;
     let ties = face.ties(&name, &bond, id).await.map_err(Fault::from)?;
     if !ties.iter().any(|row| row.key() == tie) {
@@ -168,7 +168,7 @@ pub(crate) async fn patch_tie<W: Wire>(
             note: format!("missing tie {tie}"),
         });
     }
-    let fields = cells(&body)?;
+    let fields = cells(&body, &[])?;
     let pairs: Vec<(&str, &str)> = fields
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
@@ -185,8 +185,8 @@ pub(crate) async fn detach<W: Wire>(
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
 ) -> Result<StatusCode, Fault> {
-    let name = unit_name(core.as_ref(), &unit)?;
-    let bond = bond_name(core.as_ref(), &name, &bond)?;
+    let name = core.as_ref().unit(&unit)?;
+    let bond = core.as_ref().bond(&name, &bond)?;
     let face = front(core.as_ref(), &headers, op.as_deref(), "cut").await?;
     let ties = face.ties(&name, &bond, id).await.map_err(Fault::from)?;
     if !ties.iter().any(|row| row.key() == tie) {
