@@ -65,6 +65,21 @@ The scenario suite must pass byte-equal with `kind = "memory"` and
 acceptable behavior. Validity is scoped to one engine instance (single
 writer); multi-instance coherence is parked with distribution.
 
+## Authority is cached too, so instance scope is an authority boundary
+
+Grant rows are held under the same generation as packs, because authority
+is read on every operation and the whole set is identical for all rows of
+one operation. That makes the per-instance scope above load-bearing for
+security, not only for freshness: a second instance keeps honouring a
+grant that this one revoked, until it writes and bumps its own
+generation.
+
+Therefore **more than one instance against one store requires the cache
+off** until cross-instance invalidation exists. `kind = "none"` holds no
+authority: the switch covers grants, and a test pins that it does. Any
+chart or compose file that exposes a replica count carries this
+constraint with it.
+
 ## Settled package
 
 | Id | Choice |
@@ -76,6 +91,7 @@ writer); multi-instance coherence is parked with distribution.
 | H-5 | Write path never reads cache |
 | H-6 | Eviction invisible and always legal; capacity is an engine constant |
 | H-7 | Conformance = scenario suite byte-equal on/off; per-instance validity |
+| H-8 | Grants cached under the same generation; instance scope bounds revocation |
 
 ## Open
 
@@ -94,3 +110,5 @@ writer); multi-instance coherence is parked with distribution.
 - Timed expiry as a correctness mechanism (horizons are lease facts, not
   apologies).
 - Errors on capacity (evict instead).
+- Caching authority while claiming the cache is off; the switch is whole.
+- More than one instance over one store with the cache on.

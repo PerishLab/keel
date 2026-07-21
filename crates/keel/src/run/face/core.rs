@@ -20,12 +20,16 @@ impl<W: Wire> Core<W> {
                 ..Default::default()
             },
             chart: Chart::default(),
-            deeds: Deeds::default(),
+            deeds: Deeds {
+                on: true,
+                ..Default::default()
+            },
         }
     }
 
     pub fn bare(mut self) -> Self {
         self.stash.on = false;
+        self.deeds.on = false;
         self
     }
 

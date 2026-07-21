@@ -90,8 +90,53 @@ async fn flat() {
     let pack = core.of(1).query("from Org").await.expect("q");
 
     assert_eq!(pack.rows().len(), 40);
-    assert_eq!(tally.grants.load(Ordering::Relaxed), 1);
-    assert_eq!(tally.reads.load(Ordering::Relaxed), 2);
+    assert_eq!(
+        tally.grants.load(Ordering::Relaxed),
+        1,
+        "the grant table is read once per operation, not once per row"
+    );
+    assert_eq!(
+        tally.reads.load(Ordering::Relaxed),
+        2,
+        "one row scan plus one grant scan; a read per row is the regression this pins"
+    );
+}
+
+#[tokio::test]
+async fn bared() {
+    let tally = Arc::new(Tally::default());
+    let mut graph = Graph::new();
+    graph.plug::<Org>();
+    let wire = Count {
+        inner: Sqlite::memory().await.expect("db"),
+        tally: tally.clone(),
+    };
+    let core = bind(graph, wire).await.expect("bind").bare();
+    core.put("Org", &[("name", "lab")]).await.expect("org");
+    core.put(
+        "@grant",
+        &[
+            ("who", "all"),
+            ("verb", "see"),
+            ("unit", "Org"),
+            ("scope", "all"),
+        ],
+    )
+    .await
+    .expect("grant");
+
+    tally.grants.store(0, Ordering::Relaxed);
+    core.of(1).query("from Org").await.expect("one");
+    let first = tally.grants.load(Ordering::Relaxed);
+    core.of(1).query("from Org").await.expect("two");
+    let second = tally.grants.load(Ordering::Relaxed);
+
+    assert!(first > 0);
+    assert_eq!(
+        second - first,
+        first,
+        "bare() must hold no authority: a second op re-reads the grants"
+    );
 }
 
 #[tokio::test]
@@ -130,7 +175,11 @@ async fn rooted() {
 
     assert_eq!(pack.rows().len(), 40);
     assert_eq!(tally.grants.load(Ordering::Relaxed), 1);
-    assert_eq!(tally.reads.load(Ordering::Relaxed), 42);
+    assert_eq!(
+        tally.reads.load(Ordering::Relaxed),
+        42,
+        "one row scan plus one root-chain read per row; the grant scan is hoisted"
+    );
 }
 
 #[tokio::test]

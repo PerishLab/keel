@@ -98,11 +98,15 @@ impl Stash {
 
 #[derive(Default)]
 struct Deeds {
+    on: bool,
     held: Mutex<Option<(i64, Arc<Vec<Row>>)>>,
 }
 
 impl Deeds {
     fn read(&self, step: i64) -> Option<Arc<Vec<Row>>> {
+        if !self.on {
+            return None;
+        }
         let held = self.held.lock().ok()?;
         let (at, rows) = held.as_ref()?;
         (*at == step).then(|| rows.clone())
@@ -110,6 +114,9 @@ impl Deeds {
 
     fn keep(&self, step: i64, rows: Vec<Row>) -> Arc<Vec<Row>> {
         let rows = Arc::new(rows);
+        if !self.on {
+            return rows;
+        }
         if let Ok(mut held) = self.held.lock() {
             *held = Some((step, rows.clone()));
         }
