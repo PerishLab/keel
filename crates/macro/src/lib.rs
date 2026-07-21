@@ -97,7 +97,15 @@ pub(crate) fn one(
         };
         return Ok((mark, Some(row), None));
     }
-    if let Some((card, target, slots, need, root, crew)) = link(&field.attrs, &field.ty)? {
+    if let Some(link) = link(&field.attrs, &field.ty)? {
+        let Link {
+            card,
+            target,
+            slots,
+            need,
+            root,
+            crew,
+        } = link;
         let pairs = slots.iter().map(|(n, k)| {
             quote! { (#n, ::keel::atom::Kind::#k) }
         });

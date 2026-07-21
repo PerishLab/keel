@@ -1,7 +1,7 @@
 use super::*;
 use crate::adapt::Error;
 use crate::ddl;
-use crate::life::{Ends, Row, Tie, Work};
+use crate::life::{Cell, Row, Tie, Work};
 use crate::plan::{Edge, Plan, Unit};
 use crate::wire::Wire;
 use std::collections::BTreeMap;
@@ -20,7 +20,11 @@ pub async fn run<W: Wire>(
     if !tree.preds().is_empty() {
         rows.retain(|row| pass(row, tree.preds()));
     }
-    hold(&mut work, scope, &mut rows, tree.preds()).await?;
+    let mut sweep = Sweep {
+        work: &mut work,
+        scope,
+    };
+    sweep.hold(&mut rows, tree.preds()).await?;
     if tree.tally() {
         return Ok(Pack {
             root: ddl::table(scope.name()),
@@ -34,12 +38,10 @@ pub async fn run<W: Wire>(
     let root = ddl::table(scope.name());
     let mut bags = BTreeMap::new();
     bags.insert(root.clone(), Bag::Unit(rows));
-    let unit = scope.unit();
     for name in tree.links() {
-        let bond = edge(unit, name)?;
-        let ties = pull(&mut work, unit, bond, scope.at(bond.target())?, &keys).await?;
-        let key = format!("{root}.{}", bond.name());
-        bags.insert(key, Bag::Bond(ties));
+        let bond = edge(scope.unit(), name)?;
+        let ties = sweep.pull(bond, &keys).await?;
+        bags.insert(format!("{root}.{}", bond.name()), Bag::Bond(ties));
     }
     Ok(Pack {
         root,
@@ -48,165 +50,105 @@ pub async fn run<W: Wire>(
     })
 }
 
-pub(crate) async fn pull<W: Wire>(
-    work: &mut Work<'_, W>,
-    unit: &Unit,
-    bond: &Edge,
-    target: &Unit,
-    keys: &[i64],
-) -> Result<Vec<Tie>, Error> {
-    let mut ties = Vec::new();
-    for &key in keys {
-        let part = work.ties(unit, bond, key).await?;
-        for tie in part {
-            if !work.alive(target, tie.right()).await? {
+pub(crate) struct Sweep<'a, 'w, W: Wire> {
+    work: &'a mut Work<'w, W>,
+    scope: &'a Scope,
+}
+
+impl<W: Wire> Sweep<'_, '_, W> {
+    pub(crate) async fn pull(&mut self, bond: &Edge, keys: &[i64]) -> Result<Vec<Tie>, Error> {
+        let unit = self.scope.unit();
+        let target = self.scope.at(bond.target())?;
+        let mut ties = Vec::new();
+        for &key in keys {
+            for tie in self.work.ties(unit, bond, key).await? {
+                if !self.work.alive(target, tie.right()).await? {
+                    continue;
+                }
+                ties.push(tie);
+                if ties.len() > TIE_CAP {
+                    return Err(Error::Adapt("tie cap exceeded".into()));
+                }
+            }
+        }
+        ties.sort_by_key(|tie| tie.key());
+        Ok(ties)
+    }
+
+    pub(crate) async fn hold(&mut self, rows: &mut Vec<Row>, preds: &[Pred]) -> Result<(), Error> {
+        for pred in preds {
+            match pred.op() {
+                Op::Has => self.has(rows, pred).await?,
+                Op::Some => self.some(rows, pred).await?,
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    async fn has(&mut self, rows: &mut Vec<Row>, pred: &Pred) -> Result<(), Error> {
+        let unit = self.scope.unit();
+        let bond = edge(unit, pred.field())?;
+        let right = key(pred.value())?;
+        let mut keep = Vec::new();
+        for row in rows.iter() {
+            let ties = self.work.ties(unit, bond, row.key()).await;
+            if ties.is_ok_and(|ties| ties.iter().any(|tie| tie.right() == right)) {
+                keep.push(row.key());
+            }
+        }
+        rows.retain(|row| keep.contains(&row.key()));
+        Ok(())
+    }
+
+    async fn some(&mut self, rows: &mut Vec<Row>, pred: &Pred) -> Result<(), Error> {
+        let bond = edge(self.scope.unit(), pred.field())?;
+        let nest = pred
+            .nest()
+            .ok_or_else(|| Error::Adapt("some needs inner".into()))?;
+        let mut keep = Vec::new();
+        for row in rows.iter() {
+            if self.probe(bond, row.key(), nest).await.unwrap_or(false) {
+                keep.push(row.key());
+            }
+        }
+        rows.retain(|row| keep.contains(&row.key()));
+        Ok(())
+    }
+
+    async fn probe(&mut self, bond: &Edge, left: i64, nest: &Pred) -> Result<bool, Error> {
+        let unit = self.scope.unit();
+        let target = self.scope.at(bond.target())?;
+        let ties = self.work.ties(unit, bond, left).await?;
+        let owned = bond.fields().iter().any(|s| s.name() == nest.field());
+        for tie in ties {
+            if nest.field() == ddl::KEY {
+                if nest.hits(&Cell::Int(tie.right())) {
+                    return Ok(true);
+                }
                 continue;
             }
-            ties.push(tie);
-            if ties.len() > TIE_CAP {
-                return Err(Error::Adapt("tie cap exceeded".into()));
+            if owned {
+                if nest.finds(tie.cells()) {
+                    return Ok(true);
+                }
+                continue;
             }
-        }
-    }
-    ties.sort_by_key(|tie| tie.key());
-    Ok(ties)
-}
-
-pub(crate) async fn hold<W: Wire>(
-    work: &mut Work<'_, W>,
-    scope: &Scope,
-    rows: &mut Vec<Row>,
-    preds: &[Pred],
-) -> Result<(), Error> {
-    for pred in preds {
-        hold_one(work, scope, rows, pred).await?;
-    }
-    Ok(())
-}
-
-pub(crate) async fn hold_one<W: Wire>(
-    work: &mut Work<'_, W>,
-    scope: &Scope,
-    rows: &mut Vec<Row>,
-    pred: &Pred,
-) -> Result<(), Error> {
-    match pred.op() {
-        Op::Has => hold_has(work, scope, rows, pred).await,
-        Op::Some => hold_some(work, scope, rows, pred).await,
-        _ => Ok(()),
-    }
-}
-
-pub(crate) async fn hold_has<W: Wire>(
-    work: &mut Work<'_, W>,
-    scope: &Scope,
-    rows: &mut Vec<Row>,
-    pred: &Pred,
-) -> Result<(), Error> {
-    let unit = scope.unit();
-    let bond = edge(unit, pred.field())?;
-    let right = key(pred.value())?;
-    let mut keep = Vec::new();
-    for row in rows.iter() {
-        let ends = Ends {
-            left: row.key(),
-            right,
-        };
-        if has_right(work, unit, bond, ends).await {
-            keep.push(row.key());
-        }
-    }
-    rows.retain(|row| keep.contains(&row.key()));
-    Ok(())
-}
-
-pub(crate) async fn has_right<W: Wire>(
-    work: &mut Work<'_, W>,
-    unit: &Unit,
-    bond: &Edge,
-    ends: Ends,
-) -> bool {
-    match work.ties(unit, bond, ends.left).await {
-        Ok(ties) => ties.iter().any(|tie| tie.right() == ends.right),
-        Err(_) => false,
-    }
-}
-
-pub(crate) async fn hold_some<W: Wire>(
-    work: &mut Work<'_, W>,
-    scope: &Scope,
-    rows: &mut Vec<Row>,
-    pred: &Pred,
-) -> Result<(), Error> {
-    let unit = scope.unit();
-    let bond = edge(unit, pred.field())?;
-    let nest = pred
-        .nest()
-        .ok_or_else(|| Error::Adapt("some needs inner".into()))?;
-    let target = scope.at(bond.target())?;
-    let mut keep = Vec::new();
-    for row in rows.iter() {
-        let hit = some_hit(work, unit, bond, target, row.key(), nest)
-            .await
-            .unwrap_or(false);
-        if hit {
-            keep.push(row.key());
-        }
-    }
-    rows.retain(|row| keep.contains(&row.key()));
-    Ok(())
-}
-
-pub(crate) async fn some_hit<W: Wire>(
-    work: &mut Work<'_, W>,
-    unit: &Unit,
-    bond: &Edge,
-    target: &Unit,
-    left: i64,
-    nest: &Pred,
-) -> Result<bool, Error> {
-    let ties = work.ties(unit, bond, left).await?;
-    let on_bond = bond.fields().iter().any(|s| s.name() == nest.field());
-    for tie in ties {
-        if nest.field() == ddl::KEY {
-            if nest.hits(&crate::life::Cell::Int(tie.right())) {
+            if self.mate(target, tie.right(), nest).await? {
                 return Ok(true);
             }
-            continue;
         }
-        if on_bond {
-            if nest.finds(tie.cells()) {
-                return Ok(true);
-            }
-            continue;
-        }
-        if target_hit(work, target, tie.right(), nest).await? {
-            return Ok(true);
-        }
+        Ok(false)
     }
-    Ok(false)
-}
 
-pub(crate) async fn target_hit<W: Wire>(
-    work: &mut Work<'_, W>,
-    target: &Unit,
-    key: i64,
-    nest: &Pred,
-) -> Result<bool, Error> {
-    if !work.alive(target, key).await? {
-        return Ok(false);
+    async fn mate(&mut self, target: &Unit, key: i64, nest: &Pred) -> Result<bool, Error> {
+        if !self.work.alive(target, key).await? {
+            return Ok(false);
+        }
+        let rows = self.work.scan(target).await?;
+        Ok(rows
+            .iter()
+            .find(|row| row.key() == key)
+            .is_some_and(|row| hit(row, nest)))
     }
-    match find_live(work, target, key).await? {
-        Some(row) => Ok(hit(&row, nest)),
-        None => Ok(false),
-    }
-}
-
-pub(crate) async fn find_live<W: Wire>(
-    work: &mut Work<'_, W>,
-    unit: &Unit,
-    key: i64,
-) -> Result<Option<Row>, Error> {
-    let rows = work.scan(unit).await?;
-    Ok(rows.into_iter().find(|row| row.key() == key))
 }
