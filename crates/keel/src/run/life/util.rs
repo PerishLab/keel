@@ -22,7 +22,7 @@ pub(super) fn worth(
         return Ok(Some(slot.bind(raw)?));
     }
     let held = myself.and_then(|(_, row)| row.cells().get(slot.name()));
-    Ok(held.map(cell_val))
+    Ok(held.map(Val::from))
 }
 
 pub(super) fn anchor(
@@ -40,63 +40,69 @@ pub(super) fn anchor(
         return Ok(Val::Int(key));
     }
     let held = myself.and_then(|(_, row)| row.cells().get(rel));
-    Ok(held.map(cell_val).unwrap_or(Val::Null))
+    Ok(held.map(Val::from).unwrap_or(Val::Null))
 }
 
-pub(super) fn cell_val(cell: &Cell) -> Val {
-    match cell {
-        Cell::Text(value) => Val::Text(value.clone()),
-        Cell::Int(value) => Val::Int(*value),
-        Cell::Bool(value) => Val::Int(*value as i64),
-    }
-}
-
-pub(super) fn read_tie(edge: &Edge, line: &[Val]) -> Result<Tie, Error> {
-    let key = line[0].int();
-    let left = line[1].int();
-    let right = line[2].int();
-    let expires = line[3].opt();
-    let created = line[4].int();
-    let updated = line[5].int();
-    let mut cells = BTreeMap::new();
-    for (i, slot) in edge.fields().iter().enumerate() {
-        cells.insert(slot.name().to_string(), pick(slot, &line[6 + i]));
-    }
-    Ok(Tie {
-        key,
-        left,
-        right,
-        cells,
-        expires,
-        created,
-        updated,
-    })
-}
-
-pub(super) fn read(unit: &Unit, line: &[Val]) -> Result<Row, Error> {
-    let key = line[0].int();
-    let mut cells = BTreeMap::new();
-    let mut at = 1;
-    for slot in unit.fields() {
-        cells.insert(slot.name().to_string(), pick(slot, &line[at]));
-        at += 1;
-    }
-    for edge in unit.refs() {
-        if let Some(key) = line[at].opt() {
-            cells.insert(edge.name().to_string(), Cell::Int(key));
+impl From<&Cell> for Val {
+    fn from(cell: &Cell) -> Self {
+        match cell {
+            Cell::Text(value) => Val::Text(value.clone()),
+            Cell::Int(value) => Val::Int(*value),
+            Cell::Bool(value) => Val::Int(*value as i64),
         }
-        at += 1;
     }
-    let expires = line[at].opt();
-    let created = line[at + 1].int();
-    let updated = line[at + 2].int();
-    Ok(Row {
-        key,
-        cells,
-        expires,
-        created,
-        updated,
-    })
+}
+
+impl Tie {
+    pub(super) fn read(edge: &Edge, line: &[Val]) -> Result<Tie, Error> {
+        let key = line[0].int();
+        let left = line[1].int();
+        let right = line[2].int();
+        let expires = line[3].opt();
+        let created = line[4].int();
+        let updated = line[5].int();
+        let mut cells = BTreeMap::new();
+        for (i, slot) in edge.fields().iter().enumerate() {
+            cells.insert(slot.name().to_string(), pick(slot, &line[6 + i]));
+        }
+        Ok(Tie {
+            key,
+            left,
+            right,
+            cells,
+            expires,
+            created,
+            updated,
+        })
+    }
+}
+
+impl Row {
+    pub(super) fn read(unit: &Unit, line: &[Val]) -> Result<Row, Error> {
+        let key = line[0].int();
+        let mut cells = BTreeMap::new();
+        let mut at = 1;
+        for slot in unit.fields() {
+            cells.insert(slot.name().to_string(), pick(slot, &line[at]));
+            at += 1;
+        }
+        for edge in unit.refs() {
+            if let Some(key) = line[at].opt() {
+                cells.insert(edge.name().to_string(), Cell::Int(key));
+            }
+            at += 1;
+        }
+        let expires = line[at].opt();
+        let created = line[at + 1].int();
+        let updated = line[at + 2].int();
+        Ok(Row {
+            key,
+            cells,
+            expires,
+            created,
+            updated,
+        })
+    }
 }
 
 pub(super) fn pick(slot: &Slot, cell: &Val) -> Cell {

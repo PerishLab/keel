@@ -15,7 +15,7 @@ pub fn digest(tree: &Tree) -> String {
         } else {
             out.push_str(" and ");
         }
-        write_pred(&mut out, pred);
+        spell(&mut out, pred);
     }
     for bond in tree.links() {
         out.push_str(" link ");
@@ -52,7 +52,7 @@ pub fn shape(tree: &Tree) -> String {
     };
     for (i, pred) in tree.preds().iter().enumerate() {
         out.push_str(if i == 0 { " where " } else { " and " });
-        write_shape(&mut out, pred);
+        shaped(&mut out, pred);
     }
     for bond in tree.links() {
         out.push_str(" link ");
@@ -65,7 +65,7 @@ pub fn shape(tree: &Tree) -> String {
     out
 }
 
-pub(crate) fn write_shape(out: &mut String, pred: &Pred) {
+pub(crate) fn shaped(out: &mut String, pred: &Pred) {
     out.push_str(pred.field());
     out.push(' ');
     out.push_str(mark(pred.op()));
@@ -74,12 +74,12 @@ pub(crate) fn write_shape(out: &mut String, pred: &Pred) {
     }
     out.push_str(" (");
     if let Some(nest) = pred.nest() {
-        write_shape(out, nest);
+        shaped(out, nest);
     }
     out.push(')');
 }
 
-pub(crate) fn write_pred(out: &mut String, pred: &Pred) {
+pub(crate) fn spell(out: &mut String, pred: &Pred) {
     out.push_str(pred.field());
     out.push(' ');
     if pred.op() == Op::In {
@@ -104,7 +104,7 @@ pub(crate) fn write_pred(out: &mut String, pred: &Pred) {
     if pred.op() == Op::Some {
         out.push_str("some (");
         if let Some(nest) = pred.nest() {
-            write_pred(out, nest);
+            spell(out, nest);
         }
         out.push(')');
         return;
@@ -130,58 +130,77 @@ pub(crate) fn mark(op: Op) -> &'static str {
     }
 }
 
-pub(crate) fn hit_map(cells: &BTreeMap<String, Cell>, pred: &Pred) -> bool {
-    let Some(got) = cells.get(pred.field()) else {
-        return false;
-    };
-    match got {
-        Cell::Text(value) => hit_text(value, pred),
-        Cell::Int(value) => hit_key(*value, pred),
-        Cell::Bool(value) => hit_flag(*value, pred),
+impl Pred {
+    pub(crate) fn hits(&self, got: &Cell) -> bool {
+        match got {
+            Cell::Text(value) => self.suits(value),
+            Cell::Int(value) => self.spans(*value),
+            Cell::Bool(value) => self.flags(*value),
+        }
+    }
+
+    pub(crate) fn finds(&self, cells: &BTreeMap<String, Cell>) -> bool {
+        cells.get(self.field()).is_some_and(|got| self.hits(got))
+    }
+
+    pub(crate) fn covers(&self, key: Option<i64>, cells: &BTreeMap<String, Cell>) -> bool {
+        if matches!(self.op(), Op::Has | Op::Some) {
+            return false;
+        }
+        if self.field() == ddl::KEY {
+            return key.is_some_and(|key| self.spans(key));
+        }
+        self.finds(cells)
+    }
+
+    fn suits(&self, got: &str) -> bool {
+        match self.op() {
+            Op::Eq => got == self.value(),
+            Op::Ne => got != self.value(),
+            Op::Lt => got < self.value(),
+            Op::Le => got <= self.value(),
+            Op::Gt => got > self.value(),
+            Op::Ge => got >= self.value(),
+            Op::In => self.values().iter().any(|want| want == got),
+            Op::Like => got.to_lowercase().contains(&self.value().to_lowercase()),
+            Op::Has | Op::Some => false,
+        }
+    }
+
+    fn flags(&self, got: bool) -> bool {
+        let want = got.to_string();
+        match self.op() {
+            Op::Eq => self.value() == want,
+            Op::Ne => self.value() != want,
+            Op::In => self.values().contains(&want),
+            _ => false,
+        }
+    }
+
+    fn spans(&self, got: i64) -> bool {
+        match self.op() {
+            Op::Eq => key(self.value()).is_ok_and(|want| want == got),
+            Op::Ne => key(self.value()).is_ok_and(|want| want != got),
+            Op::Lt => key(self.value()).is_ok_and(|want| got < want),
+            Op::Le => key(self.value()).is_ok_and(|want| got <= want),
+            Op::Gt => key(self.value()).is_ok_and(|want| got > want),
+            Op::Ge => key(self.value()).is_ok_and(|want| got >= want),
+            Op::In => self
+                .values()
+                .iter()
+                .any(|want| key(want).is_ok_and(|n| n == got)),
+            Op::Like | Op::Has | Op::Some => false,
+        }
     }
 }
 
-pub(crate) fn hit_text(got: &str, pred: &Pred) -> bool {
-    match pred.op() {
-        Op::Eq => got == pred.value(),
-        Op::Ne => got != pred.value(),
-        Op::Lt => got < pred.value(),
-        Op::Le => got <= pred.value(),
-        Op::Gt => got > pred.value(),
-        Op::Ge => got >= pred.value(),
-        Op::In => pred.values().iter().any(|want| want == got),
-        Op::Like => got.to_lowercase().contains(&pred.value().to_lowercase()),
-        Op::Has | Op::Some => false,
-    }
-}
-
-pub(crate) fn hit_flag(got: bool, pred: &Pred) -> bool {
-    let want = got.to_string();
-    match pred.op() {
-        Op::Eq => pred.value() == want,
-        Op::Ne => pred.value() != want,
-        Op::In => pred.values().contains(&want),
-        _ => false,
-    }
-}
-
-pub(crate) fn key_text(text: &str) -> Result<i64, Error> {
+pub(crate) fn key(text: &str) -> Result<i64, Error> {
     text.parse::<i64>()
         .map_err(|_| Error::Adapt("id needs integer".into()))
 }
 
 pub fn cover(key: Option<i64>, cells: &BTreeMap<String, Cell>, preds: &[Pred]) -> bool {
-    preds.iter().all(|pred| hit_at(key, cells, pred))
-}
-
-pub(crate) fn hit_at(key: Option<i64>, cells: &BTreeMap<String, Cell>, pred: &Pred) -> bool {
-    if matches!(pred.op(), Op::Has | Op::Some) {
-        return false;
-    }
-    if pred.field() == ddl::KEY {
-        return key.is_some_and(|key| hit_key(key, pred));
-    }
-    hit_map(cells, pred)
+    preds.iter().all(|pred| pred.covers(key, cells))
 }
 
 pub fn bare(tree: &Tree) -> Tree {
@@ -198,46 +217,18 @@ pub(crate) fn hit(row: &Row, pred: &Pred) -> bool {
     if matches!(pred.op(), Op::Has | Op::Some) {
         return true;
     }
-    if pred.field() == ddl::KEY {
-        return hit_key(row.key(), pred);
-    }
-    hit_map(row.cells(), pred)
-}
-
-pub(crate) fn hit_key(key: i64, pred: &Pred) -> bool {
-    match pred.op() {
-        Op::Eq => key_text(pred.value()).is_ok_and(|want| want == key),
-        Op::Ne => key_text(pred.value()).is_ok_and(|want| want != key),
-        Op::Lt => key_text(pred.value()).is_ok_and(|want| key < want),
-        Op::Le => key_text(pred.value()).is_ok_and(|want| key <= want),
-        Op::Gt => key_text(pred.value()).is_ok_and(|want| key > want),
-        Op::Ge => key_text(pred.value()).is_ok_and(|want| key >= want),
-        Op::In => pred
-            .values()
-            .iter()
-            .any(|want| key_text(want).is_ok_and(|n| n == key)),
-        Op::Like | Op::Has | Op::Some => false,
-    }
+    pred.covers(Some(row.key()), row.cells())
 }
 
 pub(crate) fn order(rows: &mut [Row], sort: Option<&Sort>) {
     match sort {
         None => rows.sort_by_key(|row| row.key()),
-        Some(sort) if sort.field() == ddl::KEY => {
-            let desc = sort.rank() == Rank::Desc;
-            rows.sort_by(|a, b| rank_key(a, b, desc));
-        }
         Some(sort) => {
             let field = sort.field().to_string();
             let desc = sort.rank() == Rank::Desc;
             rows.sort_by(|a, b| by(a, b, &field, desc));
         }
     }
-}
-
-pub(crate) fn rank_key(a: &Row, b: &Row, desc: bool) -> std::cmp::Ordering {
-    let primary = a.key().cmp(&b.key());
-    if desc { primary.reverse() } else { primary }
 }
 
 pub(crate) fn by(a: &Row, b: &Row, field: &str, desc: bool) -> std::cmp::Ordering {
@@ -274,6 +265,9 @@ pub(crate) fn past(rows: &mut Vec<Row>, id: i64) {
 }
 
 pub(crate) fn cell(row: &Row, field: &str) -> Cell {
+    if field == ddl::KEY {
+        return Cell::Int(row.key());
+    }
     row.cells()
         .get(field)
         .cloned()

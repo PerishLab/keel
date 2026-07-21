@@ -59,7 +59,7 @@ pub(crate) async fn pull<W: Wire>(
     for &key in keys {
         let part = work.ties(unit, bond, key).await?;
         for tie in part {
-            if !work.live_has(target, tie.right()).await? {
+            if !work.alive(target, tie.right()).await? {
                 continue;
             }
             ties.push(tie);
@@ -105,7 +105,7 @@ pub(crate) async fn hold_has<W: Wire>(
 ) -> Result<(), Error> {
     let unit = scope.unit();
     let bond = edge(unit, pred.field())?;
-    let right = key_text(pred.value())?;
+    let right = key(pred.value())?;
     let mut keep = Vec::new();
     for row in rows.iter() {
         let ends = Ends {
@@ -169,13 +169,13 @@ pub(crate) async fn some_hit<W: Wire>(
     let on_bond = bond.fields().iter().any(|s| s.name() == nest.field());
     for tie in ties {
         if nest.field() == ddl::KEY {
-            if hit_key(tie.right(), nest) {
+            if nest.hits(&crate::life::Cell::Int(tie.right())) {
                 return Ok(true);
             }
             continue;
         }
         if on_bond {
-            if hit_map(tie.cells(), nest) {
+            if nest.finds(tie.cells()) {
                 return Ok(true);
             }
             continue;
@@ -193,7 +193,7 @@ pub(crate) async fn target_hit<W: Wire>(
     key: i64,
     nest: &Pred,
 ) -> Result<bool, Error> {
-    if !work.live_has(target, key).await? {
+    if !work.alive(target, key).await? {
         return Ok(false);
     }
     match find_live(work, target, key).await? {

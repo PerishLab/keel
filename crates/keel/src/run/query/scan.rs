@@ -164,11 +164,11 @@ pub(crate) fn take(rest: &str) -> Option<(String, usize)> {
     let mut i = 1;
     let mut out = String::new();
     while i < bytes.len() {
-        let b = bytes[i];
-        if b == b'"' {
+        let byte = bytes[i];
+        if byte == b'"' {
             return Some((out, i + 1));
         }
-        if b == b'\\' {
+        if byte == b'\\' {
             i += 1;
             if i >= bytes.len() {
                 return None;
@@ -177,7 +177,7 @@ pub(crate) fn take(rest: &str) -> Option<(String, usize)> {
             i += 1;
             continue;
         }
-        out.push(b as char);
+        out.push(byte as char);
         i += 1;
     }
     None

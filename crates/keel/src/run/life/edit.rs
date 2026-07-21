@@ -19,7 +19,7 @@ impl<'a, W: Wire> Work<'a, W> {
         if at < tick {
             return Err(Error::Adapt("lease is not the past".into()));
         }
-        if self.live_in(unit.name(), key).await? || self.live_out(unit, key).await? {
+        if self.inbound(unit.name(), key).await? || self.outbound(unit, key).await? {
             return Err(Error::Adapt("live ties remain".into()));
         }
         let text = format!(
@@ -94,13 +94,13 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(!self.wire.rows(&text, &[Val::Int(key)]).await?.is_empty())
     }
 
-    pub(super) async fn live_in(&mut self, target: &str, key: i64) -> Result<bool, Error> {
+    pub(super) async fn inbound(&mut self, target: &str, key: i64) -> Result<bool, Error> {
         for unit in self.plan.units().values() {
             for edge in unit.bonds() {
                 if edge.target() != target {
                     continue;
                 }
-                if self.live_from(unit, edge, key).await? {
+                if self.feeds(unit, edge, key).await? {
                     return Ok(true);
                 }
             }
@@ -108,7 +108,7 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(false)
     }
 
-    pub(super) async fn live_from(
+    pub(super) async fn feeds(
         &mut self,
         unit: &Unit,
         edge: &Edge,
@@ -137,7 +137,7 @@ impl<'a, W: Wire> Work<'a, W> {
             .is_empty())
     }
 
-    pub(super) async fn live_out(&mut self, unit: &Unit, key: i64) -> Result<bool, Error> {
+    pub(super) async fn outbound(&mut self, unit: &Unit, key: i64) -> Result<bool, Error> {
         let tick = now();
         for edge in unit.bonds() {
             if edge.kind() != bond::Kind::Many2many {

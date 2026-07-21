@@ -128,7 +128,7 @@ impl<'a, W: Wire> Work<'a, W> {
             .parse::<i64>()
             .map_err(|_| Error::Adapt(format!("ref {} needs id", edge.name())))?;
         let mate = self.plan.find(edge.target())?;
-        if !self.live_has(mate, key).await? {
+        if !self.alive(mate, key).await? {
             return Err(Error::Adapt("right not live".into()));
         }
         if !self.fresh(edge.target(), key).await? {
@@ -219,7 +219,7 @@ impl<'a, W: Wire> Work<'a, W> {
             .rows(&text, &[Val::Int(key), Val::Int(tick)])
             .await?;
         match rows.first() {
-            Some(line) => read(unit, line),
+            Some(line) => Row::read(unit, line),
             None => Err(Error::Adapt(format!("missing row {key}"))),
         }
     }
@@ -236,7 +236,7 @@ impl<'a, W: Wire> Work<'a, W> {
         );
         let mut out = Vec::new();
         for line in self.wire.rows(&text, &[Val::Int(tick)]).await? {
-            out.push(read(unit, &line)?);
+            out.push(Row::read(unit, &line)?);
         }
         Ok(out)
     }

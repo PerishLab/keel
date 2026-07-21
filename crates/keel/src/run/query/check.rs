@@ -174,7 +174,7 @@ pub(crate) fn verify_pred(scope: &Scope, pred: &Pred) -> Result<(), Error> {
     let unit = scope.unit();
     match pred.op() {
         Op::Has => {
-            key_text(pred.value())?;
+            key(pred.value())?;
             Ok(())
         }
         Op::Some => {
