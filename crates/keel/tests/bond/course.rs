@@ -206,10 +206,8 @@ async fn select() {
         .query(r#"from Student where no = "S02" link courses"#)
         .await
         .expect("bob ties");
-    let bob_tie = pack.bond("student.courses").expect("ties")[0].key();
-    core.cut("Student", "courses", bob_tie)
-        .await
-        .expect("cut bob");
+    let knot = pack.bond("student.courses").expect("ties")[0].key();
+    core.cut("Student", "courses", knot).await.expect("cut bob");
     core.end("Course", algo).await.expect("end algo");
     core.end("Student", ada).await.expect("end ada");
 }

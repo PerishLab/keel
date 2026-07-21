@@ -18,7 +18,7 @@ struct Pass {
 }
 
 #[tokio::test]
-async fn veiled_units_stay_off_the_plan_projection_but_open_to_faces() {
+async fn shrouded() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Pass>();
     let core = bind(graph, Sqlite::memory().await.expect("db"))

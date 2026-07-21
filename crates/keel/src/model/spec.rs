@@ -14,6 +14,13 @@ pub struct Spec {
     veil: bool,
 }
 
+struct Wale {
+    name: String,
+    kind: bond::Kind,
+    target: String,
+    cast: Cast,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Cast {
     Bond,
@@ -178,7 +185,15 @@ impl Builder {
         target: impl Into<String>,
         fields: &[(&str, atom::Kind)],
     ) -> Self {
-        self.join(name, kind, target, fields, Cast::Bond)
+        self.join(
+            Wale {
+                name: name.into(),
+                kind,
+                target: target.into(),
+                cast: Cast::Bond,
+            },
+            fields,
+        )
     }
 
     pub fn free(
@@ -187,7 +202,15 @@ impl Builder {
         kind: bond::Kind,
         target: impl Into<String>,
     ) -> Self {
-        self.join(name, kind, target, &[], Cast::Free)
+        self.join(
+            Wale {
+                name: name.into(),
+                kind,
+                target: target.into(),
+                cast: Cast::Free,
+            },
+            &[],
+        )
     }
 
     pub fn root(
@@ -196,7 +219,15 @@ impl Builder {
         kind: bond::Kind,
         target: impl Into<String>,
     ) -> Self {
-        self.join(name, kind, target, &[], Cast::Root)
+        self.join(
+            Wale {
+                name: name.into(),
+                kind,
+                target: target.into(),
+                cast: Cast::Root,
+            },
+            &[],
+        )
     }
 
     pub fn crew(
@@ -205,17 +236,24 @@ impl Builder {
         kind: bond::Kind,
         target: impl Into<String>,
     ) -> Self {
-        self.join(name, kind, target, &[], Cast::Crew)
+        self.join(
+            Wale {
+                name: name.into(),
+                kind,
+                target: target.into(),
+                cast: Cast::Crew,
+            },
+            &[],
+        )
     }
 
-    fn join(
-        mut self,
-        name: impl Into<String>,
-        kind: bond::Kind,
-        target: impl Into<String>,
-        fields: &[(&str, atom::Kind)],
-        cast: Cast,
-    ) -> Self {
+    fn join(mut self, wale: Wale, fields: &[(&str, atom::Kind)]) -> Self {
+        let Wale {
+            name,
+            kind,
+            target,
+            cast,
+        } = wale;
         let fields = fields
             .iter()
             .map(|(n, k)| Field {
@@ -226,9 +264,9 @@ impl Builder {
             })
             .collect();
         self.bonds.push(Bond {
-            name: name.into(),
+            name,
             kind,
-            target: target.into(),
+            target,
             fields,
             need: cast != Cast::Free,
             root: cast == Cast::Root,

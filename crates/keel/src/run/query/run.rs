@@ -66,7 +66,7 @@ impl<W: Wire> Sweep<'_, '_, W> {
                     continue;
                 }
                 ties.push(tie);
-                if ties.len() > TIE_CAP {
+                if ties.len() > CAP {
                     return Err(Error::Adapt("tie cap exceeded".into()));
                 }
             }

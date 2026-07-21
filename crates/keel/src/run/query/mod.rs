@@ -1,7 +1,7 @@
 use crate::life::{Row, Tie};
 use std::collections::BTreeMap;
 
-pub const TIE_CAP: usize = 10_000;
+pub const CAP: usize = 10_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Slice {
@@ -164,7 +164,7 @@ impl Pack {
         self.count
     }
 
-    pub(crate) fn bags_mut(&mut self) -> &mut BTreeMap<String, Bag> {
+    pub(crate) fn amend(&mut self) -> &mut BTreeMap<String, Bag> {
         &mut self.bags
     }
 

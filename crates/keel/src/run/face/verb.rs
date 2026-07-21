@@ -115,7 +115,7 @@ impl<W: Wire> Tx<'_, W> {
     pub(super) async fn strain(&mut self, unit: &str, pack: &mut Pack) -> Result<(), Error> {
         let root = ddl::table(unit);
         let mut kept: Vec<i64> = Vec::new();
-        if let Some(crate::query::Bag::Unit(rows)) = pack.bags_mut().get_mut(&root) {
+        if let Some(crate::query::Bag::Unit(rows)) = pack.amend().get_mut(&root) {
             self.sift(unit, rows).await?;
             kept = rows.iter().map(Row::key).collect();
         }
@@ -130,7 +130,7 @@ impl<W: Wire> Tx<'_, W> {
             .map(|e| (format!("{root}.{}", e.name()), e.target().to_string()))
             .collect();
         for (key, target) in bonds {
-            let Some(crate::query::Bag::Bond(ties)) = pack.bags_mut().get_mut(&key) else {
+            let Some(crate::query::Bag::Bond(ties)) = pack.amend().get_mut(&key) else {
                 continue;
             };
             let mut hold = Vec::new();

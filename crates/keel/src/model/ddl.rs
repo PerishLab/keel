@@ -24,8 +24,8 @@ pub fn col(name: &str) -> String {
     format!("\"{name}\"")
 }
 
-pub fn seat(name: &str) -> String {
-    col(&table(name))
+pub fn seat(unit: &str) -> String {
+    col(&table(unit))
 }
 
 pub fn joint(owner: &str, bond: &str) -> String {
