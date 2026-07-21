@@ -45,6 +45,40 @@ pub fn digest(tree: &Tree) -> String {
     out
 }
 
+pub fn shape(tree: &Tree) -> String {
+    let unit = ddl::table(tree.from());
+    let mut out = match tree.slice() {
+        Slice::Live => format!("from {unit} slice live"),
+    };
+    for (i, pred) in tree.preds().iter().enumerate() {
+        out.push_str(if i == 0 { " where " } else { " and " });
+        write_shape(&mut out, pred);
+    }
+    for bond in tree.links() {
+        out.push_str(" link ");
+        out.push_str(bond);
+    }
+    if let Some(sort) = tree.sort() {
+        out.push_str(" order by ");
+        out.push_str(sort.field());
+    }
+    out
+}
+
+pub(crate) fn write_shape(out: &mut String, pred: &Pred) {
+    out.push_str(pred.field());
+    out.push(' ');
+    out.push_str(mark(pred.op()));
+    if pred.op() != Op::Some {
+        return;
+    }
+    out.push_str(" (");
+    if let Some(nest) = pred.nest() {
+        write_shape(out, nest);
+    }
+    out.push(')');
+}
+
 pub(crate) fn write_pred(out: &mut String, pred: &Pred) {
     out.push_str(pred.field());
     out.push(' ');

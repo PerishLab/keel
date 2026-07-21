@@ -19,6 +19,7 @@ impl<W: Wire> Core<W> {
                 on: true,
                 ..Default::default()
             },
+            chart: Chart::default(),
         }
     }
 

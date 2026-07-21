@@ -6,8 +6,13 @@ use crate::plan::{Edge, Plan, Unit};
 use crate::wire::Wire;
 use std::collections::BTreeMap;
 
-pub async fn run<W: Wire>(plan: &Plan, wire: &mut W, tree: &Tree) -> Result<Pack, Error> {
-    let scope = analyze(plan, tree)?;
+pub async fn run<W: Wire>(
+    plan: &Plan,
+    wire: &mut W,
+    tree: &Tree,
+    scope: &Scope,
+) -> Result<Pack, Error> {
+    verify(scope, tree)?;
     let mut work = Work::new(wire, plan);
     let mut rows = match tree.slice() {
         Slice::Live => work.scan(scope.unit()).await?,
@@ -15,7 +20,7 @@ pub async fn run<W: Wire>(plan: &Plan, wire: &mut W, tree: &Tree) -> Result<Pack
     if !tree.preds().is_empty() {
         rows.retain(|row| pass(row, tree.preds()));
     }
-    hold(&mut work, &scope, &mut rows, tree.preds()).await?;
+    hold(&mut work, scope, &mut rows, tree.preds()).await?;
     if tree.tally() {
         return Ok(Pack {
             root: ddl::table(scope.name()),

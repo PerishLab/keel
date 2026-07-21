@@ -133,7 +133,8 @@ impl<W: Wire> Tx<'_, W> {
         if let Some(pack) = self.core.stash.read(&key, &units) {
             return Ok(pack);
         }
-        let pack = query::run(self.core.plan(), &mut self.seat.wire, tree).await?;
+        let scope = self.core.chart.scope(self.core.plan(), tree)?;
+        let pack = query::run(self.core.plan(), &mut self.seat.wire, tree, &scope).await?;
         self.core.stash.keep(key, &units, &pack);
         Ok(pack)
     }

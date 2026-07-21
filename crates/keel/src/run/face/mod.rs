@@ -2,10 +2,10 @@ use crate::adapt::Error;
 use crate::ddl;
 use crate::life::{Row, Tie};
 use crate::plan::Plan;
-use crate::query::Pack;
+use crate::query::{Pack, Scope, Tree};
 use crate::wire::Wire;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 pub const HOLD: usize = 1024;
 
@@ -91,6 +91,31 @@ impl Stash {
     }
 }
 
+#[derive(Default)]
+struct Chart {
+    scopes: Mutex<HashMap<String, Arc<Scope>>>,
+}
+
+impl Chart {
+    fn scope(&self, plan: &Plan, tree: &Tree) -> Result<Arc<Scope>, Error> {
+        let key = crate::query::shape(tree);
+        if let Ok(scopes) = self.scopes.lock()
+            && let Some(scope) = scopes.get(&key)
+        {
+            return Ok(scope.clone());
+        }
+        let scope = Arc::new(crate::query::analyze(plan, tree)?);
+        let Ok(mut scopes) = self.scopes.lock() else {
+            return Ok(scope);
+        };
+        if scopes.len() >= HOLD {
+            scopes.clear();
+        }
+        scopes.insert(key, scope.clone());
+        Ok(scope)
+    }
+}
+
 fn horizon(pack: &Pack) -> Option<i64> {
     let mut edge: Option<i64> = None;
     for bag in pack.bags().values() {
@@ -130,6 +155,7 @@ pub struct Core<W: Wire> {
     seat: tokio::sync::Mutex<Seat<W>>,
     identity: Option<String>,
     stash: Stash,
+    chart: Chart,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Who {
