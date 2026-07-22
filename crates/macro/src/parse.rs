@@ -53,6 +53,15 @@ impl Spell for Expr {
     }
 
     fn tail(&self) -> syn::Result<String> {
+        let Expr::Path(path) = self else {
+            return Ok(self.head()?.to_string());
+        };
+        let segs = &path.path.segments;
+        if segs.len() == 2 {
+            let root = segs[0].ident.to_string().to_ascii_lowercase();
+            let name = segs[1].ident.to_string().to_ascii_lowercase();
+            return Ok(format!("{root}:{name}"));
+        }
         Ok(self.head()?.to_string())
     }
 

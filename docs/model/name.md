@@ -64,6 +64,16 @@ the overload this law exists to remove.
   that resolves to more than one unit is an error at the door, and an error
   never falls through to a match.
 
+## Relation targets
+
+A `#[relation(...)]` target is a **keel reference, not a Rust path**. A bare
+`Name` resolves like any short name — fine while it is unambiguous, refused
+once two units share it. To bind a specific one, qualify it with its root:
+`#[relation(Repo::Label, …)]` renders the target key `repo:label`. The
+`Root::Name` form is exactly two segments; a longer or module-qualified path
+(`crate::model::Label`) is not a qualifier and will not resolve — the target
+is a name in keel's space, never an import path.
+
 ## Renderings
 
 One declared name, several renderings, each derived and each legal in its

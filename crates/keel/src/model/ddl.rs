@@ -24,7 +24,7 @@ pub fn join(unit: &Unit, bond: &str) -> String {
 }
 
 pub fn side(name: &str) -> String {
-    format!("{}_id", name.to_ascii_lowercase())
+    format!("{}_id", name.to_ascii_lowercase().replace(':', "_"))
 }
 
 pub fn col(name: &str) -> String {

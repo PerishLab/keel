@@ -55,7 +55,7 @@ impl Plan {
             units.values().map(|unit| unit.name().to_string()).collect();
         for unit in units.values() {
             for edge in &unit.bonds {
-                if !names.contains(&edge.target) {
+                if !names.contains(&edge.target) && !units.contains_key(&edge.target) {
                     return Err(crate::adapt::Error::Missing(edge.target.clone()));
                 }
             }
