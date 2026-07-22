@@ -158,22 +158,19 @@ impl<W: Wire> Tx<'_, W> {
     }
 
     pub(super) async fn wide(&mut self, verb: &str, unit: &str) -> Result<bool, Error> {
+        let unit = self.core.plan().find(unit)?.key();
         let deeds = self.deeds().await?;
         let plea = cap::Plea {
             who: self.who,
             verb,
-            unit: &crate::name::key(unit),
+            unit: &unit,
             mark: &cap::Mark::none(),
         };
         cap::broad(self.core.plan(), &mut self.seat.wire, &plea, &deeds).await
     }
 
     pub(super) async fn grip(&mut self, unit: &str, bond: &str, key: i64) -> Result<Tie, Error> {
-        let node = self
-            .plan()
-            .units()
-            .get(unit)
-            .ok_or_else(|| Error::Missing(unit.into()))?;
+        let node = self.plan().find(unit)?;
         let name = node
             .bonds()
             .iter()
@@ -196,11 +193,7 @@ impl<W: Wire> Tx<'_, W> {
     }
 
     pub(super) fn target(&self, unit: &str, bond: &str) -> Result<String, Error> {
-        let node = self
-            .plan()
-            .units()
-            .get(unit)
-            .ok_or_else(|| Error::Missing(unit.into()))?;
+        let node = self.plan().find(unit)?;
         node.bonds()
             .iter()
             .find(|e| e.name().eq_ignore_ascii_case(bond))

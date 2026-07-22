@@ -15,7 +15,7 @@ impl Graph {
 
     pub fn plug<R: Resource>(&mut self) -> &mut Self {
         let spec = R::spec();
-        self.nodes.insert(spec.name().to_string(), spec);
+        self.nodes.insert(spec.key(), spec);
         self
     }
 

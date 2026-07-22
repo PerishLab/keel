@@ -8,32 +8,39 @@ pub const EXPIRES: &str = "expires_at";
 pub const CREATED: &str = "created_at";
 pub const UPDATED: &str = "updated_at";
 
-pub fn table(name: &str) -> String {
-    name.to_ascii_lowercase()
+pub fn table(name: &str, root: Option<&str>) -> String {
+    match root {
+        Some(root) => format!(
+            "{}_{}",
+            root.to_ascii_lowercase(),
+            name.to_ascii_lowercase()
+        ),
+        None => name.to_ascii_lowercase(),
+    }
 }
 
-pub fn join(owner: &str, bond: &str) -> String {
-    format!("{}_{}", table(owner), table(bond))
+pub fn join(unit: &Unit, bond: &str) -> String {
+    format!("{}_{}", unit.table(), bond.to_ascii_lowercase())
 }
 
 pub fn side(name: &str) -> String {
-    format!("{}_id", table(name))
+    format!("{}_id", name.to_ascii_lowercase())
 }
 
 pub fn col(name: &str) -> String {
     format!("\"{name}\"")
 }
 
-pub fn seat(unit: &str) -> String {
-    col(&table(unit))
+pub fn seat(unit: &Unit) -> String {
+    col(&unit.table())
 }
 
-pub fn joint(owner: &str, bond: &str) -> String {
-    col(&join(owner, bond))
+pub fn joint(unit: &Unit, bond: &str) -> String {
+    col(&join(unit, bond))
 }
 
 pub fn mate(owner: &str, bond: &str, target: &str) -> String {
-    if table(owner) == table(target) {
+    if owner.eq_ignore_ascii_case(target) {
         return side(bond);
     }
     side(target)
@@ -85,7 +92,7 @@ pub fn script(plan: &Plan, grain: Grain) -> Vec<String> {
 }
 
 fn lock(node: &Unit, slot: &Slot) -> String {
-    let place = table(node.name());
+    let place = node.table();
     let scopes: Vec<String> = match slot.only() {
         Only::Per(rels) => rels.iter().map(|rel| col(&side(rel))).collect(),
         _ => slot
@@ -127,7 +134,7 @@ fn form(node: &Unit, grain: Grain) -> String {
     stamp(node.reign(), &mut cols, grain);
     format!(
         "CREATE TABLE IF NOT EXISTS {} ({});",
-        seat(node.name()),
+        seat(node),
         cols.join(", ")
     )
 }
@@ -155,7 +162,7 @@ fn arc(node: &Unit, bond: &str, target: &str, grain: Grain) -> String {
     stamp(node.reign(), &mut cols, grain);
     format!(
         "CREATE TABLE IF NOT EXISTS {} ({});",
-        joint(node.name(), bond),
+        joint(node, bond),
         cols.join(", ")
     )
 }

@@ -35,7 +35,7 @@ impl<'a, W: Wire> Work<'a, W> {
             .join(", ");
         let text = format!(
             "INSERT INTO {} ({}) VALUES ({})",
-            ddl::seat(unit.name()),
+            ddl::seat(unit),
             cols.join(", "),
             marks
         );
@@ -87,7 +87,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let me = myself.map(|(key, _)| key).unwrap_or(0);
         let mut text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} != ?2 AND ({} IS NULL OR {} > ?3)",
-            ddl::seat(unit.name()),
+            ddl::seat(unit),
             ddl::col(slot.name()),
             ddl::KEY,
             ddl::EXPIRES,
@@ -151,7 +151,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let text = format!(
             "SELECT COALESCE(MAX({}), 0) + 1 FROM {} WHERE {col} = ?1 OR (?1 IS NULL AND {col} IS NULL)",
             ddl::col(slot.name()),
-            ddl::seat(unit.name())
+            ddl::seat(unit)
         );
         let hold = anchor(fields, None, scope)?;
         let rows = self.wire.rows(&text, &[hold]).await?;
@@ -169,7 +169,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let tick = now();
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} != ?2 AND ({} IS NULL OR {} > ?3) LIMIT 1",
-            ddl::seat(unit.name()),
+            ddl::seat(unit),
             ddl::col(&ddl::side(edge.name())),
             ddl::KEY,
             ddl::EXPIRES,
@@ -209,7 +209,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let text = format!(
             "SELECT {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2)",
             unit.sheet(),
-            ddl::seat(unit.name()),
+            ddl::seat(unit),
             ddl::KEY,
             ddl::EXPIRES,
             ddl::EXPIRES
@@ -229,7 +229,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let text = format!(
             "SELECT {} FROM {} WHERE {} IS NULL OR {} > ?1 ORDER BY {}",
             unit.sheet(),
-            ddl::seat(unit.name()),
+            ddl::seat(unit),
             ddl::EXPIRES,
             ddl::EXPIRES,
             ddl::KEY

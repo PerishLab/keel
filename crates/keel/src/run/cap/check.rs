@@ -27,6 +27,16 @@ impl Deed<'_> {
         cell(self.0, "unit")
     }
 
+    fn anchor(&self, plan: &Plan) -> String {
+        let place = self.place();
+        if place == "*" {
+            return place.to_string();
+        }
+        plan.find(place)
+            .map(|unit| unit.key())
+            .unwrap_or_else(|_| place.to_string())
+    }
+
     fn span(&self) -> &str {
         cell(self.0, "scope")
     }
@@ -65,7 +75,7 @@ impl Deed<'_> {
         let Ok(id) = id.parse::<i64>() else {
             return Ok(false);
         };
-        let Ok(node) = plan.find(&crate::name::key(place)) else {
+        let Ok(node) = plan.find(place) else {
             return Ok(false);
         };
         let Some(edge) = node.crew() else {
@@ -87,9 +97,10 @@ impl Deed<'_> {
         }
         let span = self.span();
         if span == "all" {
-            return Ok(self.place() == "*" || crate::name::key(self.place()) == plea.unit);
+            let anchor = self.anchor(plan);
+            return Ok(anchor == "*" || anchor == plea.unit);
         }
-        let anchor = crate::name::key(self.place());
+        let anchor = self.anchor(plan);
         if let Some(id) = span.strip_prefix("row ") {
             let Ok(id) = id.parse::<i64>() else {
                 return Ok(false);
@@ -137,7 +148,8 @@ pub async fn broad<W: Wire>(
         if !deed.bears(plan, &mut work, plea.who).await? || !deed.does(plea.verb) {
             continue;
         }
-        let wide = deed.place() == "*" || crate::name::key(deed.place()) == plea.unit;
+        let anchor = deed.anchor(plan);
+        let wide = anchor == "*" || anchor == plea.unit;
         if wide && deed.span() == "all" {
             return Ok(true);
         }
@@ -203,8 +215,8 @@ impl Mark<'_> {
             let Some(Cell::Int(up)) = cells.get(edge.name()).cloned() else {
                 break;
             };
-            let target = crate::name::key(edge.target());
             let mate = plan.find(edge.target())?;
+            let target = mate.key();
             let row = work.one(mate, up).await?;
             out.push(Hop {
                 unit: target.clone(),

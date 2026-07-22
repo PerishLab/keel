@@ -47,19 +47,22 @@ pub struct Reign {
 impl Plan {
     pub(crate) fn lift(graph: &Graph) -> Result<Self, crate::adapt::Error> {
         let mut units = BTreeMap::new();
-        for (name, spec) in graph.nodes() {
-            units.insert(name.clone(), Unit::lift(spec)?);
+        for spec in graph.nodes().values() {
+            let unit = Unit::lift(spec)?;
+            units.insert(unit.key(), unit);
         }
+        let names: std::collections::BTreeSet<String> =
+            units.values().map(|unit| unit.name().to_string()).collect();
         for unit in units.values() {
             for edge in &unit.bonds {
-                if !units.contains_key(&edge.target) {
+                if !names.contains(&edge.target) {
                     return Err(crate::adapt::Error::Missing(edge.target.clone()));
                 }
             }
         }
-        units.insert(crate::cap::GRANT.into(), Unit::grant());
-        units.insert(crate::cap::SEAL.into(), Unit::seal());
-        units.insert(crate::cap::PULSE.into(), Unit::pulse());
+        for engine in [Unit::grant(), Unit::seal(), Unit::pulse()] {
+            units.insert(engine.key(), engine);
+        }
         Ok(Self { units })
     }
 
@@ -68,23 +71,32 @@ impl Plan {
     }
 
     pub fn veiled(&self, name: &str) -> bool {
-        self.units.get(name).is_some_and(Unit::veil)
+        self.find(name).is_ok_and(Unit::veil)
     }
 
     pub fn shrouds(&self, tables: &[String]) -> bool {
         self.units
             .values()
-            .any(|unit| unit.veil() && tables.contains(&crate::name::key(unit.name())))
+            .any(|unit| unit.veil() && tables.contains(&unit.key()))
     }
 
     pub(crate) fn find(&self, name: &str) -> Result<&Unit, crate::adapt::Error> {
         if let Some(unit) = self.units.get(name) {
             return Ok(unit);
         }
-        self.units
+        let mut hits = self
+            .units
             .values()
-            .find(|unit| crate::name::key(unit.name()) == name)
-            .ok_or_else(|| crate::adapt::Error::Missing(name.into()))
+            .filter(|unit| unit.name() == name || unit.name().to_ascii_lowercase() == name);
+        let first = hits
+            .next()
+            .ok_or_else(|| crate::adapt::Error::Missing(name.into()))?;
+        if hits.next().is_some() {
+            return Err(crate::adapt::Error::Adapt(
+                "ambiguous unit name; qualify it".into(),
+            ));
+        }
+        Ok(first)
     }
 
     pub(crate) fn edge(

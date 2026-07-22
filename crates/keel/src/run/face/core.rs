@@ -1,7 +1,6 @@
 use super::*;
 use crate::adapt::Error;
 use crate::cap;
-use crate::ddl;
 use crate::ddl::Grain;
 use crate::life::{Ends, Row, Tie};
 use crate::plan::Plan;
@@ -119,7 +118,7 @@ impl<W: Wire> Core<W> {
 
     pub async fn has(&self, name: &str) -> Result<bool, Error> {
         let mut seat = self.seize().await?;
-        let table = ddl::table(name);
+        let table = name.to_string();
         let rows = match seat.wire.grain() {
             Grain::Lite => {
                 seat.wire
@@ -143,7 +142,7 @@ impl<W: Wire> Core<W> {
 
     pub async fn cols(&self, name: &str) -> Result<Vec<String>, Error> {
         let mut seat = self.seize().await?;
-        let table = ddl::table(name);
+        let table = name.to_string();
         match seat.wire.grain() {
             Grain::Lite => {
                 let rows = seat

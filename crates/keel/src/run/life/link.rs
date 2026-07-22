@@ -47,7 +47,7 @@ impl<'a, W: Wire> Work<'a, W> {
             .join(", ");
         let text = format!(
             "INSERT INTO {} ({}) VALUES ({})",
-            ddl::joint(unit.name(), edge.name()),
+            ddl::joint(unit, edge.name()),
             cols.join(", "),
             marks
         );
@@ -87,7 +87,7 @@ impl<'a, W: Wire> Work<'a, W> {
             return Err(Error::Adapt("right not live".into()));
         }
         let tick = now();
-        let mut text = format!("UPDATE {} SET ", ddl::joint(unit.name(), edge.name()));
+        let mut text = format!("UPDATE {} SET ", ddl::joint(unit, edge.name()));
         let mut vals: Vec<Val> = Vec::new();
         for (i, (col, val)) in fields.iter().enumerate() {
             if i > 0 {
@@ -128,7 +128,7 @@ impl<'a, W: Wire> Work<'a, W> {
             "SELECT {}, {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2)",
             src,
             dst,
-            ddl::joint(unit.name(), edge.name()),
+            ddl::joint(unit, edge.name()),
             ddl::KEY,
             ddl::EXPIRES,
             ddl::EXPIRES
@@ -169,7 +169,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let text = format!(
             "SELECT {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) ORDER BY {}",
             cols.join(", "),
-            ddl::joint(unit.name(), edge.name()),
+            ddl::joint(unit, edge.name()),
             ddl::col(&ddl::side(unit.name())),
             ddl::EXPIRES,
             ddl::EXPIRES,
@@ -191,7 +191,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let tick = now();
         let text = format!(
             "UPDATE {} SET {} = ?1, {} = ?1 WHERE {} = ?2",
-            ddl::joint(unit.name(), edge.name()),
+            ddl::joint(unit, edge.name()),
             ddl::EXPIRES,
             ddl::UPDATED,
             ddl::KEY
@@ -210,7 +210,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let tick = now();
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
-            ddl::seat(unit.name()),
+            ddl::seat(unit),
             ddl::KEY,
             ddl::EXPIRES,
             ddl::EXPIRES
@@ -236,7 +236,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let dst = ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target()));
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} = ?2 AND ({} IS NULL OR {} > ?3) LIMIT 1",
-            ddl::joint(unit.name(), edge.name()),
+            ddl::joint(unit, edge.name()),
             src,
             dst,
             ddl::EXPIRES,

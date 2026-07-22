@@ -30,13 +30,13 @@ impl<W: Wire> Tx<'_, W> {
         let key = Work::new(&mut self.seat.wire, plan)
             .put(&unit, fields)
             .await?;
-        self.beat("put", &crate::name::key(&unit), key).await;
+        self.beat("put", &unit, key).await;
         Ok(key)
     }
 
     pub(super) async fn beat(&mut self, verb: &str, unit: &str, key: i64) {
         self.core.stash.bump(unit);
-        if unit == crate::name::key(cap::PULSE) || unit == crate::name::key(cap::SEAL) {
+        if unit == cap::PULSE || unit == cap::SEAL {
             return;
         }
         let told = label(self.who);
@@ -60,7 +60,7 @@ impl<W: Wire> Tx<'_, W> {
         Work::new(&mut self.seat.wire, plan)
             .set(&unit, key, fields)
             .await?;
-        self.beat("set", &crate::name::key(&unit), key).await;
+        self.beat("set", &unit, key).await;
         Ok(())
     }
 
@@ -80,7 +80,7 @@ impl<W: Wire> Tx<'_, W> {
             }
             None => Work::new(&mut self.seat.wire, plan).end(&unit, key).await?,
         }
-        self.beat("end", &crate::name::key(&unit), key).await;
+        self.beat("end", &unit, key).await;
         Ok(())
     }
 
@@ -156,7 +156,7 @@ impl<W: Wire> Tx<'_, W> {
     }
 
     pub(super) async fn deeds(&mut self) -> Result<Arc<Vec<Row>>, Error> {
-        let step = self.core.stash.step(&crate::name::key(cap::GRANT));
+        let step = self.core.stash.step(cap::GRANT);
         if let Some(rows) = self.core.deeds.read(step) {
             return Ok(rows);
         }
@@ -172,11 +172,12 @@ impl<W: Wire> Tx<'_, W> {
         unit: &str,
         mark: &cap::Mark<'_>,
     ) -> Result<bool, Error> {
+        let unit = self.core.plan().find(unit)?.key();
         let deeds = self.deeds().await?;
         let plea = cap::Plea {
             who: self.who,
             verb,
-            unit: &crate::name::key(unit),
+            unit: &unit,
             mark,
         };
         cap::check(self.core.plan(), &mut self.seat.wire, &plea, &deeds).await

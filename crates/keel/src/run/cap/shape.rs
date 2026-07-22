@@ -4,7 +4,7 @@ use crate::plan::Plan;
 use std::collections::BTreeMap;
 
 pub fn blend(plan: &Plan, unit: &str, base: &mut BTreeMap<String, Cell>, fields: &[(&str, &str)]) {
-    let Some(node) = plan.find(&crate::name::key(unit)).ok() else {
+    let Some(node) = plan.find(unit).ok() else {
         return;
     };
     for (k, v) in fields {
@@ -28,7 +28,7 @@ pub fn blend(plan: &Plan, unit: &str, base: &mut BTreeMap<String, Cell>, fields:
 
 pub fn mold(plan: &Plan, unit: &str, fields: &[(&str, &str)]) -> BTreeMap<String, Cell> {
     let mut out = BTreeMap::new();
-    let Some(node) = plan.find(&crate::name::key(unit)).ok() else {
+    let Some(node) = plan.find(unit).ok() else {
         return out;
     };
     for slot in node.fields() {

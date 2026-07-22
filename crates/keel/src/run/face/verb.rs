@@ -104,7 +104,7 @@ impl<W: Wire> Tx<'_, W> {
             let pack = self.sight(&flat).await?;
             let mut rows = pack.rows().to_vec();
             self.sift(&unit, &mut rows).await?;
-            return Ok(Pack::tallied(crate::name::key(&unit), rows.len()));
+            return Ok(Pack::tallied(unit, rows.len()));
         }
         let mut pack = self.sight(tree).await?;
         self.strain(&unit, &mut pack).await?;
@@ -112,17 +112,13 @@ impl<W: Wire> Tx<'_, W> {
     }
 
     pub(super) async fn strain(&mut self, unit: &str, pack: &mut Pack) -> Result<(), Error> {
-        let root = crate::name::key(unit);
+        let root = unit.to_string();
         let mut kept: Vec<i64> = Vec::new();
         if let Some(crate::query::Bag::Unit(rows)) = pack.amend().get_mut(&root) {
             self.sift(unit, rows).await?;
             kept = rows.iter().map(Row::key).collect();
         }
-        let node = self
-            .plan()
-            .units()
-            .get(unit)
-            .ok_or_else(|| Error::Missing(unit.into()))?;
+        let node = self.plan().find(unit)?;
         let bonds: Vec<(String, String)> = node
             .bonds()
             .iter()

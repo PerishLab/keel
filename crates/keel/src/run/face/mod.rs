@@ -217,7 +217,7 @@ fn label(who: Who) -> String {
 }
 
 fn lane(unit: &str, bond: &str) -> String {
-    format!("{}.{}", crate::name::key(unit), bond)
+    format!("{}.{}", unit, bond)
 }
 
 mod core;

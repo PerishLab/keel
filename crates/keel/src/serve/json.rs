@@ -27,11 +27,7 @@ impl<W: Wire> Reach for Core<W> {
     }
 
     fn bond(&self, unit: &str, bond: &str) -> Result<String, Fault> {
-        let node = self
-            .plan()
-            .units()
-            .get(unit)
-            .ok_or_else(|| Fault::miss(unit))?;
+        let node = self.plan().find(unit).map_err(|_| Fault::miss(unit))?;
         node.bonds()
             .iter()
             .find(|edge| edge.name().eq_ignore_ascii_case(bond))

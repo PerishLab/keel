@@ -5,7 +5,7 @@ use crate::life::{Cell, Row};
 use std::collections::BTreeMap;
 
 pub fn digest(tree: &Tree) -> String {
-    let unit = crate::name::key(tree.from());
+    let unit = tree.from().to_ascii_lowercase();
     let mut out = match tree.slice() {
         Slice::Live => format!("from {unit} slice live"),
     };
@@ -46,7 +46,7 @@ pub fn digest(tree: &Tree) -> String {
 }
 
 pub fn shape(tree: &Tree) -> String {
-    let unit = crate::name::key(tree.from());
+    let unit = tree.from().to_ascii_lowercase();
     let mut out = match tree.slice() {
         Slice::Live => format!("from {unit} slice live"),
     };

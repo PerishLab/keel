@@ -28,15 +28,20 @@ async fn wire() {
     let core = bind(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
-    let student = core.plan().units().get("Student").expect("Student");
+    let student = core
+        .plan()
+        .units()
+        .values()
+        .find(|u| u.name() == "Student")
+        .expect("Student");
     assert_eq!(student.fields().len(), 2);
     assert_eq!(student.bonds().len(), 1);
     assert!(student.reign().expires());
-    assert!(core.has("Student").await.expect("has Student"));
-    assert!(core.has("Class").await.expect("has Class"));
-    let link = ddl::join("Student", "classes");
+    assert!(core.has(&student.table()).await.expect("has Student"));
+    assert!(core.has("class").await.expect("has Class"));
+    let link = ddl::join(student, "classes");
     assert!(core.has(&link).await.expect("has join"));
-    let cols = core.cols("Student").await.expect("cols");
+    let cols = core.cols(&student.table()).await.expect("cols");
     assert!(cols.iter().any(|c| c == ddl::KEY));
     assert!(cols.iter().any(|c| c == "nickname"));
     assert!(cols.iter().any(|c| c == "avatar"));
@@ -211,4 +216,52 @@ async fn exact() {
         .expect("key resolves");
     assert!(core.put("CLASS", &[("title", "no")]).await.is_err());
     assert!(core.put("Class ", &[("title", "no")]).await.is_err());
+}
+
+#[tokio::test]
+async fn rooted() {
+    #[resource]
+    struct Org {
+        #[field(string)]
+        name: string,
+    }
+
+    #[resource]
+    struct Label {
+        #[field(string)]
+        tag: string,
+        #[relation(Org, many2one, root)]
+        org: Org,
+    }
+
+    let mut graph = Graph::new();
+    graph.plug::<Org>().plug::<Label>();
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    let label = core
+        .plan()
+        .units()
+        .values()
+        .find(|u| u.name() == "Label")
+        .expect("Label");
+    assert_eq!(label.key(), "org:label");
+    assert_eq!(label.table(), "org_label");
+    let org = core
+        .plan()
+        .units()
+        .values()
+        .find(|u| u.name() == "Org")
+        .expect("Org");
+    assert_eq!(org.key(), "org");
+    assert_eq!(org.table(), "org");
+
+    let acme = core.put("Org", &[("name", "acme")]).await.expect("org");
+    core.put("Label", &[("tag", "bug"), ("org", &acme.to_string())])
+        .await
+        .expect("label");
+    let pack = core.query("from Label").await.expect("pack");
+    assert_eq!(pack.rows().len(), 1);
+    assert!(core.has("org_label").await.expect("has"));
+    assert!(!core.has("label").await.expect("no bare"));
 }

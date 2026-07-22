@@ -76,6 +76,14 @@ impl Spec {
         &self.name
     }
 
+    pub fn stem(&self) -> Option<&str> {
+        self.bonds.iter().find(|bond| bond.root()).map(Bond::target)
+    }
+
+    pub fn key(&self) -> String {
+        crate::name::key(&self.name, self.stem())
+    }
+
     pub fn veiled(&self) -> bool {
         self.veil
     }

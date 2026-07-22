@@ -126,7 +126,7 @@ try {
       repo: twin,
       author: bob,
     }, crown);
-    const rows = packRows(await query("from Issue", crown), "issue");
+    const rows = packRows(await query("from Issue", crown), "repo:issue");
     const at = (id: unknown) => rows.find((r) => r.id === id);
     if (at(one.id)?.index !== 1 || at(two.id)?.index !== 2) {
       throw new Error("keel indexes wrong");
@@ -155,7 +155,7 @@ try {
   await check("close is business state", async () => {
     const rows = packRows(
       await query(`from Issue where repo = "${keel}" order by index`, crown),
-      "issue",
+      "repo:issue",
     );
     const first = num(rows[0].id);
     const res = await fetch(`${base}/issue/${first}`, {
@@ -175,7 +175,7 @@ try {
         `from Issue where repo = "${keel}" and closed = "false"`,
         crown,
       ),
-      "issue",
+      "repo:issue",
     );
     if (open.length !== 1) {
       throw new Error("expected 1 open issue");
@@ -228,7 +228,7 @@ try {
   await check("issues order by index desc", async () => {
     const rows = packRows(
       await query(`from Issue where repo = "${keel}" order by index desc`, crown),
-      "issue",
+      "repo:issue",
     );
     if (rows.length !== 2 || rows[0].index !== 2) {
       throw new Error("desc order wrong");
@@ -529,7 +529,7 @@ try {
   await grant(String(carol), "see", "@grant", "all");
   await postJson("/hook", {
     url: "http://127.0.0.1:18768/hooked",
-    unit: "repo",
+    unit: "actor:repo",
     verb: "",
     actor: carol,
   }, her);
@@ -562,7 +562,7 @@ try {
       owner: dave,
     }, him);
     await sleep(1200);
-    const seen = inbox.filter((e) => e.unit === "repo");
+    const seen = inbox.filter((e) => e.unit === "actor:repo");
     if (seen.length !== 1) {
       throw new Error(`expected 1 repo event, got ${seen.length}`);
     }

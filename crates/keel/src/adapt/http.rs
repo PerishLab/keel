@@ -21,7 +21,7 @@ pub fn paths(plan: &Plan) -> Vec<Path> {
     for unit in plan.units().values() {
         paths.push(Path {
             unit: unit.name().to_string(),
-            route: format!("/{}", crate::name::key(unit.name())),
+            route: format!("/{}", unit.key()),
         });
     }
     paths.sort_by(|a, b| a.route.cmp(&b.route));

@@ -143,6 +143,18 @@ impl Unit {
         self.bonds.iter().find(|e| e.root)
     }
 
+    pub fn stem(&self) -> Option<&str> {
+        self.root().map(Edge::target)
+    }
+
+    pub fn key(&self) -> String {
+        crate::name::key(&self.name, self.stem())
+    }
+
+    pub fn table(&self) -> String {
+        crate::ddl::table(&self.name, self.stem())
+    }
+
     pub fn crew(&self) -> Option<&Edge> {
         self.bonds.iter().find(|e| e.crew)
     }

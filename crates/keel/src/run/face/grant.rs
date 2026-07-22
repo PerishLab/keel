@@ -120,7 +120,7 @@ impl<W: Wire> Tx<'_, W> {
         let plea = cap::Plea {
             who: self.who,
             verb,
-            unit: &crate::name::key(unit),
+            unit,
             mark: &cap::Mark::none(),
         };
         if cap::broad(self.core.plan(), &mut self.seat.wire, &plea, &deeds).await? {

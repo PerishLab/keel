@@ -127,10 +127,7 @@ pub(crate) fn range(
 ) -> Result<BTreeMap<String, Unit>, Error> {
     let mut out = BTreeMap::new();
     for bond in reached(unit, tree) {
-        let target = plan
-            .units()
-            .get(bond.target())
-            .ok_or_else(|| Error::Missing(bond.target().into()))?;
+        let target = plan.find(bond.target())?;
         out.insert(bond.target().to_string(), target.clone());
     }
     Ok(out)
@@ -154,23 +151,15 @@ pub(crate) fn reached<'a>(unit: &'a Unit, tree: &Tree) -> Vec<&'a crate::plan::E
 }
 
 pub fn resolve(plan: &Plan, unit: &str) -> Result<String, Error> {
-    plan.units()
-        .values()
-        .find(|node| node.name() == unit || crate::name::key(node.name()) == unit)
-        .map(|node| node.name().to_string())
-        .ok_or_else(|| Error::Missing(unit.into()))
+    Ok(plan.find(unit)?.key())
 }
 
 impl Tree {
     pub fn involved(&self, plan: &Plan) -> Result<Vec<String>, Error> {
-        let name = resolve(plan, self.from())?;
-        let unit = plan
-            .units()
-            .get(&name)
-            .ok_or_else(|| Error::Missing(name.clone()))?;
-        let mut out = vec![crate::name::key(&name)];
+        let unit = plan.find(self.from())?;
+        let mut out = vec![unit.key()];
         for bond in reached(unit, self) {
-            out.push(crate::name::key(bond.target()));
+            out.push(plan.find(bond.target())?.key());
         }
         out.sort();
         out.dedup();

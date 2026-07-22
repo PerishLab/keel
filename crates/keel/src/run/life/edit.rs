@@ -24,7 +24,7 @@ impl<'a, W: Wire> Work<'a, W> {
         }
         let text = format!(
             "UPDATE {} SET {} = ?1, {} = ?2 WHERE {} = ?3 AND ({} IS NULL OR {} > ?2)",
-            ddl::seat(unit.name()),
+            ddl::seat(unit),
             ddl::EXPIRES,
             ddl::UPDATED,
             ddl::KEY,
@@ -52,7 +52,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let tick = now();
         let text = format!(
             "INSERT INTO {} (verb, unit, who, {}, {}, {}, {}) VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?5)",
-            ddl::seat(seat.name()),
+            ddl::seat(seat),
             ddl::col("key"),
             ddl::EXPIRES,
             ddl::CREATED,
@@ -72,10 +72,10 @@ impl<'a, W: Wire> Work<'a, W> {
     pub(super) async fn trim(&mut self, seat: &Unit) -> Result<(), Error> {
         let text = format!(
             "DELETE FROM {} WHERE {} <= (SELECT MAX({}) FROM {}) - ?1",
-            ddl::seat(seat.name()),
+            ddl::seat(seat),
             ddl::KEY,
             ddl::KEY,
-            ddl::seat(seat.name())
+            ddl::seat(seat)
         );
         self.wire
             .run(&text, &[Val::Int(crate::cap::WINDOW as i64)])
@@ -87,7 +87,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let unit = self.plan.find(name)?;
         let text = format!(
             "SELECT 1 FROM {} WHERE {} = ?1 AND {} IS NULL LIMIT 1",
-            ddl::seat(unit.name()),
+            ddl::seat(unit),
             ddl::KEY,
             ddl::EXPIRES
         );
@@ -116,10 +116,10 @@ impl<'a, W: Wire> Work<'a, W> {
     ) -> Result<bool, Error> {
         let tick = now();
         let (place, col) = if edge.kind().point() {
-            (ddl::seat(unit.name()), ddl::col(&ddl::side(edge.name())))
+            (ddl::seat(unit), ddl::col(&ddl::side(edge.name())))
         } else {
             (
-                ddl::joint(unit.name(), edge.name()),
+                ddl::joint(unit, edge.name()),
                 ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target())),
             )
         };
@@ -146,7 +146,7 @@ impl<'a, W: Wire> Work<'a, W> {
             let left = ddl::col(&ddl::side(unit.name()));
             let text = format!(
                 "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
-                ddl::joint(unit.name(), edge.name()),
+                ddl::joint(unit, edge.name()),
                 left,
                 ddl::EXPIRES,
                 ddl::EXPIRES
@@ -180,7 +180,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let base = self.peek(unit, key).await?;
         self.solid(unit, fields, Some((key, &base))).await?;
         let tick = now();
-        let mut text = format!("UPDATE {} SET ", ddl::seat(unit.name()));
+        let mut text = format!("UPDATE {} SET ", ddl::seat(unit));
         let mut vals: Vec<Val> = Vec::new();
         for (i, (col, val)) in fields.iter().enumerate() {
             if i > 0 {
