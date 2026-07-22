@@ -7,7 +7,7 @@ pub mod wire;
 #[cfg(feature = "http")]
 pub mod serve;
 
-pub use model::{atom, bond, ddl, graph, plan, spec};
+pub use model::{atom, bond, ddl, graph, name, plan, spec};
 pub use run::{cap, face, life, query};
 
 pub use adapt::bind;

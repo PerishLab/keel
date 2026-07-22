@@ -1,6 +1,5 @@
 use super::*;
 use crate::adapt::Error;
-use crate::ddl;
 use crate::plan::Plan;
 use crate::query;
 
@@ -32,7 +31,7 @@ pub(crate) fn whole(plan: &Plan, who: &str) -> bool {
     if id.parse::<i64>().is_err() {
         return false;
     }
-    plan.find(&ddl::table(place))
+    plan.find(&crate::name::key(place))
         .ok()
         .is_some_and(|node| node.crew().is_some())
 }

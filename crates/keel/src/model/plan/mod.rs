@@ -74,17 +74,16 @@ impl Plan {
     pub fn shrouds(&self, tables: &[String]) -> bool {
         self.units
             .values()
-            .any(|unit| unit.veil() && tables.contains(&crate::ddl::table(unit.name())))
+            .any(|unit| unit.veil() && tables.contains(&crate::name::key(unit.name())))
     }
 
     pub(crate) fn find(&self, name: &str) -> Result<&Unit, crate::adapt::Error> {
         if let Some(unit) = self.units.get(name) {
             return Ok(unit);
         }
-        let want = crate::ddl::table(name);
         self.units
             .values()
-            .find(|unit| crate::ddl::table(unit.name()) == want)
+            .find(|unit| crate::name::key(unit.name()) == name)
             .ok_or_else(|| crate::adapt::Error::Missing(name.into()))
     }
 

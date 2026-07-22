@@ -27,7 +27,7 @@ pub async fn run<W: Wire>(
     sweep.hold(&mut rows, tree.preds()).await?;
     if tree.tally() {
         return Ok(Pack {
-            root: ddl::table(scope.name()),
+            root: crate::name::key(scope.name()),
             bags: BTreeMap::new(),
             count: Some(rows.len()),
         });
@@ -35,7 +35,7 @@ pub async fn run<W: Wire>(
     order(&mut rows, tree.sort());
     page(&mut rows, tree.after(), tree.limit());
     let keys: Vec<i64> = rows.iter().map(|row| row.key()).collect();
-    let root = ddl::table(scope.name());
+    let root = crate::name::key(scope.name());
     let mut bags = BTreeMap::new();
     bags.insert(root.clone(), Bag::Unit(rows));
     for name in tree.links() {

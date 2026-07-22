@@ -154,10 +154,9 @@ pub(crate) fn reached<'a>(unit: &'a Unit, tree: &Tree) -> Vec<&'a crate::plan::E
 }
 
 pub fn resolve(plan: &Plan, unit: &str) -> Result<String, Error> {
-    let want = ddl::table(unit);
     plan.units()
         .values()
-        .find(|node| ddl::table(node.name()) == want)
+        .find(|node| node.name() == unit || crate::name::key(node.name()) == unit)
         .map(|node| node.name().to_string())
         .ok_or_else(|| Error::Missing(unit.into()))
 }
@@ -169,9 +168,9 @@ impl Tree {
             .units()
             .get(&name)
             .ok_or_else(|| Error::Missing(name.clone()))?;
-        let mut out = vec![ddl::table(&name)];
+        let mut out = vec![crate::name::key(&name)];
         for bond in reached(unit, self) {
-            out.push(ddl::table(bond.target()));
+            out.push(crate::name::key(bond.target()));
         }
         out.sort();
         out.dedup();

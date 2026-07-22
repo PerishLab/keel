@@ -235,6 +235,20 @@ so the shared meaning stays true.
 - `sheet` — canonical select column order for positional row reads.
 - `pg` — the Postgres store (`adapt::pg`, `pg` feature): second Wire impl,
   proving store portability. `dollar`/`lift`/`lean`/`own` bridge Val <-> pg.
+- `key` — a unit's **identity** rendering (`name::key`, in its own `name`
+  module because identity is not physical DDL): the name as it appears in
+  `@grant` place, pulse events, pack bag keys, cache digests, the route
+  path, and every plan resolution. `table` (in `ddl`) is the **physical**
+  SQL rendering. They coincide today (both lowercase the name), but they are
+  two contracts in two modules and the call sites now say which they mean —
+  the split `docs/model/name.md` legislates. Resolution matches the declared name or
+  its key **exactly**; the old `table()`-on-both-sides lowercasing of caller
+  input is gone, so `/Actor` and `/ACTOR` no longer resolve `Actor` — only
+  `Actor` (the name) and `actor` (the key) do.
+- `table` — a unit's physical SQL table name (`ddl::table`). Only two call
+  sites outside `ddl` still use it — `has`/`cols`, which read the database
+  catalog — because everything else that once reached for a table name
+  wanted the identity key.
 - `grain` — ddl dialect (`Lite` | `Pg`): key column, int type, header.
 - `keel-blob` — the default object package (caller space): `blob!(Actor)`
   ships an `Asset` metadata unit; upload/download are capability-gated

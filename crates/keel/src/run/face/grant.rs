@@ -1,7 +1,6 @@
 use super::*;
 use crate::adapt::Error;
 use crate::cap;
-use crate::ddl;
 use crate::life::Work;
 use crate::query::{self};
 use crate::wire::Wire;
@@ -121,7 +120,7 @@ impl<W: Wire> Tx<'_, W> {
         let plea = cap::Plea {
             who: self.who,
             verb,
-            unit: &ddl::table(unit),
+            unit: &crate::name::key(unit),
             mark: &cap::Mark::none(),
         };
         if cap::broad(self.core.plan(), &mut self.seat.wire, &plea, &deeds).await? {

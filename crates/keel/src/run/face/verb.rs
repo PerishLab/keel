@@ -1,7 +1,6 @@
 use super::*;
 use crate::adapt::Error;
 use crate::cap;
-use crate::ddl;
 use crate::life::{Row, Work};
 use crate::query::{self, Pack, Tree};
 use crate::wire::Wire;
@@ -105,7 +104,7 @@ impl<W: Wire> Tx<'_, W> {
             let pack = self.sight(&flat).await?;
             let mut rows = pack.rows().to_vec();
             self.sift(&unit, &mut rows).await?;
-            return Ok(Pack::tallied(ddl::table(&unit), rows.len()));
+            return Ok(Pack::tallied(crate::name::key(&unit), rows.len()));
         }
         let mut pack = self.sight(tree).await?;
         self.strain(&unit, &mut pack).await?;
@@ -113,7 +112,7 @@ impl<W: Wire> Tx<'_, W> {
     }
 
     pub(super) async fn strain(&mut self, unit: &str, pack: &mut Pack) -> Result<(), Error> {
-        let root = ddl::table(unit);
+        let root = crate::name::key(unit);
         let mut kept: Vec<i64> = Vec::new();
         if let Some(crate::query::Bag::Unit(rows)) = pack.amend().get_mut(&root) {
             self.sift(unit, rows).await?;

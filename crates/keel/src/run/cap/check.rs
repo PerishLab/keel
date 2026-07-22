@@ -1,6 +1,5 @@
 use super::*;
 use crate::adapt::Error;
-use crate::ddl;
 use crate::face::Who;
 use crate::life::{Cell, Row, Work};
 use crate::plan::Plan;
@@ -66,7 +65,7 @@ impl Deed<'_> {
         let Ok(id) = id.parse::<i64>() else {
             return Ok(false);
         };
-        let Ok(node) = plan.find(&ddl::table(place)) else {
+        let Ok(node) = plan.find(&crate::name::key(place)) else {
             return Ok(false);
         };
         let Some(edge) = node.crew() else {
@@ -88,9 +87,9 @@ impl Deed<'_> {
         }
         let span = self.span();
         if span == "all" {
-            return Ok(self.place() == "*" || ddl::table(self.place()) == plea.unit);
+            return Ok(self.place() == "*" || crate::name::key(self.place()) == plea.unit);
         }
-        let anchor = ddl::table(self.place());
+        let anchor = crate::name::key(self.place());
         if let Some(id) = span.strip_prefix("row ") {
             let Ok(id) = id.parse::<i64>() else {
                 return Ok(false);
@@ -138,7 +137,7 @@ pub async fn broad<W: Wire>(
         if !deed.bears(plan, &mut work, plea.who).await? || !deed.does(plea.verb) {
             continue;
         }
-        let wide = deed.place() == "*" || ddl::table(deed.place()) == plea.unit;
+        let wide = deed.place() == "*" || crate::name::key(deed.place()) == plea.unit;
         if wide && deed.span() == "all" {
             return Ok(true);
         }
@@ -204,7 +203,7 @@ impl Mark<'_> {
             let Some(Cell::Int(up)) = cells.get(edge.name()).cloned() else {
                 break;
             };
-            let target = ddl::table(edge.target());
+            let target = crate::name::key(edge.target());
             let mate = plan.find(edge.target())?;
             let row = work.one(mate, up).await?;
             out.push(Hop {

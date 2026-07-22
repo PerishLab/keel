@@ -195,3 +195,20 @@ async fn miss() {
         Err(err) => panic!("unexpected {err}"),
     }
 }
+
+#[tokio::test]
+async fn exact() {
+    let mut graph = Graph::new();
+    graph.plug::<Class>().plug::<Student>();
+    let core = bind(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    core.put("Class", &[("title", "algebra")])
+        .await
+        .expect("declared name resolves");
+    core.put("class", &[("title", "history")])
+        .await
+        .expect("key resolves");
+    assert!(core.put("CLASS", &[("title", "no")]).await.is_err());
+    assert!(core.put("Class ", &[("title", "no")]).await.is_err());
+}

@@ -107,3 +107,5 @@ to the other, and an ambiguous short name refused at resolution.
 - One separator carrying both containment and possession.
 - Scope deeper than one segment, or a name grown to dodge N-4.
 - A resolution failure that resolves to something anyway.
+- Case-folding a caller's name on the way in. Resolution matches the
+  declared name or its key exactly; `/ACTOR` is not `Actor`.

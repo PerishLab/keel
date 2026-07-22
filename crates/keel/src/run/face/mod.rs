@@ -1,5 +1,4 @@
 use crate::adapt::Error;
-use crate::ddl;
 use crate::life::{Row, Tie};
 use crate::plan::Plan;
 use crate::query::{Pack, Scope, Tree};
@@ -218,7 +217,7 @@ fn label(who: Who) -> String {
 }
 
 fn lane(unit: &str, bond: &str) -> String {
-    format!("{}.{}", ddl::table(unit), bond)
+    format!("{}.{}", crate::name::key(unit), bond)
 }
 
 mod core;

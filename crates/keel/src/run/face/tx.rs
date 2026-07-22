@@ -2,7 +2,6 @@ use super::*;
 use super::{label, lane};
 use crate::adapt::Error;
 use crate::cap;
-use crate::ddl;
 use crate::life::{Ends, Row, Work};
 use crate::plan::Plan;
 use crate::query::{self, Pack, Tree};
@@ -31,13 +30,13 @@ impl<W: Wire> Tx<'_, W> {
         let key = Work::new(&mut self.seat.wire, plan)
             .put(&unit, fields)
             .await?;
-        self.beat("put", &ddl::table(&unit), key).await;
+        self.beat("put", &crate::name::key(&unit), key).await;
         Ok(key)
     }
 
     pub(super) async fn beat(&mut self, verb: &str, unit: &str, key: i64) {
         self.core.stash.bump(unit);
-        if unit == ddl::table(cap::PULSE) || unit == ddl::table(cap::SEAL) {
+        if unit == crate::name::key(cap::PULSE) || unit == crate::name::key(cap::SEAL) {
             return;
         }
         let told = label(self.who);
@@ -61,7 +60,7 @@ impl<W: Wire> Tx<'_, W> {
         Work::new(&mut self.seat.wire, plan)
             .set(&unit, key, fields)
             .await?;
-        self.beat("set", &ddl::table(&unit), key).await;
+        self.beat("set", &crate::name::key(&unit), key).await;
         Ok(())
     }
 
@@ -81,7 +80,7 @@ impl<W: Wire> Tx<'_, W> {
             }
             None => Work::new(&mut self.seat.wire, plan).end(&unit, key).await?,
         }
-        self.beat("end", &ddl::table(&unit), key).await;
+        self.beat("end", &crate::name::key(&unit), key).await;
         Ok(())
     }
 
@@ -157,7 +156,7 @@ impl<W: Wire> Tx<'_, W> {
     }
 
     pub(super) async fn deeds(&mut self) -> Result<Arc<Vec<Row>>, Error> {
-        let step = self.core.stash.step(&ddl::table(cap::GRANT));
+        let step = self.core.stash.step(&crate::name::key(cap::GRANT));
         if let Some(rows) = self.core.deeds.read(step) {
             return Ok(rows);
         }
@@ -177,7 +176,7 @@ impl<W: Wire> Tx<'_, W> {
         let plea = cap::Plea {
             who: self.who,
             verb,
-            unit: &ddl::table(unit),
+            unit: &crate::name::key(unit),
             mark,
         };
         cap::check(self.core.plan(), &mut self.seat.wire, &plea, &deeds).await

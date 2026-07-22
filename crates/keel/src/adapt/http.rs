@@ -1,4 +1,3 @@
-use crate::ddl;
 use crate::plan::Plan;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -22,7 +21,7 @@ pub fn paths(plan: &Plan) -> Vec<Path> {
     for unit in plan.units().values() {
         paths.push(Path {
             unit: unit.name().to_string(),
-            route: format!("/{}", ddl::table(unit.name())),
+            route: format!("/{}", crate::name::key(unit.name())),
         });
     }
     paths.sort_by(|a, b| a.route.cmp(&b.route));
