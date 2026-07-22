@@ -23,6 +23,7 @@ pub fn app<W: Wire + 'static>(core: Arc<Core<W>>, prefix: &str) -> Router {
     let api = Router::new()
         .route("/health", get(health))
         .route("/query", post(run::<W>))
+        .route("/batch", post(batch::<W>))
         .route("/{unit}", get(list::<W>).post(create::<W>))
         .route(
             "/{unit}/{id}",
@@ -99,7 +100,9 @@ async fn health() -> impl IntoResponse {
 mod fault;
 mod json;
 mod route;
+mod write;
 
 pub(crate) use fault::*;
 pub(crate) use json::*;
 pub(crate) use route::*;
+pub(crate) use write::*;

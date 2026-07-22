@@ -84,11 +84,25 @@ own alphabet:
 | Host type | the declared name | `Label` |
 | Identity key | `{root}:{name}` | `repo:label` |
 | SQL table | the key, `:` written `_` | `repo_label` |
-| URL segment | the key | `/repo:label/{id}` |
-| Capability, pulse | the key | `repo:label` |
+| URL segment | an **unambiguous short name** only | `/label`, `/issue` |
+| Capability, pulse, query DSL | the key | `repo:label` |
 
 A bond name is one atom, so the only `_` a table name carries comes from
 its own scope. `repo_label_tags` decomposes exactly one way.
+
+## The colon never enters a URL
+
+A `:` is legal in a path segment but breaks a **relative** URL — its first
+segment is read as a scheme (`repo:label/1` parses as scheme `repo:`). So
+the key never appears in a route. The REST surface addresses only units
+reachable by an **unambiguous bare name**; a name shared by two units has no
+REST route. Everything else carries the key in a request **body**, where a
+colon is inert: reads through `/query` (`from repo:label …`), and writes
+through `/batch` — a list of deeds (`put`/`set`/`end`/`tie`/`tune`/`cut`),
+each naming its `unit`/`owner` by key, run as one operator-scoped
+transaction (`docs/run/txn.md`). `/batch` is the HTTP face of `batch`, and
+the write-side mirror of `/query`; a deed list is static data, so a deed
+cannot reference an id a prior deed in the same batch created.
 
 ## Conformance
 

@@ -218,7 +218,10 @@ so the shared meaning stays true.
 - `scopes` — macro parse of a unique scope, single ref or a ref tuple (U4).
 - `batch` — Core/Face verb: run a closure of writes as one transaction;
   all-or-nothing, intra-batch visibility, pulse inside the txn
-  (`docs/txn.md`).
+  (`docs/txn.md`). Its HTTP face is `POST /batch`, taking a `deeds` list
+  (put/set/end/tie/tune/cut, each naming its `unit`/`owner` by key in the
+  body) — the colon-free write path, and the write-side mirror of `/query`.
+  A `deed` is one entry in that list.
 - `begin` / `commit` / `undo` — store transaction primitives; SQLite txn
   state lives on the connection, so per-call locking still shares it.
 - `step` — run one transaction control word on the connection.

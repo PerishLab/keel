@@ -182,6 +182,31 @@ try {
     }
   });
 
+  await check("POST /batch runs writes as one deed list", async () => {
+    io.print("==> POST /batch");
+    const res = await fetch(`${base}/batch`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        deeds: [
+          { verb: "put", unit: "Course", fields: { code: "M1", title: "algebra" } },
+          { verb: "put", unit: "Course", fields: { code: "M2", title: "calculus" } },
+        ],
+      }),
+    });
+    if (res.status !== 200) {
+      throw new Error(`batch status ${res.status}`);
+    }
+    const out = await res.json();
+    if (!Array.isArray(out.ids) || out.ids.length !== 2) {
+      throw new Error(`batch ids ${JSON.stringify(out.ids)}`);
+    }
+    const back = await query(`from Course where code = "M2"`);
+    if (packRows(back, "course").length !== 1) {
+      throw new Error("batch put did not land");
+    }
+  });
+
   io.print("smoke: clean");
 } catch (err) {
   failed = true;
