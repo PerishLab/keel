@@ -1,8 +1,8 @@
+use clap::Parser;
 use keel::atom::string;
 use keel::config;
 use keel::resource;
 use keel::{Graph, bind, listen};
-use std::env;
 use std::path::Path;
 
 #[resource]
@@ -23,9 +23,15 @@ struct Student {
     courses: Course,
 }
 
+#[derive(Parser)]
+struct Cli {
+    #[arg(default_value = ".")]
+    root: String,
+}
+
 #[tokio::main]
 async fn main() {
-    let root = env::args().nth(1).unwrap_or_else(|| ".".into());
+    let root = Cli::parse().root;
     let cfg = config::load(Path::new(&root));
     let store = match cfg.open().await {
         Ok(store) => store,

@@ -13,6 +13,7 @@ name = "keel-api"
 path = "src/main.rs"
 
 [dependencies]
+clap = { workspace = true }
 axum = { workspace = true }
 keel = { workspace = true, features = ["http"] }
 keel-gate = { workspace = true }
