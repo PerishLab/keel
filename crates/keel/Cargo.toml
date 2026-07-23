@@ -27,6 +27,9 @@ tokio = { workspace = true }
 toml = { workspace = true }
 sqlx = { workspace = true }
 
+[dev-dependencies]
+plumb-lib = { workspace = true }
+
 [[test]]
 name = "cap"
 path = "tests/cap/main.rs"
