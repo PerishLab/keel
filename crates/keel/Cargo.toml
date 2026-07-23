@@ -17,6 +17,7 @@ http = ["dep:axum", "dep:serde_json"]
 pg = ["sqlx/postgres"]
 
 [dependencies]
+plumb-lib = { workspace = true }
 axum = { workspace = true, optional = true }
 keel-macro = { workspace = true }
 serde = { workspace = true }

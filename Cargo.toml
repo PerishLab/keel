@@ -3,12 +3,13 @@ resolver = "3"
 members = ["crates/keel", "crates/macro", "crates/api", "crates/gate", "crates/relay", "crates/blob"]
 
 [workspace.package]
-version = "0.5.1"
+version = "0.5.2"
 edition = "2024"
 license = "MIT"
 repository = "https://git.perish.top/PerishLab/keel"
 
 [workspace.dependencies]
+plumb-lib = { version = "0.2.0", registry = "perish" }
 clap = { version = "4", features = ["derive"] }
 axum = "0.8"
 getrandom = "0.3"

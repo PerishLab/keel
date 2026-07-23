@@ -1,5 +1,6 @@
 use crate::adapt::Error;
 use crate::adapt::db::Sqlite;
+pub use plumb_lib::config::{Kind, Listen, Store};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
@@ -40,29 +41,6 @@ pub struct Identity {
     pub unit: String,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct Listen {
-    pub host: String,
-    pub port: u16,
-    pub prefix: String,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct Store {
-    pub kind: Kind,
-    pub path: String,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum Kind {
-    #[default]
-    Memory,
-    File,
-}
-
 #[derive(Deserialize, Default)]
 #[serde(default)]
 struct File {
@@ -70,25 +48,6 @@ struct File {
     store: Store,
     identity: Identity,
     cache: Cache,
-}
-
-impl Default for Listen {
-    fn default() -> Self {
-        Self {
-            host: "127.0.0.1".into(),
-            port: 3000,
-            prefix: String::new(),
-        }
-    }
-}
-
-impl Default for Store {
-    fn default() -> Self {
-        Self {
-            kind: Kind::Memory,
-            path: String::new(),
-        }
-    }
 }
 
 pub fn load(root: impl AsRef<Path>) -> Config {
@@ -113,11 +72,7 @@ impl Config {
                 if self.store.path.trim().is_empty() {
                     return Err(Error::Adapt("store.kind=file requires store.path".into()));
                 }
-                let path = if Path::new(&self.store.path).is_absolute() {
-                    PathBuf::from(&self.store.path)
-                } else {
-                    self.root.join(&self.store.path)
-                };
+                let path = self.store.rebased(&self.root);
                 if let Some(parent) = path.parent()
                     && !parent.as_os_str().is_empty()
                 {
