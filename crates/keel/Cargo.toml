@@ -17,7 +17,7 @@ http = ["dep:axum", "dep:serde_json"]
 pg = ["sqlx/postgres"]
 
 [dependencies]
-plumb-lib = { workspace = true }
+plumb = { workspace = true }
 axum = { workspace = true, optional = true }
 keel-macro = { workspace = true }
 serde = { workspace = true }
@@ -28,7 +28,7 @@ toml = { workspace = true }
 sqlx = { workspace = true }
 
 [dev-dependencies]
-plumb-lib = { workspace = true }
+plumb = { workspace = true }
 
 [[test]]
 name = "cap"

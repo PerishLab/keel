@@ -1,5 +1,5 @@
 use keel::config;
-use plumb_lib::config::Kind;
+use plumb::config::Kind;
 
 #[tokio::test]
 async fn defaults() {

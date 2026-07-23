@@ -1,6 +1,6 @@
 use crate::adapt::Error;
 use crate::adapt::db::Sqlite;
-use plumb_lib::config::{Kind, Listen, Store};
+use plumb::config::{Kind, Listen, Store};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
