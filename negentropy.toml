@@ -40,6 +40,6 @@ note = "runseal operator glue is vendored; guarded by deno fmt and deno check in
 allow = ["path", "comment", "word"]
 
 [[boundary]]
-paths = ["crates/keel/src/serve.rs"]
+paths = ["crates/keel/src/serve/**"]
 note = "axum IntoResponse trait forces into_response spelling"
 allow = ["word"]
