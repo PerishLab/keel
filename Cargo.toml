@@ -9,7 +9,7 @@ license = "MIT"
 repository = "https://git.perish.top/PerishLab/keel"
 
 [workspace.dependencies]
-plumb = { version = "0.1.0", registry = "perish" }
+plumb = { version = "0.4.0", registry = "perish" }
 clap = { version = "4", features = ["derive"] }
 axum = "0.8"
 getrandom = "0.3"
@@ -27,4 +27,3 @@ sha2 = "0.10"
 syn = { version = "2", features = ["full"] }
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "sync", "time"] }
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "sqlite"] }
-toml = "0.8"

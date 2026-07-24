@@ -10,8 +10,8 @@ use keel_gate::Gate;
 use keel_relay::Relay;
 
 mod gear;
+use clap::Parser;
 use gear::{plug, wire};
-use std::env;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -47,14 +47,26 @@ struct Issue {
     author: Actor,
 }
 
+#[derive(Parser)]
+struct Cli {
+    #[arg(default_value = ".")]
+    root: String,
+}
+
 #[tokio::main]
 async fn main() {
-    let root = env::args().nth(1).unwrap_or_else(|| ".".into());
-    let cfg = config::load(Path::new(&root));
-    let store = match cfg.open().await {
-        Ok(store) => store,
+    let start = Cli::parse().root;
+    let (cfg, root) = match config::load(Path::new(&start)) {
+        Ok(found) => found,
         Err(err) => {
             eprintln!("forge: config: {err}");
+            std::process::exit(1);
+        }
+    };
+    let store = match cfg.open(&root).await {
+        Ok(store) => store,
+        Err(err) => {
+            eprintln!("forge: store: {err}");
             std::process::exit(1);
         }
     };

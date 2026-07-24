@@ -31,12 +31,18 @@ struct Cli {
 
 #[tokio::main]
 async fn main() {
-    let root = Cli::parse().root;
-    let cfg = config::load(Path::new(&root));
-    let store = match cfg.open().await {
-        Ok(store) => store,
+    let start = Cli::parse().root;
+    let (cfg, root) = match config::load(Path::new(&start)) {
+        Ok(found) => found,
         Err(err) => {
             eprintln!("keel-api: config: {err}");
+            std::process::exit(1);
+        }
+    };
+    let store = match cfg.open(&root).await {
+        Ok(store) => store,
+        Err(err) => {
+            eprintln!("keel-api: store: {err}");
             std::process::exit(1);
         }
     };

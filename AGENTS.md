@@ -8,8 +8,11 @@ engine projections, not business authoring surfaces.
 
 - **Business**: `#[resource]`, `#[field]`, `#[relation]`, `Graph::plug`, `bind`.
 - **Engine face (`Core`)**: `put` / `set` / `live` / `end` / `tie` / `ties` / `cut`.
-- **Runtime policy**: repo-rooted `keel.toml` (`[listen]`, `[store]`); load via
-  `config::load(root)`; missing file => defaults (memory store, 127.0.0.1:3000).
+- **Runtime policy**: repo-rooted `keel.toml` (`[listen]`, `[store]`,
+  `[identity]`, `[cache]`) cascading default < file < `KEEL_*` env; load via
+  `config::load(root)`; missing file => defaults (memory store,
+  127.0.0.1:3000); malformed file => refuse to boot. The environment is read
+  only through the cascade (plumb `docs/config.md`).
 - **HTTP (axum)**: resource REST + edge **write** (`tie`/`cut` routes); no
   association **reads**. Global `POST {prefix}/query` DSL; host/port/prefix
   from `keel.toml`. Filter/order/page/link only inside DSL.
@@ -59,7 +62,7 @@ done when its scenario is green; no stage begins against unlanded law.
 - `crates/api/` — demo binaries (`keel-api`, `forge`) for sidecar/scenarios
 - `crates/gate/` — `keel-gate`: default credential package (caller space)
 - `crates/relay/` — `keel-relay`: default webhook package (caller space)
-- `keel.toml` — runtime policy (listen/store)
+- `keel.toml` — runtime policy (listen/store/identity/cache)
 - `sidecar.toml` — local process plan
 - `docs/` — vocabulary, verify, edge, capability, trigger laws
 - `.runseal/` / `.forgejo/` — guard and CI
