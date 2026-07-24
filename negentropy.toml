@@ -29,6 +29,10 @@ single = true
 syntax = "test"
 paths = ["crates/*/tests/**/*.rs"]
 
+[[grant]]
+syntax = "environment"
+paths = ["crates/*/tests/**/*.rs"]
+
 [[boundary]]
 paths = [".forgejo/**"]
 note = "ci infra; product depth and comment laws do not apply"
