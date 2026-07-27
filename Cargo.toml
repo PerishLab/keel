@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/keel", "crates/macro", "crates/api", "crates/gate", "crates/relay", "crates/blob"]
 
 [workspace.package]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2024"
 license = "MIT"
 repository = "https://git.perish.top/PerishLab/keel"
@@ -13,10 +13,10 @@ plumb = { version = "0.5.0", registry = "perish" }
 clap = { version = "4", features = ["derive"] }
 axum = "0.8"
 getrandom = "0.3"
-keel = { path = "crates/keel", version = "0.6.0", registry = "perish" }
-keel-gate = { path = "crates/gate", version = "0.6.0", registry = "perish" }
-keel-macro = { path = "crates/macro", version = "0.6.0", registry = "perish" }
-keel-relay = { path = "crates/relay", version = "0.6.0", registry = "perish" }
+keel = { path = "crates/keel", version = "0.7.0", registry = "perish" }
+keel-gate = { path = "crates/gate", version = "0.7.0", registry = "perish" }
+keel-macro = { path = "crates/macro", version = "0.7.0", registry = "perish" }
+keel-relay = { path = "crates/relay", version = "0.7.0", registry = "perish" }
 proc-macro2 = "1"
 quote = "1"
 serde = { version = "1", features = ["derive"] }
