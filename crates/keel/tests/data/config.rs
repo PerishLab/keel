@@ -1,5 +1,12 @@
+use keel::adapt::db::{Kind, Store};
 use keel::config;
-use plumb::config::{Cascade, Kind};
+use plumb::config::Cascade;
+
+#[derive(Debug, Default, PartialEq, Cascade)]
+struct Rig {
+    #[cascade(section)]
+    store: Store,
+}
 
 #[tokio::test]
 async fn defaults() {
@@ -8,11 +15,11 @@ async fn defaults() {
     assert_eq!(cfg.listen.host, "127.0.0.1");
     assert_eq!(cfg.listen.port, 3000);
     assert!(cfg.listen.prefix.is_empty());
-    assert_eq!(cfg.store.kind, Kind::Memory);
-    assert!(cfg.store.path.is_empty());
     assert_eq!(cfg.cache.kind, config::Hold::Memory);
     assert_eq!(root, start);
-    let store = cfg.open(&root).await.expect("memory open");
+    let rig = Rig::resolve(None).expect("bare rig");
+    assert_eq!(rig.store.kind, Kind::Memory);
+    let store = rig.store.open(&root).await.expect("memory open");
     let _ = store;
 }
 
@@ -39,9 +46,11 @@ path = "data/keel.sqlite"
     let (cfg, found) = config::load(&nested).expect("file resolves");
     assert_eq!(found, root);
     assert_eq!(cfg.listen.port, 3001);
-    assert_eq!(cfg.store.kind, Kind::File);
-    assert_eq!(cfg.store.path, "data/keel.sqlite");
-    let store = cfg.open(&found).await.expect("file open");
+    let file = plumb::config::discover(&nested, config::NAME).expect("found");
+    let rig = Rig::resolve(Some(&file)).expect("rig resolves");
+    assert_eq!(rig.store.kind, Kind::File);
+    assert_eq!(rig.store.path, "data/keel.sqlite");
+    let store = rig.store.open(&found).await.expect("file open");
     let _ = store;
     let db = root.join("data/keel.sqlite");
     assert!(db.exists() || db.parent().map(|p| p.exists()).unwrap_or(false));
@@ -67,16 +76,17 @@ fn prefixed() {
 fn veiled() {
     let get = |key: &str| match key {
         "KEEL_LISTEN_PORT" => Some("7".to_string()),
-        "KEEL_STORE_KIND" => Some("file".to_string()),
         "KEEL_CACHE_KIND" => Some("none".to_string()),
         "KEEL_IDENTITY_UNIT" => Some("veiled".to_string()),
+        "RIG_STORE_KIND" => Some("file".to_string()),
         _ => None,
     };
     let over = config::Config::lookup("KEEL", &get).expect("env reads");
     let cfg = config::Config::default().merge(over);
     assert_eq!(cfg.listen.port, 7);
     assert_eq!(cfg.listen.host, "127.0.0.1");
-    assert_eq!(cfg.store.kind, Kind::File);
     assert_eq!(cfg.cache.kind, config::Hold::None);
     assert_eq!(cfg.identity.unit, "veiled");
+    let held = Rig::default().merge(Rig::lookup("RIG", &get).expect("env reads"));
+    assert_eq!(held.store.kind, Kind::File);
 }

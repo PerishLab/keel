@@ -9,7 +9,7 @@ license = "MIT"
 repository = "https://git.perish.top/PerishLab/keel"
 
 [workspace.dependencies]
-plumb = { version = "0.4.0", registry = "perish" }
+plumb = { version = "0.5.0", registry = "perish" }
 clap = { version = "4", features = ["derive"] }
 axum = "0.8"
 getrandom = "0.3"

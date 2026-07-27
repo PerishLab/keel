@@ -1,4 +1,5 @@
 mod make;
+mod rite;
 
 use axum::http::StatusCode;
 use axum::middleware::{self};
@@ -32,36 +33,28 @@ impl<W: Wire> Clone for Gate<W> {
 
 impl<W: Wire + 'static> Gate<W> {
     pub async fn rise(core: Arc<Core<W>>, svc: i64) -> Result<Self, keel::adapt::Error> {
-        let sudo = core.sudo();
-        let held = sudo
-            .query(&format!(r#"from @grant where who = "{svc}" count"#))
-            .await?;
-        if held.count() == Some(0) {
-            let whom = core.identity().unwrap_or("").to_string();
-            for (verb, unit) in [
-                ("see", "Token"),
-                ("see", "Session"),
-                ("see", whom.as_str()),
-                ("put", "Session"),
-            ] {
-                sudo.put(
-                    "@grant",
-                    &[
-                        ("who", &svc.to_string()),
-                        ("verb", verb),
-                        ("unit", unit),
-                        ("scope", "all"),
-                    ],
-                )
-                .await?;
-            }
-        }
-        Ok(Self {
+        let whom = core.identity().unwrap_or("").to_string();
+        let ask = keel::form("@grant")
+            .when("who", keel::Op::Eq, &svc.to_string())
+            .count();
+        let held = core.sudo().ask(&ask).await?;
+        let gate = Self {
             core,
             svc,
             bar: None,
             secure: false,
-        })
+        };
+        if held.count() == Some(0) {
+            let who = svc.to_string();
+            gate.sow(&[
+                (&who, "see", "Token", "all"),
+                (&who, "see", "Session", "all"),
+                (&who, "see", &whom, "all"),
+                (&who, "put", "Session", "all"),
+            ])
+            .await?;
+        }
+        Ok(gate)
     }
 
     pub fn bar(mut self, field: &str) -> Self {
@@ -107,13 +100,13 @@ pub(crate) fn flat(body: &Map<String, Value>) -> Result<Vec<(String, String)>, D
     Ok(out)
 }
 
-pub(crate) fn wild() -> String {
+pub fn wild() -> String {
     let mut seed = [0u8; 32];
     getrandom::fill(&mut seed).expect("os entropy");
     seed.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-pub(crate) fn bake(sid: &str, secure: bool) -> String {
+pub fn bake(sid: &str, secure: bool) -> String {
     let mut jar = format!("session={sid}; HttpOnly; SameSite=Lax; Path=/");
     if secure {
         jar.push_str("; Secure");
@@ -121,19 +114,11 @@ pub(crate) fn bake(sid: &str, secure: bool) -> String {
     jar
 }
 
-pub(crate) fn digest(token: &str) -> String {
+pub fn digest(token: &str) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());
     format!("{:x}", hasher.finalize())
-}
-
-pub(crate) fn now() -> i64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
 }
 
 pub struct Deny {
@@ -142,10 +127,25 @@ pub struct Deny {
 }
 
 impl Deny {
+    pub fn status(&self) -> StatusCode {
+        self.status
+    }
+
+    pub fn note(&self) -> &str {
+        &self.note
+    }
+
     fn misfit() -> Self {
         Self {
             status: StatusCode::BAD_REQUEST,
             note: "bad request".into(),
+        }
+    }
+
+    fn gone(unit: &str) -> Self {
+        Self {
+            status: StatusCode::NOT_FOUND,
+            note: format!("no {}", unit.to_lowercase()),
         }
     }
 }
@@ -172,6 +172,8 @@ impl IntoResponse for Deny {
 
 pub(crate) use door::*;
 pub(crate) use guard::*;
+
+pub use guard::{bearer, crumb};
 
 mod door;
 mod guard;

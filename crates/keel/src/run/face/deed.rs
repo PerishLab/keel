@@ -102,6 +102,10 @@ impl<W: Wire> Face<'_, W> {
         self.read(async |tx| tx.ask(tree).await).await
     }
 
+    pub async fn one(&self, tree: &Tree) -> Result<Option<Row>, Error> {
+        self.read(async |tx| tx.one(tree).await).await
+    }
+
     pub async fn ties(&self, owner: &str, bond: &str, left: i64) -> Result<Vec<Tie>, Error> {
         self.read(async |tx| tx.ties(owner, bond, left).await).await
     }

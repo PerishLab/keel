@@ -87,6 +87,54 @@ pub struct Tree {
 }
 
 impl Tree {
+    pub fn when(mut self, field: &str, op: Op, value: &str) -> Self {
+        self.preds.push(Pred {
+            field: field.to_string(),
+            op,
+            values: vec![value.to_string()],
+            nest: None,
+        });
+        self
+    }
+
+    pub fn any(mut self, field: &str, values: &[&str]) -> Self {
+        self.preds.push(Pred {
+            field: field.to_string(),
+            op: Op::In,
+            values: values.iter().map(|value| value.to_string()).collect(),
+            nest: None,
+        });
+        self
+    }
+
+    pub fn link(mut self, bond: &str) -> Self {
+        self.links.push(bond.to_string());
+        self
+    }
+
+    pub fn order(mut self, field: &str, rank: Rank) -> Self {
+        self.sort = Some(Sort {
+            field: field.to_string(),
+            rank,
+        });
+        self
+    }
+
+    pub fn top(mut self, n: usize) -> Self {
+        self.limit = Some(n);
+        self
+    }
+
+    pub fn past(mut self, key: i64) -> Self {
+        self.after = Some(key);
+        self
+    }
+
+    pub fn count(mut self) -> Self {
+        self.tally = true;
+        self
+    }
+
     pub fn from(&self) -> &str {
         &self.from
     }

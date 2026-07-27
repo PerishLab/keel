@@ -62,6 +62,31 @@ impl Row {
         &self.cells
     }
 
+    pub fn cell(&self, name: &str) -> Option<&Cell> {
+        self.cells.get(name)
+    }
+
+    pub fn text(&self, name: &str) -> Option<&str> {
+        match self.cells.get(name) {
+            Some(Cell::Text(value)) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn int(&self, name: &str) -> Option<i64> {
+        match self.cells.get(name) {
+            Some(Cell::Int(value)) => Some(*value),
+            _ => None,
+        }
+    }
+
+    pub fn flag(&self, name: &str) -> Option<bool> {
+        match self.cells.get(name) {
+            Some(Cell::Bool(value)) => Some(*value),
+            _ => None,
+        }
+    }
+
     pub fn expires(&self) -> Option<i64> {
         self.expires
     }
@@ -90,6 +115,31 @@ impl Tie {
 
     pub fn cells(&self) -> &BTreeMap<String, Cell> {
         &self.cells
+    }
+
+    pub fn cell(&self, name: &str) -> Option<&Cell> {
+        self.cells.get(name)
+    }
+
+    pub fn text(&self, name: &str) -> Option<&str> {
+        match self.cells.get(name) {
+            Some(Cell::Text(value)) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn int(&self, name: &str) -> Option<i64> {
+        match self.cells.get(name) {
+            Some(Cell::Int(value)) => Some(*value),
+            _ => None,
+        }
+    }
+
+    pub fn flag(&self, name: &str) -> Option<bool> {
+        match self.cells.get(name) {
+            Some(Cell::Bool(value)) => Some(*value),
+            _ => None,
+        }
     }
 
     pub fn expires(&self) -> Option<i64> {

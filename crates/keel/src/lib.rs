@@ -18,7 +18,7 @@ pub use model::atom::{int, string, url};
 pub use model::spec::Resource;
 pub use run::face::{Core, Face, Tx, Who};
 pub use run::life::{Cell, Ends, Row, Tie};
-pub use run::query::{Ask, Bag, Op, Pack, Pred, Rank, Slice, Sort, Tree};
+pub use run::query::{Ask, Bag, Op, Pack, Pred, Rank, Slice, Sort, Tree, form};
 pub use wire::{Val, Wire};
 
 #[cfg(feature = "http")]

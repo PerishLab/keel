@@ -122,6 +122,22 @@ the law.
   pass layer alone (credential → operator, bar honored); `wall` adds
   the stock doors. A caller with its own ceremonies (invitation join,
   password floor) takes `screen` and keeps gate's grounding intact.
+- **Primitives are package surface.** The ceremony bodies — session and
+  token mint, logout and revoke by presented credential, operator
+  resolution (`whom`) and the bar check — are public methods on the
+  gate; the stock doors are one composition of them. A caller with its
+  own ceremonies reuses the primitives rather than retelling them, so
+  every credential row keeps one author.
+- **Birth rides the axiom, never the service face.** For callers whose
+  registration is not open (invitation join), `birth` creates the
+  identity row under sudo and retells the engine's mint to the newborn
+  — one batch, the same mini-genesis grounding as `register`, journaled
+  loudly like every sudo act. The service face still never authors an
+  identity row.
+- **Sowing is idempotent.** `sow` ensures grant rows exist without
+  re-authoring live ones, so bootstrap ceremonies replay safely; it
+  never revokes. `rise` seeds its own four grants through it on first
+  boot only — an operator's later attenuation is not resurrected.
 - **Bearer secrets from the OS CSPRNG.** Sessions and tokens draw 256
   bits from `getrandom`, never a hash-table hasher. Session cookies are
   `HttpOnly; SameSite=Lax; Path=/`; `.secure()` adds `Secure` behind

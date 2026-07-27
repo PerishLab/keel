@@ -4,7 +4,7 @@ use axum::http::HeaderMap;
 use axum::middleware::Next;
 use axum::response::Response;
 use keel::Wire;
-use keel::{Cell, Operator};
+use keel::{Op, Operator, form};
 
 pub(crate) async fn pass<W: Wire + 'static>(
     State(gate): State<Gate<W>>,
@@ -28,12 +28,12 @@ pub(crate) async fn whom<W: Wire>(gate: &Gate<W>, headers: &HeaderMap) -> Option
 pub(crate) async fn resolve<W: Wire>(gate: &Gate<W>, headers: &HeaderMap) -> Option<i64> {
     let face = gate.core.of(gate.svc);
     if let Some(token) = bearer(headers) {
-        let q = format!(r#"from Token where hash = "{}""#, digest(&token));
-        return actor(face.query(&q).await.ok()?.rows().first()?);
+        let ask = form("Token").when("hash", Op::Eq, &digest(&token));
+        return face.one(&ask).await.ok()??.int("actor");
     }
     let sid = crumb(headers)?;
-    let q = format!(r#"from Session where hash = "{}""#, digest(&sid));
-    actor(face.query(&q).await.ok()?.rows().first()?)
+    let ask = form("Session").when("hash", Op::Eq, &digest(&sid));
+    face.one(&ask).await.ok()??.int("actor")
 }
 
 pub(crate) async fn barred<W: Wire>(gate: &Gate<W>, key: i64) -> bool {
@@ -43,24 +43,14 @@ pub(crate) async fn barred<W: Wire>(gate: &Gate<W>, key: i64) -> bool {
     let Some(whom) = gate.core.identity() else {
         return false;
     };
-    let q = format!(r#"from {whom} where id = "{key}""#);
-    let Ok(pack) = gate.core.of(gate.svc).query(&q).await else {
+    let ask = form(whom).when("id", Op::Eq, &key.to_string());
+    let Ok(held) = gate.core.of(gate.svc).one(&ask).await else {
         return false;
     };
-    match pack.rows().first() {
-        Some(row) => row.cells().get(field).map(Cell::show) == Some("true".into()),
-        None => false,
-    }
+    held.and_then(|row| row.flag(field)) == Some(true)
 }
 
-pub(crate) fn actor(row: &keel::Row) -> Option<i64> {
-    match row.cells().get("actor") {
-        Some(Cell::Int(key)) => Some(*key),
-        _ => None,
-    }
-}
-
-pub(crate) fn bearer(headers: &HeaderMap) -> Option<String> {
+pub fn bearer(headers: &HeaderMap) -> Option<String> {
     headers
         .get("authorization")?
         .to_str()
@@ -69,7 +59,7 @@ pub(crate) fn bearer(headers: &HeaderMap) -> Option<String> {
         .map(str::to_string)
 }
 
-pub(crate) fn crumb(headers: &HeaderMap) -> Option<String> {
+pub fn crumb(headers: &HeaderMap) -> Option<String> {
     let jar = headers.get("cookie")?.to_str().ok()?;
     jar.split(';')
         .filter_map(|part| part.trim().strip_prefix("session="))

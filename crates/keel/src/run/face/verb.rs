@@ -94,6 +94,11 @@ impl<W: Wire> Tx<'_, W> {
         self.ask(&tree).await
     }
 
+    pub async fn one(&mut self, tree: &Tree) -> Result<Option<Row>, Error> {
+        let pack = self.ask(tree).await?;
+        Ok(pack.rows().first().cloned())
+    }
+
     pub async fn ask(&mut self, tree: &Tree) -> Result<Pack, Error> {
         if self.free() {
             return self.sight(tree).await;

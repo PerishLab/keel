@@ -8,11 +8,16 @@ engine projections, not business authoring surfaces.
 
 - **Business**: `#[resource]`, `#[field]`, `#[relation]`, `Graph::plug`, `bind`.
 - **Engine face (`Core`)**: `put` / `set` / `live` / `end` / `tie` / `ties` / `cut`.
-- **Runtime policy**: repo-rooted `keel.toml` (`[listen]`, `[store]`,
-  `[identity]`, `[cache]`) cascading default < file < `KEEL_*` env; load via
-  `config::load(root)`; missing file => defaults (memory store,
-  127.0.0.1:3000); malformed file => refuse to boot. The environment is read
-  only through the cascade (plumb `docs/config.md`).
+- **Runtime policy**: repo-rooted `keel.toml`; the engine face owns
+  `[listen]`, `[identity]`, `[cache]` (cascading default < file < `KEEL_*`
+  env; load via `config::load(root)`; missing file => defaults,
+  127.0.0.1:3000; malformed file => refuse to boot). `[store]` is each
+  caller binary's own section: adaptors carry config fragments
+  (`adapt::db::Store`, `adapt::pg::Store`) and the caller composes one at
+  bootstrap, then hands the opened store to `bind` — the engine never
+  interprets store config. The environment is read only through the
+  cascade (plumb `docs/config.md`); config vocabulary is never imported
+  from plumb, only the mechanism.
 - **HTTP (axum)**: resource REST + edge **write** (`tie`/`cut` routes); no
   association **reads**. Global `POST {prefix}/query` DSL; host/port/prefix
   from `keel.toml`. Filter/order/page/link only inside DSL.

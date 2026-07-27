@@ -18,4 +18,6 @@ axum = { workspace = true }
 keel = { workspace = true, features = ["http"] }
 keel-gate = { workspace = true }
 keel-relay = { workspace = true }
+plumb = { workspace = true }
+serde = { workspace = true }
 tokio = { workspace = true }

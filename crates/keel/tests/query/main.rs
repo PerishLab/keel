@@ -1,3 +1,4 @@
+mod build;
 mod cast;
 mod chart;
 mod parse;

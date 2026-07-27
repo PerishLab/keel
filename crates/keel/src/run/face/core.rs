@@ -76,6 +76,10 @@ impl<W: Wire> Core<W> {
         self.sudo().ask(tree).await
     }
 
+    pub async fn one(&self, tree: &Tree) -> Result<Option<Row>, Error> {
+        self.sudo().one(tree).await
+    }
+
     pub async fn end(&self, name: &str, key: i64) -> Result<(), Error> {
         self.sudo().end(name, key).await
     }

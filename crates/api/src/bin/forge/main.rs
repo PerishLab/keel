@@ -53,6 +53,12 @@ struct Cli {
     root: String,
 }
 
+#[derive(Default, plumb::config::Cascade)]
+struct Rig {
+    #[cascade(section)]
+    store: keel::adapt::db::Store,
+}
+
 #[tokio::main]
 async fn main() {
     let start = Cli::parse().root;
@@ -63,7 +69,15 @@ async fn main() {
             std::process::exit(1);
         }
     };
-    let store = match cfg.open(&root).await {
+    let file = plumb::config::discover(Path::new(&start), config::NAME).ok();
+    let rig = match Rig::resolve(file.as_deref()) {
+        Ok(rig) => rig,
+        Err(err) => {
+            eprintln!("forge: config: {err}");
+            std::process::exit(1);
+        }
+    };
+    let store = match rig.store.open(&root).await {
         Ok(store) => store,
         Err(err) => {
             eprintln!("forge: store: {err}");

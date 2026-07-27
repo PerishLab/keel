@@ -857,6 +857,8 @@ dependencies = [
  "keel",
  "keel-gate",
  "keel-relay",
+ "plumb",
+ "serde",
  "tokio",
 ]
 
@@ -880,6 +882,7 @@ dependencies = [
  "keel",
  "serde_json",
  "sha2 0.10.9",
+ "tokio",
 ]
 
 [[package]]
@@ -1063,9 +1066,9 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "plumb"
-version = "0.4.0"
+version = "0.5.0"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "b42c19cf29ee094dd67c6c183f8a26bb64a9792c7d94af75a97505469740fb00"
+checksum = "fedabb48658b60f98a000b984bb0c9875f2730bbb541564513f2cc08bdd8fa6c"
 dependencies = [
  "clap",
  "pin-project-lite",
@@ -1076,9 +1079,9 @@ dependencies = [
 
 [[package]]
 name = "plumb-macro"
-version = "0.4.0"
+version = "0.5.0"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "c352fddd25143d3d7aeb0d9cbc23fc6f04f531ed8bd3d9933a485debbd450d87"
+checksum = "efbb080626ce128eb20e22ee6ef5e5b418f7a09d801ae86d347e00dc480faea2"
 dependencies = [
  "proc-macro2",
  "quote",
