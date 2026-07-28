@@ -41,7 +41,7 @@ records the generations of every unit its tree involves (root, link
 targets, `has`/`some` targets) at fill time and is valid only while all
 match — invalidation is exact, not timed.
 
-Leases are the one time-driven death (`docs/lease.md` L4): an entry also
+Leases are the one time-driven death (`docs/run/lease.md` L4): an entry also
 records the nearest `expires_at` horizon among the rows and ties it holds,
 and dies at that instant. A leased row can therefore never be served past
 its death.

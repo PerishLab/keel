@@ -3,7 +3,7 @@
 Pressure pass of keel through a classic enroll / drop / schedule flow.
 Gates: L1 `tests/course.rs`, L2 `runseal :course` (also from `:guard`).
 
-The flagship staged scenario is **`:forge`** (`docs/spec.md`): a thin
+The flagship staged scenario is **`:forge`** (`docs/model/spec.md`): a thin
 Forgejo slice growing one act per delivery stage. Act 1 (S1 data
 completeness) covers unique login, per-owner repo names, per-repo issue
 serials, typed json, count packs, and ref-blocked ends over the `forge`
@@ -47,12 +47,12 @@ Enrollment is pure many2many: live ties only (no grade / term on the edge).
 
 | Gap | Impact | Direction |
 |-----|--------|-----------|
-| No edge business fields | No grade / term on enroll | **Settled: bond attrs** (`docs/bond.md`) |
+| No edge business fields | No grade / term on enroll | **Settled: bond attrs** (`docs/model/bond.md`) |
 | No reverse bond auto | Roster needs scan or P1 filter | R0 for now; not auto reverse |
-| No edge `where` predicate | Cannot filter students by course | Open: P1/P2 in `docs/bond.md` |
+| No edge `where` predicate | Cannot filter students by course | Open: P1/P2 in `docs/model/bond.md` |
 | Ended unit with live ties | cut in/out then end (409) | **K3** symmetric + **K1** |
 | Tie to dead ends | left/right must be live | **A** live ends on `tie`/`tune` |
-| Re-enroll after cut | UNIQUE(left,right) vs soft-cut | Open: U* in `docs/bond.md` |
+| Re-enroll after cut | UNIQUE(left,right) vs soft-cut | Open: U* in `docs/model/bond.md` |
 
 ### Cascading note
 

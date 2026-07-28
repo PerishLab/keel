@@ -5,7 +5,6 @@ include = [
 ]
 exclude = [
   "**/target/**",
-  "crates/blob/src/make.rs",
 ]
 
 [module]
@@ -40,10 +39,9 @@ allow = ["path", "comment"]
 
 [[boundary]]
 paths = [".runseal/**"]
-note = "runseal operator glue is vendored; guarded by deno fmt and deno check instead"
+note = "runseal operator adapters are guarded by deno fmt and deno check instead"
 allow = ["path", "comment", "word"]
 
-[[boundary]]
-paths = ["crates/keel/src/serve/**"]
-note = "axum IntoResponse trait forces into_response spelling"
-allow = ["word"]
+[[vocabulary.term]]
+name = "into_response"
+description = "Foreign axum IntoResponse trait method implemented at the framework boundary; keel cannot rename or decompose it without replacing domain error types with raw Response across handlers."

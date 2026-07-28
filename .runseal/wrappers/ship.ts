@@ -1,6 +1,6 @@
-import { cli, flags } from "@/lib/cli.ts";
-import { bin } from "@/lib/std/cmd.ts";
-import { io } from "@/lib/std/io.ts";
+import { cli, flags } from "@perish/sealkit/cli";
+import { bin } from "@perish/sealkit/cmd";
+import { io } from "@perish/sealkit/io";
 
 const INDEX = "https://git.perish.top/api/packages/PerishLab/cargo";
 const CRATES = ["keel-macro", "keel", "keel-gate", "keel-relay", "keel-blob"];

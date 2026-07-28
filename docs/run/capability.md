@@ -56,7 +56,7 @@ This clause fixes semantics only. The default engine implements it by direct
 reads; a replacement engine may use any mechanism (e.g. store-native row
 security) provided observable behavior is identical. Modeling never moves
 with the engine. The scenario suite is the conformance boundary
-(`docs/verify.md`).
+(`docs/run/verify.md`).
 
 ## Identity
 
@@ -231,7 +231,7 @@ A row the operator cannot `see` does not exist for it:
 - **403** is reserved for refused writes; **401** belongs to caller
   middleware (keel itself never authenticates).
 - The trigger adaptor is a read surface under this same law: no event is
-  delivered outside `see` coverage (`docs/trigger.md`).
+  delivered outside `see` coverage (`docs/run/trigger.md`).
 
 ## Audit asymmetry
 
@@ -267,4 +267,3 @@ between them is a bug in law, not a tuning knob.
   subtree scopes; a pred scope whose truth depends on the candidate row
   contributes `false` (fail closed). `set` probes answer the
   precondition half only.
-

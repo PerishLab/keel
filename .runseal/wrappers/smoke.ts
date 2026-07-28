@@ -1,6 +1,6 @@
-import { cli, flags } from "@/lib/cli.ts";
-import { bin } from "@/lib/std/cmd.ts";
-import { io } from "@/lib/std/io.ts";
+import { cli, flags } from "@perish/sealkit/cli";
+import { bin } from "@perish/sealkit/cmd";
+import { io } from "@perish/sealkit/io";
 
 const host = "127.0.0.1";
 const port = 18765;

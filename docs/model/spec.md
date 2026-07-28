@@ -17,7 +17,7 @@ Every stage delivers the same triple:
 | scenario | a new or extended L2 act proving the surface |
 
 Acceptance is exactly `runseal :guard` green including the stage's
-scenario. The scenario suite is the conformance kit (`docs/verify.md`);
+scenario. The scenario suite is the conformance kit (`docs/run/verify.md`);
 each stage's act is the executable form of its promise.
 
 **Flagship scenario `:forge`**: a thin Forgejo slice (Actor / Repo / Issue,
@@ -54,7 +54,7 @@ act needs search.
 
 | Part | Content |
 |------|---------|
-| laws | `docs/capability.md` in force; amendments as friction demands |
+| laws | `docs/run/capability.md` in force; amendments as friction demands |
 | surface | `of(operator)` / `sudo()` faces; `@grant` unit; root chain + subtree coverage; uniform six-verb check; mint; attenuation; `@me`; `anon` / `all`; genesis token ceremony; sudo journal; 404 semantics |
 | scenario | `:forge` act 2 — six-row seed policy runs; authority matrix (author edits own issue, stranger reads 404, writer 403 outside coverage, transfer moves the subtree) |
 
@@ -75,7 +75,7 @@ Open inside: session expiry riding reign lifecycle.
 
 | Part | Content |
 |------|---------|
-| laws | `docs/trigger.md` in force |
+| laws | `docs/run/trigger.md` in force |
 | surface | ordered post-commit stream with cursor; coverage-checked delivery; `relay` package (`Hook` unit + consumer) |
 | scenario | webhook act — delivery bound by `see`; cursor past window errors; `@grant` change events observable |
 

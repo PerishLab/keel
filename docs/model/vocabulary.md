@@ -109,7 +109,7 @@ so the shared meaning stays true.
 - `lone` — engine check: no other live row holds this one2one target.
 - `point` — also: Kind method, true for single-target kinds (many2one/one2one).
 - `only` — field uniqueness seat: `Free` | `All` (`unique`) | `Per(rel)`
-  (`unique = rel`); live rows only (`docs/unique.md`).
+  (`unique = rel`); live rows only (`docs/model/unique.md`).
 - `sole` / `per` — spec builder verbs for the two unique forms.
 - `solid` — engine gate: all unique slots hold before a write lands.
 - `taken` — one unique slot probe; conflict reads `field {name} taken` (409).
@@ -126,9 +126,9 @@ so the shared meaning stays true.
   columns, unit tables, join tables; single-word fields may collide with
   SQL keywords (`index`, `order`), so generated SQL always quotes.
 - `count` — query terminal: count pack `{root, count}` without bags; stands
-  alone (`docs/edge.md`). Tree flag named `tally`.
+  alone (`docs/model/edge.md`). Tree flag named `tally`.
 - `forge` — flagship scenario binary + `:forge` gate; one act per spec
-  stage (`docs/spec.md`).
+  stage (`docs/model/spec.md`).
 - `root` — relation marker (C-M2): the one `many2one` that carries the
   unit's root chain; at most one per unit; always required.
 - `cap` — capability module: `@grant` seat and write vetting.
@@ -159,7 +159,7 @@ so the shared meaning stays true.
 - `front` — serve helper: sudo window else injected operator else anon.
 - `gate` — forge demo middleware: `x-login` → operator (deliberately toy).
 - `app` — exported Router builder so caller middleware can wrap keel.
-- `lease` — `end` completed with an instant (`docs/lease.md`): schedule
+- `lease` — `end` completed with an instant (`docs/run/lease.md`): schedule
   death, renew while live, never resurrect; same verb, same coverage.
 - `fresh` — live with `expires_at` NULL (unleased); new edges require it.
 - `identity` — `keel.toml [identity] unit` names the operator unit;
@@ -173,8 +173,8 @@ so the shared meaning stays true.
   mini-genesis), login (svc put Session + lease TTL), logout (operator end).
 - `bearer` / `crumb` — authorization token / session cookie readers.
 - `deny` — gate fault mapping (401/403/404/400).
-- `make` / `gear` — macro-only files; scan excludes retired at negentropy
-  v0.4.0 (macro items parse; templates under law).
+- `make` / `gear` — macro-only files; ectropy parses macro items directly
+  while templates remain under law.
 - `@pulse` — engine unit: the write log's public face; one row per write
   verb (verb, unit, key, who); engine key is the total order; caller
   writes rejected.
@@ -198,7 +198,7 @@ so the shared meaning stays true.
   one hook's deliveries; filter match; thin event json; raw http post.
 - `stash` — the engine cache: engine-view packs under coverage; key =
   digest, validity = per-unit generation vector + lease horizon
-  (`docs/cache.md`).
+  (`docs/run/cache.md`).
 - `deal` — one cache entry (gens, until, pack).
 - `bump` / `stamp` — advance a unit generation at `beat`; snapshot the
   vector for an entry.
@@ -218,7 +218,7 @@ so the shared meaning stays true.
 - `scopes` — macro parse of a unique scope, single ref or a ref tuple (U4).
 - `batch` — Core/Face verb: run a closure of writes as one transaction;
   all-or-nothing, intra-batch visibility, pulse inside the txn
-  (`docs/txn.md`). Its HTTP face is `POST /batch`, taking a `deeds` list
+  (`docs/run/txn.md`). Its HTTP face is `POST /batch`, taking a `deeds` list
   (put/set/end/tie/tune/cut, each naming its `unit`/`owner` by key in the
   body) — the colon-free write path, and the write-side mirror of `/query`.
   A `deed` is one entry in that list.

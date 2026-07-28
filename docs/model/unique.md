@@ -43,14 +43,14 @@ is never reallocated. Gaps are legal and meaningless.
 - SQLite single-connection writes are the base serialization.
 - A partial unique index (`WHERE` live) is a legal mechanism and a welcome
   second lock; plain DDL `UNIQUE` is not (it would block key reuse after
-  `end`, violating the liveness rule). Leased rows (`docs/lease.md`) escape
+  `end`, violating the liveness rule). Leased rows (`docs/run/lease.md`) escape
   the index; the serialized engine check is the contract (L5).
 - Check-then-insert is legal **only** inside the serialized step.
 
 ## Conformance
 
 A replacement engine must pass the scenario suite's contention acts when
-they exist (`docs/verify.md`); until then, the sequential acts plus this
+they exist (`docs/run/verify.md`); until then, the sequential acts plus this
 document are the contract.
 
 ## Must not

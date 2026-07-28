@@ -1,9 +1,6 @@
 {
   "imports": {
-    "@/lib/": "./lib/",
-    "@deno.land/": "https://deno.land/",
-    "@perish/sealkit": "jsr:@perish/sealkit",
-    "@std/cli/parse-args": "jsr:@std/cli@1.0.30/parse-args"
+    "@perish/sealkit": "jsr:@perish/sealkit"
   },
   "compilerOptions": {
     "strict": true

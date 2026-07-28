@@ -30,7 +30,7 @@ event
   time. Fat payloads would freeze stale data into deliveries and dodge the
   read check.
 - `see` never emits events (reads are not occurrences).
-- A scheduled `end` (`docs/lease.md`) is the event for the death it
+- A scheduled `end` (`docs/run/lease.md`) is the event for the death it
   schedules: the transition at the instant is silent but fully determined.
   Consumers and caches bound validity by lease horizons (L4).
 
@@ -47,7 +47,7 @@ Triggers observe; they never participate:
 
 ## Trigger is a read surface
 
-Coverage law (`docs/capability.md`) applies in full: an event about row X
+Coverage law (`docs/run/capability.md`) applies in full: an event about row X
 is delivered to an operator's subscription only if that operator can `see`
 X — checked **at delivery time**, consistent with revocation immediacy. No
 event escapes coverage; a broadcast channel that skipped this check would
@@ -65,7 +65,7 @@ a cursor older than the window is an **error, not a silent skip** (C0
 spirit).
 
 Everything else is caller space. keel may ship **`relay`**, the default
-webhook package, on the gate pattern (`docs/capability.md` § gate):
+webhook package, on the gate pattern (`docs/run/capability.md` § gate):
 recursive resource definitions (a `Hook` unit — url, events, active) plus
 one trigger consumer that delivers matching events outward. Caller space,
 enumerable grant authority, replace or omit freely.

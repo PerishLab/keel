@@ -233,9 +233,9 @@ truncation is forbidden.
 | Cap seat | **C0** — engine constants; error on overflow |
 | Count | terminal, stands alone, count pack without bags |
 | Like | `field like "frag"` case-insensitive substring on a text field |
-| Association data | **Bond attrs** on many2many join — see `docs/bond.md` |
+| Association data | **Bond attrs** on many2many join — see `docs/model/bond.md` |
 
-## Bond suite (see `docs/bond.md`)
+## Bond suite (see `docs/model/bond.md`)
 
 Adopted: M1b attrs, W1b tune, P1 `has`, K1 live-target filter, U1
 live-unique, R0 no reverse.

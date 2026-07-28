@@ -21,8 +21,8 @@ capability coverage, HTTP mapping, and journal treatment are `end`'s.
 | L1 | `end` takes an optional instant; `at >= now`; default is now |
 | L2 | **No resurrection**: scheduling (and re-scheduling) requires a live row; a dead row stays dead |
 | L3 | K3 checks at **schedule time**; a leased row (live, `expires_at` set) accepts **no new edges** — neither ties nor incoming refs |
-| L4 | Death is **pre-observed**: the lease write is the event; the transition at `at` is silent but fully determined by it. Caches bound entry validity by the nearest lease horizon (`docs/trigger.md`) |
-| L5 | The unique second lock covers NULL-live rows only; the serialized engine check remains the contract (`docs/unique.md`) |
+| L4 | Death is **pre-observed**: the lease write is the event; the transition at `at` is silent but fully determined by it. Caches bound entry validity by the nearest lease horizon (`docs/run/trigger.md`) |
+| L5 | The unique second lock covers NULL-live rows only; the serialized engine check remains the contract (`docs/model/unique.md`) |
 
 ## Semantics
 

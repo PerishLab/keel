@@ -74,7 +74,7 @@ Native REST per resource (**no association queries**):
 
 ## Runtime config (`keel.toml`)
 
-Repo-rooted, negentropy-style. Missing file uses the same defaults:
+Repo-rooted. Missing file uses the same defaults:
 
 ```toml
 [listen]

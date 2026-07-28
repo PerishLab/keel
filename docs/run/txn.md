@@ -15,7 +15,7 @@ write, and a way to widen it across several verbs — `batch`.
 - A **batch** widens the boundary: a list of verbs commits as one. All land
   or none do. Capability checks, mint, unique/serial checks, and pulse
   emission for every verb happen inside the one transaction.
-- The write path never reads the cache (`docs/cache.md` H-5) — inside a
+- The write path never reads the cache (`docs/run/cache.md` H-5) — inside a
   batch too.
 
 ## Batch

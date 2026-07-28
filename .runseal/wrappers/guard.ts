@@ -1,107 +1,61 @@
-import { cli, flags } from "@/lib/cli.ts";
-import { bin } from "@/lib/std/cmd.ts";
-import { io } from "@/lib/std/io.ts";
+import { guard } from "@perish/sealkit/guard";
 
-function usage(): void {
-  io.print("Usage: runseal :guard");
-  io.print("");
-  io.print("Run repository guard checks.");
+function scenario(name: string): [string, string[]] {
+  return ["deno", [
+    "run",
+    "--allow-read",
+    "--allow-write=.",
+    "--allow-env",
+    "--allow-net",
+    "--allow-run=git,cargo",
+    "--config",
+    ".runseal/deno.json",
+    "--lock",
+    ".runseal/deno.lock",
+    "--frozen=true",
+    `.runseal/wrappers/${name}.ts`,
+  ]];
 }
 
-const args = cli.parse(Deno.args, { boolean: ["help", "h"] });
-if (flags(args).help()) {
-  flags(args).positionals("guard", { allowHelp: true });
-  usage();
-  Deno.exit(0);
-}
-flags(args).positionals("guard");
-
-io.print("==> cargo fmt");
-await bin("cargo").run(["fmt", "--all", "--check"]);
-
-io.print("==> cargo clippy");
-await bin("cargo").run([
-  "clippy",
-  "--locked",
-  "--workspace",
-  "--all-targets",
-  "--",
-  "-D",
-  "warnings",
-]);
-
-io.print("==> cargo test");
-await bin("cargo").run(["test", "--locked", "--workspace"]);
-io.print("==> deno fmt");
-await bin("deno").run(["fmt", "--check", ".runseal"]);
-
-io.print("==> deno check");
-await bin("deno").run([
-  "check",
-  "--config",
-  ".runseal/deno.json",
-  "--lock",
-  ".runseal/deno.lock",
-  "--frozen=true",
-  ".runseal/wrappers/guard.ts",
-  ".runseal/wrappers/init.ts",
-  ".runseal/wrappers/land.ts",
-  ".runseal/wrappers/smoke.ts",
-  ".runseal/wrappers/course.ts",
-  ".runseal/wrappers/forge.ts",
-  ".runseal/wrappers/ship.ts",
-]);
-
-io.print("==> negentropy");
-await bin("negentropy").run(["--strict", "."]);
-
-io.print("==> smoke");
-const root = await bin("git").text(["rev-parse", "--show-toplevel"]);
-await bin("deno").run([
-  "run",
-  "--allow-read",
-  "--allow-write",
-  "--allow-env",
-  "--allow-net",
-  "--allow-run",
-  "--config",
-  ".runseal/deno.json",
-  "--lock",
-  ".runseal/deno.lock",
-  "--frozen=true",
-  ".runseal/wrappers/smoke.ts",
-], { cwd: root });
-
-io.print("==> course");
-await bin("deno").run([
-  "run",
-  "--allow-read",
-  "--allow-write",
-  "--allow-env",
-  "--allow-net",
-  "--allow-run",
-  "--config",
-  ".runseal/deno.json",
-  "--lock",
-  ".runseal/deno.lock",
-  "--frozen=true",
-  ".runseal/wrappers/course.ts",
-], { cwd: root });
-
-io.print("==> forge");
-await bin("deno").run([
-  "run",
-  "--allow-read",
-  "--allow-write",
-  "--allow-env",
-  "--allow-net",
-  "--allow-run",
-  "--config",
-  ".runseal/deno.json",
-  "--lock",
-  ".runseal/deno.lock",
-  "--frozen=true",
-  ".runseal/wrappers/forge.ts",
-], { cwd: root });
-
-io.print("guard: clean");
+await guard(
+  [
+    { label: "cargo fmt", runs: [["cargo", ["fmt", "--all", "--check"]]] },
+    {
+      label: "cargo clippy",
+      runs: [["cargo", [
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings",
+      ]]],
+    },
+    { label: "cargo test", runs: [["cargo", ["test", "--locked", "--workspace"]]] },
+    { label: "deno fmt", runs: [["deno", ["fmt", "--check", ".runseal"]]] },
+    {
+      label: "deno check",
+      runs: [["deno", [
+        "check",
+        "--config",
+        ".runseal/deno.json",
+        "--lock",
+        ".runseal/deno.lock",
+        "--frozen=true",
+        ".runseal/wrappers/guard.ts",
+        ".runseal/wrappers/init.ts",
+        ".runseal/wrappers/land.ts",
+        ".runseal/wrappers/smoke.ts",
+        ".runseal/wrappers/course.ts",
+        ".runseal/wrappers/forge.ts",
+        ".runseal/wrappers/ship.ts",
+      ]]],
+    },
+    { label: "smoke", runs: [scenario("smoke")] },
+    { label: "course", runs: [scenario("course")] },
+    { label: "forge", runs: [scenario("forge")] },
+  ],
+  Deno.args,
+  { checker: ["ectropy", ["--strict", "."]] },
+);

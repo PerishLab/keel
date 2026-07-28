@@ -1,4 +1,4 @@
-# Runtime policy for keel processes (negentropy-style: repo-rooted, defaults safe).
+# Runtime policy for keel processes (repo-rooted, defaults safe).
 # Missing or empty file => same defaults as below. Malformed file => keel
 # refuses to boot. Cascade: default < file < KEEL_* env (KEEL_LISTEN_PORT,
 # KEEL_STORE_KIND, ...); the environment is read only through this cascade

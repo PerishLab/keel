@@ -1,7 +1,7 @@
 # Conformance plan (store portability)
 
 keel's law: engine replaceable, modeling invariant, scenario suite = TCK
-(`docs/verify.md`). SQLite has been the only store; this plan validates the
+(`docs/run/verify.md`). SQLite has been the only store; this plan validates the
 claim with a real Postgres store, and stages the blob plane on MinIO.
 
 ## Substrate

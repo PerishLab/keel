@@ -87,7 +87,7 @@ Empty attrs on a field-less bond: body may be only `{ "right" }`.
 | W1 | **W1b** — attrs on `tie`; `tune` + HTTP PATCH on tie |
 | D3 | **P1+P2** — `has` + `some (field op val)` on bond or target |
 | D4 | **K1+K3** — link hides dead targets; `end` rejects while live ties remain (in **or** out) |
-| D5 | **U1** — live-pair unique on the serialized write path (`docs/unique.md`) |
+| D5 | **U1** — live-pair unique on the serialized write path (`docs/model/unique.md`) |
 | D2 | **R0** — no reverse; roster via P1 / scan |
 
 ### P2 surface

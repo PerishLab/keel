@@ -9,7 +9,7 @@ start is done; failures mean cold start is not closed.
 |-------|------|------|
 | L1 | unit tests (smoke/life/bond/course/config/query) | CI + `runseal :guard` |
 | L2 | process smoke + course scenario | `runseal :smoke` / `:course` (from `:guard`) |
-| L3 | static discipline (fmt/clippy/deno/negentropy) | `runseal :guard` |
+| L3 | static discipline (fmt/clippy/deno/ectropy) | `runseal :guard` |
 
 ## Must pass (in)
 
