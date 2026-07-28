@@ -76,11 +76,11 @@ async fn horizon() {
         .await
         .expect("bind");
     let den = core.put("Room", &[("name", "den")]).await.expect("den");
-    core.lease("Room", den, tick() + 1).await.expect("lease");
+    core.lease("Room", den, tick() + 2).await.expect("lease");
 
     let warm = core.query("from Room").await.expect("warm");
     assert_eq!(warm.rows().len(), 1);
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    std::thread::sleep(std::time::Duration::from_secs(3));
     let cold = core.query("from Room").await.expect("cold");
     assert_eq!(cold.rows().len(), 0);
 }

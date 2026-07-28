@@ -114,9 +114,11 @@ async fn undo() {
             != "actor"
     }));
 
-    core.put("Actor", &[("login", "lab")])
+    let key = core
+        .put("Actor", &[("login", "lab")])
         .await
         .expect("free after undo");
+    assert_eq!(key, 1);
 }
 
 #[tokio::test]

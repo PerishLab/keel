@@ -43,6 +43,21 @@ async fn build() {
         .collect();
     assert_eq!(names, ["algo", "db"]);
 
+    let stable = core
+        .ask(
+            &form("Score")
+                .order("passed", Rank::Asc)
+                .order("points", Rank::Desc),
+        )
+        .await
+        .expect("stable");
+    let names: Vec<_> = stable
+        .rows()
+        .iter()
+        .filter_map(|row| row.text("name"))
+        .collect();
+    assert_eq!(names, ["net", "algo", "db"]);
+
     let some = core
         .ask(&form("Score").any("name", &["net", "db"]))
         .await

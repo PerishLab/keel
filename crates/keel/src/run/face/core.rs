@@ -64,6 +64,10 @@ impl<W: Wire> Core<W> {
         self.sudo().set(name, key, fields).await
     }
 
+    pub async fn unset(&self, name: &str, key: i64, fields: &[&str]) -> Result<(), Error> {
+        self.sudo().unset(name, key, fields).await
+    }
+
     pub async fn live(&self, name: &str) -> Result<Vec<Row>, Error> {
         self.sudo().live(name).await
     }

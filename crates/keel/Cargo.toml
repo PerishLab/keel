@@ -13,7 +13,7 @@ path = "src/lib.rs"
 
 [features]
 default = ["http"]
-http = ["dep:axum", "dep:serde_json"]
+http = ["dep:axum"]
 pg = ["sqlx/postgres"]
 
 [dependencies]
@@ -22,7 +22,7 @@ axum = { workspace = true, optional = true }
 keel-macro = { workspace = true }
 serde = { workspace = true }
 sha2 = { workspace = true }
-serde_json = { workspace = true, optional = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 sqlx = { workspace = true }
 
@@ -48,3 +48,7 @@ path = "tests/bond/main.rs"
 [[test]]
 name = "pulse"
 path = "tests/pulse/main.rs"
+
+[[test]]
+name = "estate"
+path = "tests/estate/main.rs"

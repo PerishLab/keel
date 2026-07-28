@@ -52,5 +52,21 @@ include = [
 description = "Foreign axum IntoResponse trait method implemented at the framework boundary; keel cannot rename or decompose it without replacing domain error types with raw Response across handlers."
 name = "into_response"
 
+[[vocabulary.term]]
+description = "Foreign std IntoFuture trait and method implemented so the configured bind ceremony remains directly awaitable."
+name = "into_future"
+
+[[vocabulary.term]]
+description = "Foreign std IntoFuture associated type required by the awaitable bind ceremony."
+name = "IntoFuture"
+
+[[vocabulary.term]]
+description = "Foreign std FromStr trait method implementing strict human-duration parsing for estate retention."
+name = "from_str"
+
+[[vocabulary.term]]
+description = "Foreign std TryFrom trait method used by serde to refuse malformed estate retention values during config load."
+name = "try_from"
+
 [word]
 single = true

@@ -6,11 +6,14 @@ engine projections, not business authoring surfaces.
 
 ## Product boundary
 
-- **Business**: `#[resource]`, `#[field]`, `#[relation]`, `Graph::plug`, `bind`.
+- **Business**: `#[resource]`, `#[field]`, `#[relation]`, `Graph::plug`, `bind`;
+  `.adopt()` is the explicit exact-projection ceremony for an unsealed estate;
+  `.hook()` registers one idempotent non-estate derivative consumer.
 - **Engine face (`Core`)**: `put` / `set` / `live` / `end` / `tie` / `ties` / `cut`.
 - **Runtime policy**: repo-rooted `keel.toml`; the engine face owns
-  `[listen]`, `[identity]`, `[cache]` (cascading default < file < `KEEL_*`
-  env; load via `config::load(root)`; missing file => defaults,
+  `[listen]`, `[identity]`, `[cache]`, `[estate.generation.cleanup]`
+  (cascading default < file < `KEEL_*` env; load via
+  `config::load(root)`; missing file => defaults,
   127.0.0.1:3000; malformed file => refuse to boot). `[store]` is each
   caller binary's own section: adaptors carry config fragments
   (`adapt::db::Store`, `adapt::pg::Store`) and the caller composes one at
@@ -68,7 +71,7 @@ done when its scenario is green; no stage begins against unlanded law.
 - `crates/api/` — demo binaries (`keel-api`, `forge`) for sidecar/scenarios
 - `crates/gate/` — `keel-gate`: default credential package (caller space)
 - `crates/relay/` — `keel-relay`: default webhook package (caller space)
-- `keel.toml` — runtime policy (listen/store/identity/cache)
+- `keel.toml` — runtime policy (listen/store/identity/cache/estate)
 - `sidecar.toml` — local process plan
 - `docs/` — vocabulary, verify, edge, capability, trigger laws
 - `.runseal/` / `.forgejo/` — guard and CI

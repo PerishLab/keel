@@ -8,6 +8,7 @@ async fn parse() {
     assert!(tree.preds().is_empty());
     assert!(tree.links().is_empty());
     assert!(tree.sort().is_none());
+    assert!(tree.sorts().is_empty());
     assert!(tree.limit().is_none());
     assert!(tree.after().is_none());
     assert_eq!(query::digest(&tree), "from student slice live");
@@ -67,6 +68,22 @@ async fn parse() {
     let tree =
         query::parse("from Student order by nickname desc limit 2 after \"3\"").expect("page");
     assert_eq!(tree.after(), Some(3));
+
+    let tree =
+        query::parse("from Student order by nickname desc, id asc limit 2").expect("compound");
+    assert_eq!(tree.sorts().len(), 2);
+    assert_eq!(tree.sorts()[0].field(), "nickname");
+    assert_eq!(tree.sorts()[0].rank(), Rank::Desc);
+    assert_eq!(tree.sorts()[1].field(), "id");
+    assert_eq!(tree.sorts()[1].rank(), Rank::Asc);
+    assert_eq!(
+        query::digest(&tree),
+        "from student slice live order by nickname desc, id asc limit 2"
+    );
+    assert_eq!(
+        query::shape(&tree),
+        "from student slice live order by nickname, id"
+    );
 
     assert!(query::parse("from Student link classes link classes").is_err());
     assert!(query::parse("select *").is_err());

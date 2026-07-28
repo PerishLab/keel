@@ -107,6 +107,18 @@ async fn run() {
         vec!["cy", "bob", "ada"]
     );
 
+    let pack = core
+        .query("from Student order by nickname desc, id desc")
+        .await
+        .expect("compound order");
+    assert_eq!(
+        pack.rows()
+            .iter()
+            .map(|row| row.cells().get("nickname").expect("cell").show())
+            .collect::<Vec<_>>(),
+        vec!["cy", "bob", "ada"]
+    );
+
     let pack = core.query("from Student limit 2").await.expect("limit");
     assert_eq!(pack.rows().len(), 2);
     assert_eq!(pack.rows()[0].key(), ada);

@@ -94,8 +94,15 @@ Open inside: generation granularity, eviction policy.
 
 ### S6 — estate
 
-Real estate scenarios begin. Their spec lives with that domain, not here;
-this document's job ends at a proven general engine.
+Estate evolution begins under `docs/run/estate.md`.
+
+| Part | Content |
+|------|---------|
+| laws | nominal manifest identity; exact bind; closed delta compiler; out-of-place activation; Keel-owned cleanup |
+| surface | canonical manifest, estate/generation/clock/derivative catalog, permanent allocators, physical drift seal, generated evolution plan, configured cleanup retention, typed purge hook |
+| scenario | estate act — fresh seal, exact reopen, drift refusal, additive evolution, contraction, cleanup |
+
+Open inside: the finite validator and cast matrices.
 
 ## Sequencing
 

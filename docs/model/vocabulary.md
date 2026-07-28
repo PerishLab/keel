@@ -72,7 +72,7 @@ so the shared meaning stays true.
 - `digest` — normalized tree string for cache/identity later.
 - `pred` — one where clause (field or engine `id`, op, value).
 - `op` — predicate operator (`=` `!=` `<` `<=` `>` `>=` `in` `has` `some`).
-- `sort` — order clause on a tree (field + rank).
+- `sort` — one field + rank in a tree's ordered sort list.
 - `rank` — sort direction (`asc` | `desc`).
 - `limit` — max rows returned after filter/sort/cursor.
 - `after` — id cursor: rows strictly after that key in ordered result.
@@ -87,29 +87,27 @@ so the shared meaning stays true.
 - `verify` — cold-start verification boundary document.
 - `atom` — delta: atoms now `string`, `url`, `int`, `bool`; kinds Text/Link/Int/Bool.
 - `cell` — delta: typed value (`Cell::Text/Int/Bool`), not a raw string.
-- `pick` — read one typed cell out of a store row by slot kind.
-- `bind` — also: cast one caller value to a storage value by slot kind.
+- `pick` / `bind` — read one typed store cell / cast one caller value by slot kind.
 - `fit` — match a value against a slot or pred kind; reject mistyped input.
 - `show` — render a cell as display text (digest/sort-free).
-- `many2many` — relation kind, spelled out; digit form `n2m` retired with no
-  alias. Family law: `many2one` / `one2one` next; `one2many` deliberately
-  absent (FK side declares).
-- `many2one` — relation kind: FK column `{field}_id` on the declaring side;
-  target must be live on put/set; inbound live refs block `end` (K3).
-- `opt` — relation marker: many2one column may be NULL; empty value clears.
-- `need` — spec/plan flag: relation is required (not `opt`).
-- `point` — validate and cast one ref value (live target) to a storage key.
+- `many2many` — relation kind, spelled out; digit form `n2m` retired. Family
+  law continues with `many2one` / `one2one`; the FK side declares.
+- `many2one` — FK column `{field}_id`; target must be live on writes and live
+  inbound refs block `end` (K3).
+- `opt` — field/relation marker: projected NULL; omitted scalar stays absent,
+  empty text stays data, and an empty relation value remains a clear shorthand.
+- `need` — scalar or single relation is required (not `opt`); `unset` /
+  `loosen` is the public/internal verb clearing optional scalar or point
+  fields to NULL; required and serial fields refuse.
+- `point` — cast a live ref to a key; Kind test for many2one/one2one.
 - `refs` — the many2one edges of a unit.
 - `pluck` — read one caller field value by name, empty when absent.
 - `known` — field name is a slot or a ref of the unit.
 - `entry` — resolve one set column to storage column + casted value.
 - `free` — spec builder: declare an `opt` relation (need = false).
-- `one2one` — relation kind: many2one plus live-unique on the ref column;
-  second live holder rejected (`live ref exists`, 409).
+- `one2one` — many2one plus live-unique ref; a second holder is rejected (409).
 - `lone` — engine check: no other live row holds this one2one target.
-- `point` — also: Kind method, true for single-target kinds (many2one/one2one).
-- `only` — field uniqueness seat: `Free` | `All` (`unique`) | `Per(rel)`
-  (`unique = rel`); live rows only (`docs/model/unique.md`).
+- `only` — uniqueness: `Free` | `All` | `Per(rel)` over live rows only.
 - `sole` / `per` — spec builder verbs for the two unique forms.
 - `solid` — engine gate: all unique slots hold before a write lands.
 - `taken` — one unique slot probe; conflict reads `field {name} taken` (409).
@@ -118,13 +116,14 @@ so the shared meaning stays true.
 - `lock` — DDL second lock: partial unique index over live rows.
 - `peek` — read one live row by key (engine-internal).
 - `seek` — find one caller field value by name, `None` when absent.
+- `rule` — manifest field `default`/`values`/`min`/`max`; never runtime config.
+- `fallback` — typed default for omitted puts and evolution fills.
 - `serial` — engine-allocated per-scope monotonic int (`#[field(serial,
   scope = rel)]`); caller writes rejected; never reused (U5).
 - `next` — allocate the next serial value inside the serialized write step.
 - `tally` — macro parse of the serial field form.
-- `col` / `seat` / `joint` — ddl: quoted SQL identifiers for business
-  columns, unit tables, join tables; single-word fields may collide with
-  SQL keywords (`index`, `order`), so generated SQL always quotes.
+- `col` / `seat` / `joint` — quoted SQL identifiers for columns, unit tables,
+  and join tables; generated SQL always quotes keyword collisions.
 - `count` — query terminal: count pack `{root, count}` without bags; stands
   alone (`docs/model/edge.md`). Tree flag named `tally`.
 - `forge` — flagship scenario binary + `:forge` gate; one act per spec
@@ -205,17 +204,47 @@ so the shared meaning stays true.
 - `horizon` — nearest lease `expires_at` inside a pack; entry dies there.
 - `bare` — Core builder: cache off (`[cache] kind = "none"`).
 - `hold` — cache capacity constant; overflow clears (eviction, never error).
-- `involved` — the units a tree reads (root, link and pred targets);
-  the invalidation footprint of a cached entry.
-- `ship` — publish the crate family to the perish registry from clean
-  main; idempotent per version (sparse-index probe skips published).
+- `involved` — units a tree reads; the invalidation footprint of a cache entry.
+- `ship` — idempotently publish the crate family from clean main.
+- `estate` — Keel-owned manifest, generation, retention, and cleanup namespace.
+- `manifest` — canonical caller model; nominal finite paths, order erased.
+- `@estate` — private format, active generation, and physical shape root.
+- `@generation` — active/candidate/cleanup manifests and digests.
+- `@clock` — permanent named high-water state outside generations.
+- `@derivative` — durable logical purge atoms awaiting hook acknowledgement.
+- `generation` — one complete manifest expression; exactly one is active.
+- `clock` — atomically advance named high-water in the write transaction.
+- `format` — private storage format, outside business schema deltas.
+- `shape` — canonical physical namespace snapshot checked at bind.
+- `attach` / `seed` — verify exact seal or transactionally install one.
+- `frame` — length-delimited canonical rendering of physical catalog rows.
+- `drift` — missing, changed, or extra physical object, never schema intent.
+- `unsealed` — nonempty namespace without `@estate`; ordinary bind refuses.
+- `adopt` — explicit exact-projection seal with allocator reconstruction.
+- `projection` — isolated backend realization used to prove an unsealed shape.
+- `gone` — one purged canonical path and permanent key.
+- `purge` — one generation-keyed at-least-once derivative cleanup event.
+- `changed` — requested manifest differs and needs generated evolution.
+- `change` — read-only generated plan; callers cannot construct or edit it.
+- `step` — one planned nominal path with an act and optional finite check.
+- `act` — generated structural operation: add, drop, cast, or alter.
+- `denied` — known unlegislated delta, reported by path before allocation.
+- `blocked` — generated finite check failed, reported by path before allocation.
+- `scalar` — classify retained field deltas into steps or denial.
+- `candidate` — out-of-place generation built under `@g<id>:` physical names.
+- `transfer` — copy the live world into candidate columns without business verbs.
+- `activate` — transactionally exchange stable active names and generation states.
+- `contract` — remove pulse events whose nominal path left the active manifest.
+- `retain` — minimum cleanup-generation age before collection, or `forever`.
+- `sweep` — transactionally collect every eligible cleanup generation and reseal
+  the physical shape.
 - `shelf` — sparse index path prefix for a crate name.
 - `crew` — relation marker (C-M1): the one many2many that is a unit's
   membership roster; grant `who = "<unit> <id>"` admits its live members.
 - `bearer` — who-match incl. group expansion through a crew bond.
 - `whole` — validate a grant `who` value (id / group / anon / all).
 - `cast` — spec builder: which marker a bond carries (Bond/Free/Root/Crew).
-- `scopes` — macro parse of a unique scope, single ref or a ref tuple (U4).
+- `scopes` — macro parse of a unique scope, one named scalar/ref or a tuple (U4).
 - `batch` — Core/Face verb: run a closure of writes as one transaction;
   all-or-nothing, intra-batch visibility, pulse inside the txn
   (`docs/run/txn.md`). Its HTTP face is `POST /batch`, taking a `deeds` list
@@ -264,6 +293,7 @@ so the shared meaning stays true.
   gated put + presigned PUT url), `fetch` (GET /asset/{id}: gated see +
   302 to presigned GET url). `object` keys by asset id.
 - `like` — query op: case-insensitive substring on a text field (issue search).
+- `null` / `missing` — real absence query, spelled `where field is null`.
 - pred-subtree (C-16) — a pred grant flows down the root chain; `held` evaluates it against the matching ancestor row.
 - `bar` — gate suspension hook (`Gate::bar(field)`): refuses to resolve an operator whose identity row has the named bool field set true (settled gate law).
 - `resolve` / `barred` — gate: credential→id, then suspension check.

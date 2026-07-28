@@ -50,15 +50,18 @@ impl<'a, W: Wire> Work<'a, W> {
     ) -> Result<(), Error> {
         let seat = self.plan.find(crate::cap::PULSE)?;
         let tick = now();
+        let pulse = crate::estate::next(self.wire, "pulse").await?;
         let text = format!(
-            "INSERT INTO {} (verb, unit, who, {}, {}, {}, {}) VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?5)",
+            "INSERT INTO {} ({}, verb, unit, who, {}, {}, {}, {}) VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?6)",
             ddl::seat(seat),
+            ddl::KEY,
             ddl::col("key"),
             ddl::EXPIRES,
             ddl::CREATED,
             ddl::UPDATED
         );
         let args = [
+            Val::Int(pulse),
             Val::Text(verb.into()),
             Val::Text(unit.into()),
             Val::Text(who.into()),
@@ -170,6 +173,9 @@ impl<'a, W: Wire> Work<'a, W> {
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
         let unit = self.plan.find(name)?;
+        if unit.frozen() {
+            return Err(Error::Adapt(format!("frozen unit {}", unit.name())));
+        }
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
         }
@@ -207,6 +213,49 @@ impl<'a, W: Wire> Work<'a, W> {
         vals.push(Val::Int(key));
         vals.push(Val::Int(tick));
         let changed = self.wire.run(&text, &vals).await?;
+        if changed == 0 {
+            return Err(Error::Adapt(format!("missing row {key}")));
+        }
+        Ok(())
+    }
+
+    pub(crate) async fn unset(
+        &mut self,
+        name: &str,
+        key: i64,
+        fields: &[&str],
+    ) -> Result<(), Error> {
+        let unit = self.plan.find(name)?;
+        if unit.frozen() {
+            return Err(Error::Adapt(format!("frozen unit {}", unit.name())));
+        }
+        unit.loose(fields)?;
+        self.peek(unit, key).await?;
+        let tick = now();
+        let assignments = fields
+            .iter()
+            .map(|name| {
+                let column = unit
+                    .refs()
+                    .find(|edge| edge.name() == *name)
+                    .map(|_| ddl::side(name))
+                    .unwrap_or_else(|| (*name).to_string());
+                format!("{} = NULL", ddl::col(&column))
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let text = format!(
+            "UPDATE {} SET {assignments}, {} = ?1 WHERE {} = ?2 AND ({} IS NULL OR {} > ?1)",
+            ddl::seat(unit),
+            ddl::UPDATED,
+            ddl::KEY,
+            ddl::EXPIRES,
+            ddl::EXPIRES
+        );
+        let changed = self
+            .wire
+            .run(&text, &[Val::Int(tick), Val::Int(key)])
+            .await?;
         if changed == 0 {
             return Err(Error::Adapt(format!("missing row {key}")));
         }

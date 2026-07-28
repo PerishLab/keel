@@ -5,17 +5,36 @@ use syn::{Fields, Ident, ItemStruct, parse_macro_input};
 #[proc_macro_attribute]
 pub fn resource(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
-    let veil = attr
+    let words: Vec<String> = attr
         .to_string()
         .split(',')
-        .any(|word| word.trim() == "veil");
-    match expand(input, veil) {
+        .map(|word| word.trim().to_string())
+        .filter(|word| !word.is_empty())
+        .collect();
+    if let Some(word) = words
+        .iter()
+        .find(|word| !matches!(word.as_str(), "veil" | "frozen"))
+    {
+        return syn::Error::new(
+            proc_macro2::Span::call_site(),
+            format!("unknown resource mode: {word}"),
+        )
+        .to_compile_error()
+        .into();
+    }
+    let veil = words.iter().any(|word| word == "veil");
+    let frozen = words.iter().any(|word| word == "frozen");
+    match expand(input, veil, frozen) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),
     }
 }
 
-pub(crate) fn expand(input: ItemStruct, veil: bool) -> syn::Result<proc_macro2::TokenStream> {
+pub(crate) fn expand(
+    input: ItemStruct,
+    veil: bool,
+    frozen: bool,
+) -> syn::Result<proc_macro2::TokenStream> {
     let name = &input.ident;
     let vis = &input.vis;
     let Fields::Named(fields) = &input.fields else {
@@ -51,6 +70,11 @@ pub(crate) fn expand(input: ItemStruct, veil: bool) -> syn::Result<proc_macro2::
     } else {
         quote! {}
     };
+    let frozen = if frozen {
+        quote! { .freeze() }
+    } else {
+        quote! {}
+    };
 
     Ok(quote! {
         #[allow(non_camel_case_types)]
@@ -70,6 +94,7 @@ pub(crate) fn expand(input: ItemStruct, veil: bool) -> syn::Result<proc_macro2::
                     #(#rows)*
                     #(#links)*
                     #veil
+                    #frozen
                     .seal()
             }
         }
@@ -92,7 +117,7 @@ pub(crate) fn one(
     let mark = quote! { #ty };
     if let Some(made) = atom(&field.attrs)? {
         let row = match made {
-            Made::Atom(atom, only) => grow(&label, &atom, &only),
+            Made::Atom(atom, only, need, guard) => grow(&label, &atom, &only, need, &guard),
             Made::Serial(scope) => quote! { .serial(#label, #scope) },
         };
         return Ok((mark, Some(row), None));
@@ -141,21 +166,80 @@ pub(crate) enum Only {
 }
 
 pub(crate) enum Made {
-    Atom(Ident, Only),
+    Atom(Ident, Only, bool, Guard),
     Serial(String),
 }
 
-pub(crate) fn grow(label: &str, atom: &Ident, only: &Only) -> proc_macro2::TokenStream {
-    match only {
-        Only::Free => quote! { .field(#label, ::keel::atom::Kind::#atom) },
-        Only::All => quote! { .sole(#label, ::keel::atom::Kind::#atom) },
-        Only::Per(scope) => {
+#[derive(Default)]
+pub(crate) struct Guard {
+    pub fallback: Option<String>,
+    pub values: Vec<String>,
+    pub min: Option<i64>,
+    pub max: Option<i64>,
+}
+
+pub(crate) fn grow(
+    label: &str,
+    atom: &Ident,
+    only: &Only,
+    need: bool,
+    guard: &Guard,
+) -> proc_macro2::TokenStream {
+    let field = match (only, need) {
+        (Only::Free, true) => quote! { .field(#label, ::keel::atom::Kind::#atom) },
+        (Only::Free, false) => {
+            quote! { .optional(#label, ::keel::atom::Kind::#atom, ::keel::spec::Only::Free) }
+        }
+        (Only::All, true) => quote! { .sole(#label, ::keel::atom::Kind::#atom) },
+        (Only::All, false) => {
+            quote! { .optional(#label, ::keel::atom::Kind::#atom, ::keel::spec::Only::All) }
+        }
+        (Only::Per(scope), true) => {
             let refs = scope.iter();
             quote! { .per(#label, ::keel::atom::Kind::#atom, &[#(#refs),*]) }
         }
+        (Only::Per(scope), false) => {
+            let refs = scope.iter();
+            quote! {
+                .optional(
+                    #label,
+                    ::keel::atom::Kind::#atom,
+                    ::keel::spec::Only::Per(vec![#(#refs.to_string()),*]),
+                )
+            }
+        }
+    };
+    if guard.fallback.is_none()
+        && guard.values.is_empty()
+        && guard.min.is_none()
+        && guard.max.is_none()
+    {
+        return field;
+    }
+    let fallback = guard
+        .fallback
+        .as_ref()
+        .map(|value| quote! { .default(#value) });
+    let values = (!guard.values.is_empty()).then(|| {
+        let values = &guard.values;
+        quote! { .values(&[#(#values),*]) }
+    });
+    let min = guard.min.map(|value| quote! { .min(#value) });
+    let max = guard.max.map(|value| quote! { .max(#value) });
+    quote! {
+        #field
+        .rule(
+            #label,
+            ::keel::spec::Rule::new()
+                #fallback
+                #values
+                #min
+                #max
+        )
     }
 }
 
 pub(crate) use parse::*;
 
 mod parse;
+mod rule;

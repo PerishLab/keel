@@ -151,7 +151,9 @@ async fn tally() {
 
 #[resource]
 struct React {
-    #[field(string, unique = (fan, issue))]
+    #[field(string)]
+    channel: string,
+    #[field(string, unique = (fan, issue, channel))]
     emoji: string,
     #[relation(Org, many2one, root)]
     fan: Org,
@@ -177,10 +179,11 @@ async fn composite() {
         .await
         .expect("two");
 
-    let seed = async |emoji: &str, actor: i64, issue: i64| {
+    let seed = async |emoji: &str, channel: &str, actor: i64, issue: i64| {
         core.put(
             "React",
             &[
+                ("channel", channel),
                 ("emoji", emoji),
                 ("fan", &actor.to_string()),
                 ("issue", &issue.to_string()),
@@ -188,13 +191,24 @@ async fn composite() {
         )
         .await
     };
-    seed("up", lab, one).await.expect("first");
-    seed("tada", lab, one).await.expect("same pair other emoji");
-    seed("up", ada, one).await.expect("other actor same emoji");
-    seed("up", lab, two).await.expect("other issue same emoji");
-    assert!(seed("up", lab, one).await.is_err());
+    seed("up", "web", lab, one).await.expect("first");
+    seed("tada", "web", lab, one)
+        .await
+        .expect("same pair other emoji");
+    seed("up", "web", ada, one)
+        .await
+        .expect("other actor same emoji");
+    seed("up", "web", lab, two)
+        .await
+        .expect("other issue same emoji");
+    seed("up", "mail", lab, one)
+        .await
+        .expect("other scalar scope");
+    assert!(seed("up", "web", lab, one).await.is_err());
 
-    let react = seed("heart", lab, two).await.expect("live");
+    let react = seed("heart", "web", lab, two).await.expect("live");
     core.end("React", react).await.expect("undo");
-    seed("heart", lab, two).await.expect("re-react after undo");
+    seed("heart", "web", lab, two)
+        .await
+        .expect("re-react after undo");
 }

@@ -89,6 +89,7 @@ async fn main() {
     plug(&mut graph);
     wire(&mut graph);
     let made = bind(graph, store)
+        .estate(&cfg.estate)
         .await
         .and_then(|core| core.identify("Actor"))
         .map(|core| match cfg.cache.kind {

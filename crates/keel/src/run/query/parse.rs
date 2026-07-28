@@ -7,7 +7,7 @@ pub fn form(unit: &str) -> Tree {
         slice: Slice::Live,
         preds: Vec::new(),
         links: Vec::new(),
-        sort: None,
+        sorts: Vec::new(),
         limit: None,
         after: None,
         tally: false,
@@ -33,14 +33,14 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
     scan.ws();
     let tally = scan.opt("count");
     let links = scan.links()?;
-    let sort = scan.sort()?;
+    let sorts = scan.sorts()?;
     let limit = scan.limit()?;
     let after = scan.after()?;
     scan.ws();
     if !scan.done() {
         return Err(Error::Adapt("query has trailing tokens".into()));
     }
-    let more = !links.is_empty() || sort.is_some() || limit.is_some() || after.is_some();
+    let more = !links.is_empty() || !sorts.is_empty() || limit.is_some() || after.is_some();
     if tally && more {
         return Err(Error::Adapt("count stands alone".into()));
     }
@@ -49,7 +49,7 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
         slice: Slice::Live,
         preds,
         links,
-        sort,
+        sorts,
         limit,
         after,
         tally,
@@ -98,6 +98,15 @@ impl Scan<'_> {
 
     pub(crate) fn cell(&mut self, field: String) -> Result<Pred, Error> {
         self.ws();
+        if self.opt("is") {
+            self.kw("null")?;
+            return Ok(Pred {
+                field,
+                op: Op::Null,
+                values: Vec::new(),
+                nest: None,
+            });
+        }
         if self.opt("in") {
             let values = self.list()?;
             return Ok(Pred {
@@ -164,21 +173,29 @@ impl Scan<'_> {
         Ok(links)
     }
 
-    pub(crate) fn sort(&mut self) -> Result<Option<Sort>, Error> {
+    pub(crate) fn sorts(&mut self) -> Result<Vec<Sort>, Error> {
         self.ws();
         if !self.opt("order") {
-            return Ok(None);
+            return Ok(Vec::new());
         }
         self.kw("by")?;
-        let field = self.ident()?;
-        let mut rank = Rank::Asc;
-        self.ws();
-        if self.opt("desc") {
-            rank = Rank::Desc;
-        } else {
-            let _ = self.opt("asc");
+        let mut sorts = Vec::new();
+        loop {
+            let field = self.ident()?;
+            let mut rank = Rank::Asc;
+            self.ws();
+            if self.opt("desc") {
+                rank = Rank::Desc;
+            } else {
+                let _ = self.opt("asc");
+            }
+            sorts.push(Sort { field, rank });
+            self.ws();
+            if !self.comma() {
+                break;
+            }
         }
-        Ok(Some(Sort { field, rank }))
+        Ok(sorts)
     }
 
     pub(crate) fn limit(&mut self) -> Result<Option<usize>, Error> {

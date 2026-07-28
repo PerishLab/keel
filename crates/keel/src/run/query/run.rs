@@ -32,7 +32,7 @@ pub async fn run<W: Wire>(
             count: Some(rows.len()),
         });
     }
-    order(&mut rows, tree.sort());
+    order(&mut rows, tree.sorts());
     page(&mut rows, tree.after(), tree.limit());
     let keys: Vec<i64> = rows.iter().map(|row| row.key()).collect();
     let root = scope.name().to_string();

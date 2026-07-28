@@ -32,6 +32,29 @@ impl<W: Wire> Tx<'_, W> {
         self.shift(&unit, key, fields).await
     }
 
+    pub async fn unset(&mut self, name: &str, key: i64, fields: &[&str]) -> Result<(), Error> {
+        if self.free() {
+            return self.loosen(name, key, fields).await;
+        }
+        let unit = query::resolve(self.plan(), name)?;
+        let pre = self.seen(&unit, key).await?;
+        let mark = cap::Mark {
+            key: Some(key),
+            cells: pre.cells(),
+        };
+        self.may("set", &unit, &mark).await?;
+        let mut post = pre.cells().clone();
+        for field in fields {
+            post.remove(*field);
+        }
+        let after = cap::Mark {
+            key: Some(key),
+            cells: &post,
+        };
+        self.may("set", &unit, &after).await?;
+        self.loosen(&unit, key, fields).await
+    }
+
     pub async fn end(&mut self, name: &str, key: i64) -> Result<(), Error> {
         if self.free() {
             return self.fell(name, key, None).await;

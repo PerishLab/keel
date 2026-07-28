@@ -55,6 +55,11 @@ impl<W: Wire> Face<'_, W> {
         self.write(async |tx| tx.set(name, key, fields).await).await
     }
 
+    pub async fn unset(&self, name: &str, key: i64, fields: &[&str]) -> Result<(), Error> {
+        self.write(async |tx| tx.unset(name, key, fields).await)
+            .await
+    }
+
     pub async fn end(&self, name: &str, key: i64) -> Result<(), Error> {
         self.write(async |tx| tx.end(name, key).await).await
     }

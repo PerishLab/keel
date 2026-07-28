@@ -14,6 +14,9 @@ impl<'a, W: Wire> Work<'a, W> {
         fields: &[(&str, &str)],
     ) -> Result<i64, Error> {
         let (unit, edge) = self.plan.edge(owner, bond)?;
+        if unit.frozen() {
+            return Err(Error::Adapt(format!("frozen unit {}", unit.name())));
+        }
         let mate = self.plan.find(edge.target())?;
         edge.part(fields)?;
         if !self.alive(unit, ends.left).await? {
@@ -34,7 +37,7 @@ impl<'a, W: Wire> Work<'a, W> {
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
         let dst = ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target()));
-        let mut cols = vec![src, dst];
+        let mut cols = vec![ddl::KEY.into(), src, dst];
         for slot in edge.fields() {
             cols.push(ddl::col(slot.name()));
         }
@@ -51,7 +54,9 @@ impl<'a, W: Wire> Work<'a, W> {
             cols.join(", "),
             marks
         );
-        let mut vals: Vec<Val> = vec![Val::Int(ends.left), Val::Int(ends.right)];
+        let clock = crate::estate::clock::bond(&unit.key(), edge.name());
+        let key = crate::estate::next(self.wire, &clock).await?;
+        let mut vals: Vec<Val> = vec![Val::Int(key), Val::Int(ends.left), Val::Int(ends.right)];
         for slot in edge.fields() {
             let hit = fields
                 .iter()
@@ -63,7 +68,8 @@ impl<'a, W: Wire> Work<'a, W> {
         vals.push(Val::Null);
         vals.push(Val::Int(tick));
         vals.push(Val::Int(tick));
-        self.wire.plant(&text, &vals).await
+        self.wire.run(&text, &vals).await?;
+        Ok(key)
     }
 
     pub(crate) async fn tune(
@@ -74,6 +80,9 @@ impl<'a, W: Wire> Work<'a, W> {
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
         let (unit, edge) = self.plan.edge(owner, bond)?;
+        if unit.frozen() {
+            return Err(Error::Adapt(format!("frozen unit {}", unit.name())));
+        }
         let mate = self.plan.find(edge.target())?;
         edge.part(fields)?;
         if fields.is_empty() {
@@ -188,6 +197,9 @@ impl<'a, W: Wire> Work<'a, W> {
 
     pub(crate) async fn cut(&mut self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
         let (unit, edge) = self.plan.edge(owner, bond)?;
+        if unit.frozen() {
+            return Err(Error::Adapt(format!("frozen unit {}", unit.name())));
+        }
         let tick = now();
         let text = format!(
             "UPDATE {} SET {} = ?1, {} = ?1 WHERE {} = ?2",

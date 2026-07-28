@@ -3,7 +3,6 @@ use crate::adapt::Error;
 use crate::ddl;
 use crate::life::{Cell, Row};
 use std::collections::BTreeMap;
-
 pub fn digest(tree: &Tree) -> String {
     let unit = tree.from().to_ascii_lowercase();
     let mut out = match tree.slice() {
@@ -21,14 +20,19 @@ pub fn digest(tree: &Tree) -> String {
         out.push_str(" link ");
         out.push_str(bond);
     }
-    if let Some(sort) = tree.sort() {
+    if !tree.sorts().is_empty() {
         out.push_str(" order by ");
-        out.push_str(sort.field());
-        out.push(' ');
-        out.push_str(match sort.rank() {
-            Rank::Asc => "asc",
-            Rank::Desc => "desc",
-        });
+        for (i, sort) in tree.sorts().iter().enumerate() {
+            if i > 0 {
+                out.push_str(", ");
+            }
+            out.push_str(sort.field());
+            out.push(' ');
+            out.push_str(match sort.rank() {
+                Rank::Asc => "asc",
+                Rank::Desc => "desc",
+            });
+        }
     }
     if let Some(n) = tree.limit() {
         out.push_str(" limit ");
@@ -44,7 +48,6 @@ pub fn digest(tree: &Tree) -> String {
     }
     out
 }
-
 pub fn shape(tree: &Tree) -> String {
     let unit = tree.from().to_ascii_lowercase();
     let mut out = match tree.slice() {
@@ -58,13 +61,17 @@ pub fn shape(tree: &Tree) -> String {
         out.push_str(" link ");
         out.push_str(bond);
     }
-    if let Some(sort) = tree.sort() {
+    if !tree.sorts().is_empty() {
         out.push_str(" order by ");
-        out.push_str(sort.field());
+        for (i, sort) in tree.sorts().iter().enumerate() {
+            if i > 0 {
+                out.push_str(", ");
+            }
+            out.push_str(sort.field());
+        }
     }
     out
 }
-
 pub(crate) fn shaped(out: &mut String, pred: &Pred) {
     out.push_str(pred.field());
     out.push(' ');
@@ -82,6 +89,10 @@ pub(crate) fn shaped(out: &mut String, pred: &Pred) {
 pub(crate) fn spell(out: &mut String, pred: &Pred) {
     out.push_str(pred.field());
     out.push(' ');
+    if pred.op() == Op::Null {
+        out.push_str("is null");
+        return;
+    }
     if pred.op() == Op::In {
         out.push_str("in (");
         for (i, value) in pred.values().iter().enumerate() {
@@ -125,6 +136,7 @@ pub(crate) fn mark(op: Op) -> &'static str {
         Op::Ge => ">=",
         Op::In => "in",
         Op::Like => "like",
+        Op::Null => "is null",
         Op::Has => "has",
         Op::Some => "some",
     }
@@ -148,7 +160,13 @@ impl Pred {
             return false;
         }
         if self.field() == ddl::KEY {
+            if self.op() == Op::Null {
+                return false;
+            }
             return key.is_some_and(|key| self.spans(key));
+        }
+        if self.op() == Op::Null {
+            return !cells.contains_key(self.field());
         }
         self.finds(cells)
     }
@@ -163,7 +181,7 @@ impl Pred {
             Op::Ge => got >= self.value(),
             Op::In => self.values().iter().any(|want| want == got),
             Op::Like => got.to_lowercase().contains(&self.value().to_lowercase()),
-            Op::Has | Op::Some => false,
+            Op::Null | Op::Has | Op::Some => false,
         }
     }
 
@@ -189,7 +207,7 @@ impl Pred {
                 .values()
                 .iter()
                 .any(|want| key(want).is_ok_and(|n| n == got)),
-            Op::Like | Op::Has | Op::Some => false,
+            Op::Like | Op::Null | Op::Has | Op::Some => false,
         }
     }
 }
@@ -220,22 +238,24 @@ pub(crate) fn hit(row: &Row, pred: &Pred) -> bool {
     pred.covers(Some(row.key()), row.cells())
 }
 
-pub(crate) fn order(rows: &mut [Row], sort: Option<&Sort>) {
-    match sort {
-        None => rows.sort_by_key(|row| row.key()),
-        Some(sort) => {
-            let field = sort.field().to_string();
-            let desc = sort.rank() == Rank::Desc;
-            rows.sort_by(|a, b| by(a, b, &field, desc));
-        }
+pub(crate) fn order(rows: &mut [Row], sorts: &[Sort]) {
+    if sorts.is_empty() {
+        rows.sort_by_key(|row| row.key());
+        return;
     }
-}
-
-pub(crate) fn by(a: &Row, b: &Row, field: &str, desc: bool) -> std::cmp::Ordering {
-    let left = cell(a, field);
-    let right = cell(b, field);
-    let primary = grade(&left, &right, desc);
-    primary.then_with(|| a.key().cmp(&b.key()))
+    rows.sort_by(|a, b| {
+        for sort in sorts {
+            let compared = grade(
+                &cell(a, sort.field()),
+                &cell(b, sort.field()),
+                sort.rank() == Rank::Desc,
+            );
+            if compared != std::cmp::Ordering::Equal {
+                return compared;
+            }
+        }
+        a.key().cmp(&b.key())
+    });
 }
 
 pub(crate) fn grade(left: &Cell, right: &Cell, desc: bool) -> std::cmp::Ordering {

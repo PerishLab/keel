@@ -16,6 +16,10 @@ async fn defaults() {
     assert_eq!(cfg.listen.port, 3000);
     assert!(cfg.listen.prefix.is_empty());
     assert_eq!(cfg.cache.kind, config::Hold::Memory);
+    assert_eq!(
+        cfg.estate.generation.cleanup.retain,
+        config::Retain::Span(30 * 24 * 60 * 60)
+    );
     assert_eq!(root, start);
     let rig = Rig::resolve(None).expect("bare rig");
     assert_eq!(rig.store.kind, Kind::Memory);
@@ -38,6 +42,9 @@ port = 3001
 [store]
 kind = "file"
 path = "data/keel.sqlite"
+
+[estate.generation.cleanup]
+retain = "2h"
 "#,
     )
     .expect("write");
@@ -46,6 +53,10 @@ path = "data/keel.sqlite"
     let (cfg, found) = config::load(&nested).expect("file resolves");
     assert_eq!(found, root);
     assert_eq!(cfg.listen.port, 3001);
+    assert_eq!(
+        cfg.estate.generation.cleanup.retain,
+        config::Retain::Span(2 * 60 * 60)
+    );
     let file = plumb::config::discover(&nested, config::NAME).expect("found");
     let rig = Rig::resolve(Some(&file)).expect("rig resolves");
     assert_eq!(rig.store.kind, Kind::File);
@@ -78,6 +89,7 @@ fn veiled() {
         "KEEL_LISTEN_PORT" => Some("7".to_string()),
         "KEEL_CACHE_KIND" => Some("none".to_string()),
         "KEEL_IDENTITY_UNIT" => Some("veiled".to_string()),
+        "KEEL_ESTATE_GENERATION_CLEANUP_RETAIN" => Some("forever".to_string()),
         "RIG_STORE_KIND" => Some("file".to_string()),
         _ => None,
     };
@@ -87,6 +99,24 @@ fn veiled() {
     assert_eq!(cfg.listen.host, "127.0.0.1");
     assert_eq!(cfg.cache.kind, config::Hold::None);
     assert_eq!(cfg.identity.unit, "veiled");
+    assert_eq!(
+        cfg.estate.generation.cleanup.retain,
+        config::Retain::Forever
+    );
     let held = Rig::default().merge(Rig::lookup("RIG", &get).expect("env reads"));
     assert_eq!(held.store.kind, Kind::File);
+}
+
+#[test]
+fn retention() {
+    assert_eq!(
+        "0s".parse::<config::Retain>().expect("immediate"),
+        config::Retain::Span(0)
+    );
+    assert_eq!(
+        "30d".parse::<config::Retain>().expect("default"),
+        config::Retain::Span(30 * 24 * 60 * 60)
+    );
+    assert!("30".parse::<config::Retain>().is_err());
+    assert!("1w".parse::<config::Retain>().is_err());
 }

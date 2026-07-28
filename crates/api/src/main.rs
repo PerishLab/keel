@@ -62,10 +62,13 @@ async fn main() {
     };
     let mut graph = Graph::new();
     graph.plug::<Course>().plug::<Student>();
-    let made = bind(graph, store).await.map(|core| match cfg.cache.kind {
-        keel::config::Hold::Memory => core,
-        keel::config::Hold::None => core.bare(),
-    });
+    let made = bind(graph, store)
+        .estate(&cfg.estate)
+        .await
+        .map(|core| match cfg.cache.kind {
+            keel::config::Hold::Memory => core,
+            keel::config::Hold::None => core.bare(),
+        });
     let core = match made {
         Ok(core) => core.share(),
         Err(err) => {

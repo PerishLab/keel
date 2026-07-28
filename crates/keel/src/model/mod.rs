@@ -1,7 +1,9 @@
 pub mod atom;
 pub mod bond;
 pub mod ddl;
+pub(crate) mod delta;
 pub mod graph;
+pub(crate) mod manifest;
 pub mod name;
 pub mod plan;
 pub mod spec;

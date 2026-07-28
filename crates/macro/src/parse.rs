@@ -181,7 +181,7 @@ impl Read for Attribute {
 }
 
 pub(crate) fn atom(attrs: &[Attribute]) -> syn::Result<Option<Made>> {
-    let hint = "use #[field(string)] or #[field(string, unique = rel)]";
+    let hint = "use #[field(string)] or #[field(string, default = \"ready\", values = (\"ready\", \"done\"))]";
     for attr in attrs {
         if !attr.path().is_ident("field") {
             continue;
@@ -196,10 +196,19 @@ pub(crate) fn atom(attrs: &[Attribute]) -> syn::Result<Option<Made>> {
         }
         let kind = first.atom()?;
         let mut only = Only::Free;
+        let mut need = true;
+        let mut guard = Guard::default();
         for item in items.iter().skip(1) {
+            if item.ident().is_ok_and(|word| word == "opt") {
+                need = false;
+                continue;
+            }
+            if crate::rule::read(attr, item, &mut only, &mut guard)? {
+                continue;
+            }
             only = attr.only(item)?;
         }
-        return Ok(Some(Made::Atom(kind, only)));
+        return Ok(Some(Made::Atom(kind, only, need, guard)));
     }
     Ok(None)
 }

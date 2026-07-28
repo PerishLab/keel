@@ -18,6 +18,7 @@ pub enum Op {
     Ge,
     In,
     Like,
+    Null,
     Has,
     Some,
 }
@@ -80,7 +81,7 @@ pub struct Tree {
     slice: Slice,
     preds: Vec<Pred>,
     links: Vec<String>,
-    sort: Option<Sort>,
+    sorts: Vec<Sort>,
     limit: Option<usize>,
     after: Option<i64>,
     tally: bool,
@@ -107,13 +108,23 @@ impl Tree {
         self
     }
 
+    pub fn missing(mut self, field: &str) -> Self {
+        self.preds.push(Pred {
+            field: field.to_string(),
+            op: Op::Null,
+            values: Vec::new(),
+            nest: None,
+        });
+        self
+    }
+
     pub fn link(mut self, bond: &str) -> Self {
         self.links.push(bond.to_string());
         self
     }
 
     pub fn order(mut self, field: &str, rank: Rank) -> Self {
-        self.sort = Some(Sort {
+        self.sorts.push(Sort {
             field: field.to_string(),
             rank,
         });
@@ -152,7 +163,11 @@ impl Tree {
     }
 
     pub fn sort(&self) -> Option<&Sort> {
-        self.sort.as_ref()
+        self.sorts.first()
+    }
+
+    pub fn sorts(&self) -> &[Sort] {
+        &self.sorts
     }
 
     pub fn limit(&self) -> Option<usize> {

@@ -64,6 +64,21 @@ impl<W: Wire> Tx<'_, W> {
         Ok(())
     }
 
+    pub(super) async fn loosen(
+        &mut self,
+        name: &str,
+        key: i64,
+        fields: &[&str],
+    ) -> Result<(), Error> {
+        let plan = self.core.plan();
+        let unit = query::resolve(plan, name)?;
+        Work::new(&mut self.seat.wire, plan)
+            .unset(&unit, key, fields)
+            .await?;
+        self.beat("set", &unit, key).await;
+        Ok(())
+    }
+
     pub(super) async fn fell(
         &mut self,
         name: &str,

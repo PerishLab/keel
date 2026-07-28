@@ -123,7 +123,7 @@ Clause order (fixed, case-insensitive keywords):
 from <Unit>
 [where <pred> (and <pred>)*]
 [link <bond>]+
-[order by <field> [asc|desc]]
+[order by <field> [asc|desc] (, <field> [asc|desc])*]
 [limit <n>]
 [after "<id>"]
 ```
@@ -132,6 +132,8 @@ from <Unit>
 - Repeat `link` for multiple bonds. Duplicate same bond → error.
 - Unknown bond → error. Nested bond path → error.
 - `order` / `limit` / `after` bind **only** the root.
+- Multiple order fields compare lexicographically in declaration order.
+  Engine `id` ascending is the final stable tie-breaker.
 
 Example:
 
@@ -139,7 +141,7 @@ Example:
 from Student
 where nickname != "zoe"
 link classes
-order by nickname asc
+order by nickname asc, id asc
 limit 10
 after "3"
 ```

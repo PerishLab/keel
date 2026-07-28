@@ -48,10 +48,34 @@ fn main() {
 | Method | Meaning |
 |--------|---------|
 | `put` / `set` / `live` / `end` | insert, partial update, live list, soft-end |
+| `unset` | clear explicitly optional scalar or single-relation fields to null |
 | `query` / `ask` | text → AST → run; `ask` takes `Tree` directly |
 | AST | `from` + where + `link` + order/page → always **pack** |
 | `tie` / `ties` / `cut` | many2many write on Core; read via `link` bond bags (H0) |
 | edge law | flat pack; root-only order/page — `docs/model/edge.md` |
+
+Scalar fields are required by default. `#[field(string, opt)]` makes absence a
+real null state: omit it on `put`, supply a value through `set`, and clear it
+explicitly through `unset`. Empty text remains ordinary business data. Query
+absence with `where field is null` or `form("Unit").missing("field")`.
+
+Field laws are schema, not runtime configuration:
+
+```rust
+#[field(string, default = "queued", values = ("done", "queued"))]
+state: string,
+#[field(int, opt, min = 1)]
+remind_every_seconds: int,
+```
+
+`default` fills an omitted required field. `values` is a finite admitted set;
+`min` and `max` are inclusive integer bounds. Keel enforces the same law in
+writes, physical projection, manifests, and generation evolution.
+
+`#[resource(frozen)]` declares an immutable-from-birth fact. It may be put and
+later ended or leased, but `set`, `unset`, and set-relation mutation refuse.
+Schema generations may still re-express the same frozen resource.
+
 | `serve` / `listen` | axum (`http` feature) |
 
 ### HTTP surface
@@ -91,17 +115,31 @@ kind = "memory"
 [cache]
 kind = "memory"
 # kind = "none"
+
+[estate.generation.cleanup]
+retain = "30d"
 ```
 
 ```rust
 let cfg = keel::config::load(".");
 let store = cfg.open()?;
-let core = bind(graph, store)?;
+let core = bind(graph, store).estate(&cfg.estate).await?;
 // listen(core.share(), &cfg.listen.host, cfg.listen.port).await?;
 ```
 
 `keel-api [ROOT]` loads `ROOT/keel.toml` (default `ROOT=.`). CLI does not
-re-express policy keys — change the file.
+re-express policy keys — change the file. Cleanup retention accepts
+`<digits>s`, `m`, `h`, or `d`; `"0s"` makes retired generations immediately
+eligible and `"forever"` disables automatic collection.
+
+An existing nonempty namespace without an estate seal is refused by ordinary
+bind. `bind(graph, store).adopt().await` is the explicit exception: it succeeds
+only when the namespace exactly matches Keel's generated physical projection,
+then seals it and reconstructs every permanent allocator high-water.
+
+`bind(graph, store).hook(handler).await` registers one typed derivative cleanup
+consumer. Keel commits estate GC first, durably retains logical `path + key`
+events, and retries failed or unacknowledged delivery on later hooked binds.
 
 ## Local process (sidecar)
 

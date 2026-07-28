@@ -34,6 +34,9 @@ pub fn mold(plan: &Plan, unit: &str, fields: &[(&str, &str)]) -> BTreeMap<String
     for slot in node.fields() {
         let raw = get(fields, slot.name());
         if raw.is_empty() {
+            if let Some(value) = slot.rule().fallback() {
+                out.insert(slot.name().to_string(), shape(slot.kind(), value));
+            }
             continue;
         }
         out.insert(slot.name().to_string(), shape(slot.kind(), raw));

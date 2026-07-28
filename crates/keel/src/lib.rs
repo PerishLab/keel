@@ -8,9 +8,9 @@ pub mod wire;
 pub mod serve;
 
 pub use model::{atom, bond, ddl, graph, name, plan, spec};
-pub use run::{cap, face, life, query};
+pub use run::{cap, estate, face, life, query};
 
-pub use adapt::bind;
+pub use adapt::{Bind, bind};
 pub use config::{Config, load};
 pub use graph::Graph;
 pub use keel_macro::resource;

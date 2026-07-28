@@ -14,8 +14,8 @@ differ per store, provided the scenario suite cannot tell.
 |----|-----------|
 | U1 | at most one **live** tie per `(left, right)` per bond; second rejected |
 | U2 | `unique` field: at most one live row per value, engine-wide |
-| U3 | `unique = <relation>` field: at most one live row per value **within the parent row** |
-| U4 | composite unique: one live row per value tuple; `unique = (rel, rel)` scopes a field by a tuple of refs |
+| U3 | `unique = <scope>` field: at most one live row per value within one named scalar or point-ref scope |
+| U4 | composite unique: one live row per value tuple; `unique = (scope, scope)` mixes named scalars and refs |
 | U5 | scoped serial: per-parent monotonic allocation at `put`; never reused |
 
 ## Liveness rule
@@ -60,5 +60,5 @@ document are the contract.
 - Serial reuse, renumbering, or per-engine serial semantics.
 - Caller-observable check/write windows.
 - Conflict errors that reveal row content beyond the key name.
-- A second uniqueness vocabulary outside `unique` / `unique = rel` /
+- A second uniqueness vocabulary outside `unique` / `unique = scope` /
   composite / serial.

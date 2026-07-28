@@ -22,7 +22,8 @@ impl<'a, W: Wire> Work<'a, W> {
         }
         unit.check(fields)?;
         let tick = now();
-        let mut cols: Vec<String> = unit.fields().iter().map(|s| ddl::col(s.name())).collect();
+        let mut cols: Vec<String> = vec![ddl::KEY.into()];
+        cols.extend(unit.fields().iter().map(|s| ddl::col(s.name())));
         for edge in unit.refs() {
             cols.push(ddl::col(&ddl::side(edge.name())));
         }
@@ -39,14 +40,24 @@ impl<'a, W: Wire> Work<'a, W> {
             cols.join(", "),
             marks
         );
-        let mut vals: Vec<Val> = Vec::new();
+        let clock = crate::estate::clock::unit(&unit.key());
+        let key = crate::estate::next(self.wire, &clock).await?;
+        let mut vals: Vec<Val> = vec![Val::Int(key)];
         for slot in unit.fields() {
             if let Some(scope) = slot.serial() {
                 vals.push(self.next(unit, slot, scope, fields).await?);
                 continue;
             }
-            let hit = pluck(fields, slot.name());
-            vals.push(slot.bind(hit)?);
+            vals.push(match seek(fields, slot.name()) {
+                Some(hit) => slot.bind(hit)?,
+                None if !slot.need() => Val::Null,
+                None if slot.rule().fallback().is_some() => {
+                    slot.bind(slot.rule().fallback().expect("fallback"))?
+                }
+                None => {
+                    return Err(Error::Adapt(format!("missing field {}", slot.name())));
+                }
+            });
         }
         for edge in unit.refs() {
             let hit = pluck(fields, edge.name());
@@ -56,7 +67,8 @@ impl<'a, W: Wire> Work<'a, W> {
         vals.push(Val::Int(tick));
         vals.push(Val::Int(tick));
         self.solid(unit, fields, None).await?;
-        self.wire.plant(&text, &vals).await
+        self.wire.run(&text, &vals).await?;
+        Ok(key)
     }
 
     pub(super) async fn solid(
@@ -96,12 +108,12 @@ impl<'a, W: Wire> Work<'a, W> {
         let mut vals = vec![value, Val::Int(me), Val::Int(now())];
         if let Only::Per(rels) = slot.only() {
             for rel in rels {
-                let col = ddl::col(&ddl::side(rel));
+                let col = unit.column(rel)?;
                 let at = vals.len() + 1;
                 text.push_str(&format!(
                     " AND ({col} = ?{at} OR (?{at} IS NULL AND {col} IS NULL))"
                 ));
-                vals.push(anchor(fields, myself, rel)?);
+                vals.push(anchor(unit, fields, myself, rel)?);
             }
         }
         text.push_str(" LIMIT 1");
@@ -147,15 +159,9 @@ impl<'a, W: Wire> Work<'a, W> {
         scope: &str,
         fields: &[(&str, &str)],
     ) -> Result<Val, Error> {
-        let col = ddl::col(&ddl::side(scope));
-        let text = format!(
-            "SELECT COALESCE(MAX({}), 0) + 1 FROM {} WHERE {col} = ?1 OR (?1 IS NULL AND {col} IS NULL)",
-            ddl::col(slot.name()),
-            ddl::seat(unit)
-        );
-        let hold = anchor(fields, None, scope)?;
-        let rows = self.wire.rows(&text, &[hold]).await?;
-        let key = rows.first().map(|line| line[0].int()).unwrap_or(1);
+        let hold = anchor(unit, fields, None, scope)?;
+        let name = crate::estate::clock::serial(&unit.key(), slot.name(), &hold)?;
+        let key = crate::estate::next(self.wire, &name).await?;
         Ok(Val::Int(key))
     }
 

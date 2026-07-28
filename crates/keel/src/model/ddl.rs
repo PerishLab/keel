@@ -20,7 +20,11 @@ pub fn table(name: &str, root: Option<&str>) -> String {
 }
 
 pub fn join(unit: &Unit, bond: &str) -> String {
-    format!("{}_{}", unit.table(), bond.to_ascii_lowercase())
+    joiner(&unit.table(), bond)
+}
+
+pub(crate) fn joiner(table: &str, bond: &str) -> String {
+    format!("{}_{}", table, bond.to_ascii_lowercase())
 }
 
 pub fn side(name: &str) -> String {
@@ -55,7 +59,7 @@ pub enum Grain {
 fn stub(grain: Grain) -> &'static str {
     match grain {
         Grain::Lite => "INTEGER PRIMARY KEY NOT NULL",
-        Grain::Pg => "BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY",
+        Grain::Pg => "BIGINT PRIMARY KEY NOT NULL",
     }
 }
 
@@ -67,34 +71,52 @@ fn whole(grain: Grain) -> &'static str {
 }
 
 pub fn script(plan: &Plan, grain: Grain) -> Vec<String> {
+    project(plan, grain, None)
+}
+
+pub(crate) fn candidate(plan: &Plan, grain: Grain, generation: i64) -> Vec<String> {
+    project(plan, grain, Some(generation))
+}
+
+fn project(plan: &Plan, grain: Grain, generation: Option<i64>) -> Vec<String> {
     let mut out = Vec::new();
     if grain == Grain::Lite {
         out.push("PRAGMA foreign_keys = ON;".into());
     }
-    for node in plan.units().values() {
-        out.push(form(node, grain));
+    let units: Vec<&Unit> = plan
+        .units()
+        .values()
+        .filter(|unit| generation.is_none() || !unit.name().starts_with('@'))
+        .collect();
+    for node in &units {
+        let place = place(&node.table(), generation);
+        out.push(form(node, &place, grain));
     }
-    for node in plan.units().values() {
+    for node in &units {
         for bond in node.bonds() {
             if bond.kind() == bond::Kind::Many2many {
-                out.push(arc(node, bond.name(), bond.target(), grain));
+                let joint = place(&join(node, bond.name()), generation);
+                out.push(arc(node, bond.name(), &joint, grain));
             }
         }
     }
-    for node in plan.units().values() {
+    for node in units {
         for slot in node.fields() {
             if *slot.only() != Only::Free || slot.serial().is_some() {
-                out.push(lock(node, slot));
+                let place = place(&node.table(), generation);
+                out.push(lock(node, slot, &place, generation));
             }
         }
     }
     out
 }
 
-fn lock(node: &Unit, slot: &Slot) -> String {
-    let place = node.table();
+fn lock(node: &Unit, slot: &Slot, place: &str, generation: Option<i64>) -> String {
     let scopes: Vec<String> = match slot.only() {
-        Only::Per(rels) => rels.iter().map(|rel| col(&side(rel))).collect(),
+        Only::Per(fields) => fields
+            .iter()
+            .map(|field| node.column(field).expect("validated unique scope"))
+            .collect(),
         _ => slot
             .serial()
             .map(|rel| col(&side(rel)))
@@ -104,20 +126,30 @@ fn lock(node: &Unit, slot: &Slot) -> String {
     let mut parts = scopes;
     parts.push(col(slot.name()));
     let cols = parts.join(", ");
+    let mark = generation.map(|id| format!("g{id}_")).unwrap_or_default();
+    let index = col(&format!("only_{mark}{}_{}", node.table(), slot.name()));
     format!(
-        "CREATE UNIQUE INDEX IF NOT EXISTS only_{place}_{} ON {} ({cols}) WHERE {EXPIRES} IS NULL;",
-        slot.name(),
-        col(&place)
+        "CREATE UNIQUE INDEX IF NOT EXISTS {index} ON {} ({cols}) WHERE {EXPIRES} IS NULL;",
+        col(place)
     )
 }
 
-fn form(node: &Unit, grain: Grain) -> String {
+fn form(node: &Unit, place: &str, grain: Grain) -> String {
     let mut cols = vec![format!("{KEY} {}", stub(grain))];
     for slot in node.fields() {
+        let null = if slot.need() { " NOT NULL" } else { "" };
+        let default = slot
+            .rule()
+            .fallback()
+            .map(|value| format!(" DEFAULT {}", literal(slot.kind(), value)))
+            .unwrap_or_default();
         cols.push(format!(
-            "{} {} NOT NULL",
+            "{} {}{}{}{}",
             col(slot.name()),
-            cast(slot.kind(), grain)
+            cast(slot.kind(), grain),
+            null,
+            default,
+            checks(slot)
         ));
     }
     for edge in node.bonds() {
@@ -134,19 +166,19 @@ fn form(node: &Unit, grain: Grain) -> String {
     stamp(node.reign(), &mut cols, grain);
     format!(
         "CREATE TABLE IF NOT EXISTS {} ({});",
-        seat(node),
+        col(place),
         cols.join(", ")
     )
 }
 
-fn arc(node: &Unit, bond: &str, target: &str, grain: Grain) -> String {
+fn arc(node: &Unit, bond: &str, joint: &str, grain: Grain) -> String {
     let edge = node
         .bonds()
         .iter()
         .find(|edge| edge.name() == bond)
         .expect("bond");
     let left = col(&side(node.name()));
-    let right = col(&mate(node.name(), bond, target));
+    let right = col(&mate(node.name(), bond, edge.target()));
     let mut cols = vec![
         format!("{KEY} {}", stub(grain)),
         format!("{left} {} NOT NULL", whole(grain)),
@@ -162,9 +194,17 @@ fn arc(node: &Unit, bond: &str, target: &str, grain: Grain) -> String {
     stamp(node.reign(), &mut cols, grain);
     format!(
         "CREATE TABLE IF NOT EXISTS {} ({});",
-        joint(node, bond),
+        col(joint),
         cols.join(", ")
     )
+}
+
+pub(crate) fn stage(generation: i64, table: &str) -> String {
+    format!("@g{generation}:{table}")
+}
+
+fn place(table: &str, generation: Option<i64>) -> String {
+    generation.map_or_else(|| table.into(), |id| stage(id, table))
 }
 
 fn stamp(reign: &Reign, cols: &mut Vec<String>, grain: Grain) {
@@ -184,5 +224,42 @@ fn cast(kind: atom::Kind, grain: Grain) -> &'static str {
     match kind {
         atom::Kind::Text | atom::Kind::Link => "TEXT",
         atom::Kind::Int | atom::Kind::Bool => whole(grain),
+    }
+}
+
+fn checks(slot: &Slot) -> String {
+    let rule = slot.rule();
+    let name = col(slot.name());
+    let mut checks = Vec::new();
+    if !rule.admitted().is_empty() {
+        let values = rule
+            .admitted()
+            .iter()
+            .map(|value| literal(slot.kind(), value))
+            .collect::<Vec<_>>()
+            .join(", ");
+        checks.push(format!("{name} IN ({values})"));
+    }
+    if let Some(min) = rule.minimum() {
+        checks.push(format!("{name} >= {min}"));
+    }
+    if let Some(max) = rule.maximum() {
+        checks.push(format!("{name} <= {max}"));
+    }
+    checks
+        .into_iter()
+        .map(|check| format!(" CHECK ({check})"))
+        .collect()
+}
+
+fn literal(kind: atom::Kind, value: &str) -> String {
+    match kind {
+        atom::Kind::Text | atom::Kind::Link => format!("'{}'", value.replace('\'', "''")),
+        atom::Kind::Int => value.to_string(),
+        atom::Kind::Bool => match value {
+            "true" => "1".into(),
+            "false" => "0".into(),
+            _ => unreachable!("normalized bool"),
+        },
     }
 }

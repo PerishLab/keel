@@ -65,6 +65,10 @@ impl From<Error> for Fault {
                 status: StatusCode::BAD_REQUEST,
                 note,
             },
+            Error::Estate(fault) => Self {
+                status: StatusCode::BAD_REQUEST,
+                note: fault.to_string(),
+            },
         }
     }
 }

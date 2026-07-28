@@ -4,22 +4,31 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug, Default)]
 pub struct Graph {
     nodes: BTreeMap<String, Spec>,
+    conflicts: std::collections::BTreeSet<String>,
 }
 
 impl Graph {
     pub fn new() -> Self {
         Self {
             nodes: BTreeMap::new(),
+            conflicts: std::collections::BTreeSet::new(),
         }
     }
 
     pub fn plug<R: Resource>(&mut self) -> &mut Self {
         let spec = R::spec();
-        self.nodes.insert(spec.key(), spec);
+        let key = spec.key();
+        if self.nodes.insert(key.clone(), spec).is_some() {
+            self.conflicts.insert(key);
+        }
         self
     }
 
     pub fn nodes(&self) -> &BTreeMap<String, Spec> {
         &self.nodes
+    }
+
+    pub(crate) fn conflicts(&self) -> &std::collections::BTreeSet<String> {
+        &self.conflicts
     }
 }

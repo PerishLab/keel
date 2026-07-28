@@ -30,7 +30,7 @@ impl Scope {
         for pred in tree.preds() {
             self.pred(pred)?;
         }
-        if let Some(sort) = tree.sort() {
+        for sort in tree.sorts() {
             self.unit.kind(sort.field())?;
         }
         for bond in tree.links() {
@@ -90,6 +90,7 @@ impl Scope {
                 let nest = inner(pred)?;
                 fits(self.kind(bond, nest.field())?, nest.values())
             }
+            Op::Null => Ok(()),
             _ => fits(self.unit.kind(pred.field())?, pred.values()),
         }
     }

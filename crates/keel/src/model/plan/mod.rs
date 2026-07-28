@@ -2,6 +2,7 @@ use crate::atom;
 use crate::bond;
 use crate::graph::Graph;
 use crate::spec::Only;
+use crate::spec::Rule;
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug)]
@@ -16,6 +17,7 @@ pub struct Unit {
     bonds: Vec<Edge>,
     reign: Reign,
     veil: bool,
+    frozen: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -24,6 +26,8 @@ pub struct Slot {
     kind: atom::Kind,
     only: Only,
     serial: Option<String>,
+    need: bool,
+    rule: Rule,
 }
 
 #[derive(Clone, Debug)]
@@ -46,22 +50,57 @@ pub struct Reign {
 
 impl Plan {
     pub(crate) fn lift(graph: &Graph) -> Result<Self, crate::adapt::Error> {
+        if let Some(key) = graph.conflicts().first() {
+            return Err(crate::adapt::Error::Adapt(format!("duplicate unit {key}")));
+        }
         let mut units = BTreeMap::new();
         for spec in graph.nodes().values() {
             let unit = Unit::lift(spec)?;
             units.insert(unit.key(), unit);
         }
-        let names: std::collections::BTreeSet<String> =
-            units.values().map(|unit| unit.name().to_string()).collect();
         for unit in units.values() {
             for edge in &unit.bonds {
-                if !names.contains(&edge.target) && !units.contains_key(&edge.target) {
+                if units.contains_key(&edge.target) {
+                    continue;
+                }
+                let hits = units
+                    .values()
+                    .filter(|unit| unit.name() == edge.target)
+                    .count();
+                if hits == 0 {
                     return Err(crate::adapt::Error::Missing(edge.target.clone()));
+                }
+                if hits > 1 {
+                    return Err(crate::adapt::Error::Adapt(format!(
+                        "ambiguous bond target {}",
+                        edge.target
+                    )));
                 }
             }
         }
         for engine in [Unit::grant(), Unit::seal(), Unit::pulse()] {
             units.insert(engine.key(), engine);
+        }
+        let mut places = std::collections::BTreeSet::new();
+        for unit in units.values() {
+            if !places.insert(unit.table()) {
+                return Err(crate::adapt::Error::Adapt(format!(
+                    "duplicate table {}",
+                    unit.table()
+                )));
+            }
+            for edge in unit
+                .bonds()
+                .iter()
+                .filter(|edge| edge.kind() == crate::bond::Kind::Many2many)
+            {
+                let table = crate::ddl::join(unit, edge.name());
+                if !places.insert(table.clone()) {
+                    return Err(crate::adapt::Error::Adapt(format!(
+                        "duplicate table {table}"
+                    )));
+                }
+            }
         }
         Ok(Self { units })
     }
@@ -134,7 +173,16 @@ impl Slot {
         self.serial.as_deref()
     }
 
+    pub fn need(&self) -> bool {
+        self.need
+    }
+
+    pub fn rule(&self) -> &Rule {
+        &self.rule
+    }
+
     pub(crate) fn bind(&self, value: &str) -> Result<crate::wire::Val, crate::adapt::Error> {
+        self.rule.check(self.kind, value)?;
         use crate::wire::Val;
         match self.kind {
             atom::Kind::Text | atom::Kind::Link => Ok(Val::Text(value.into())),
@@ -224,4 +272,7 @@ impl Reign {
     }
 }
 
+mod mode;
+mod optional;
+mod scope;
 mod unit;
