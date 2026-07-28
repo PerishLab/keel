@@ -1,47 +1,56 @@
-[scan]
-include = [
-  "crates/**/*.rs",
-  "docs/**/*.md",
+[[boundary]]
+allow = [
+    "path",
+    "comment",
 ]
-exclude = [
-  "**/target/**",
-]
+note = "ci infra; product depth and comment laws do not apply"
+paths = [".forgejo/**"]
 
-[module]
-roots = [
-  "crates/*/src",
-  "crates/*/tests",
-  "docs",
+[[boundary]]
+allow = [
+    "path",
+    "comment",
+    "word",
 ]
-
-[limit]
-block = 4
-path = 4
+note = "runseal operator adapters are guarded by deno fmt and deno check instead"
+paths = [".runseal/**"]
 
 [comment]
 allow = false
 
-[word]
-single = true
-
 [[grant]]
+paths = ["crates/*/tests/**/*.rs"]
 syntax = "test"
-paths = ["crates/*/tests/**/*.rs"]
 
 [[grant]]
-syntax = "environment"
 paths = ["crates/*/tests/**/*.rs"]
+syntax = "environment"
 
-[[boundary]]
-paths = [".forgejo/**"]
-note = "ci infra; product depth and comment laws do not apply"
-allow = ["path", "comment"]
+[limit]
+block = 4
+fanout = 10
+file = 300
+markup = 8
+param = 4
+path = 4
 
-[[boundary]]
-paths = [".runseal/**"]
-note = "runseal operator adapters are guarded by deno fmt and deno check instead"
-allow = ["path", "comment", "word"]
+[module]
+roots = [
+    "crates/*/src",
+    "crates/*/tests",
+    "docs",
+]
+
+[scan]
+exclude = ["**/target/**"]
+include = [
+    "crates/**/*.rs",
+    "docs/**/*.md",
+]
 
 [[vocabulary.term]]
-name = "into_response"
 description = "Foreign axum IntoResponse trait method implemented at the framework boundary; keel cannot rename or decompose it without replacing domain error types with raw Response across handlers."
+name = "into_response"
+
+[word]
+single = true

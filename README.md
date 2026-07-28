@@ -124,7 +124,7 @@ runseal :guard    # unit tests + smoke + course + forge scenarios
 runseal :smoke    # thin L2
 runseal :course   # classic enroll/drop/schedule L2
 runseal :forge    # forge slice act 1: data completeness L2
-cargo run -p keel-api --locked
+cargo run -p api --locked
 ```
 
 Scenario notes: `docs/run/scenario.md`.

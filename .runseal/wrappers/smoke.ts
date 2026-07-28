@@ -34,11 +34,11 @@ kind = "memory"
 await Deno.writeTextFile(`${dir}/keel.toml`, toml);
 
 io.print("==> build keel-api");
-await bin("cargo").run(["build", "-p", "keel-api", "--locked"], { cwd: root });
+await bin("cargo").run(["build", "-p", "api", "--locked"], { cwd: root });
 
 io.print(`==> boot keel-api on ${base}`);
 const child = new Deno.Command("cargo", {
-  args: ["run", "-p", "keel-api", "--locked", "--", dir],
+  args: ["run", "-p", "api", "--locked", "--", dir],
   cwd: root,
   stdin: "null",
   stdout: "null",

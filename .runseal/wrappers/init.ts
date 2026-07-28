@@ -12,7 +12,7 @@ if (flags(args).help()) {
 }
 
 await init({
-  tools: ["git", "tea", "deno", "cargo", "ectropy", "runseal", "sh"],
+  tools: ["git", "tea", "deno", "cargo", "ectropy", "plumb", "runseal", "sh"],
   paths: [
     "Cargo.toml",
     "Cargo.lock",

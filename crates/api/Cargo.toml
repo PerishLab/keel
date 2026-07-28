@@ -1,5 +1,5 @@
 [package]
-name = "keel-api"
+name = "api"
 default-run = "keel-api"
 version.workspace = true
 edition.workspace = true

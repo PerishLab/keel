@@ -35,13 +35,13 @@ await Deno.writeTextFile(`${dir}/keel.toml`, toml);
 
 io.print("==> build forge");
 await bin("cargo").run(
-  ["build", "-p", "keel-api", "--bin", "forge", "--locked"],
+  ["build", "-p", "api", "--bin", "forge", "--locked"],
   { cwd: root },
 );
 
 io.print(`==> boot forge on ${base}`);
 const child = new Deno.Command("cargo", {
-  args: ["run", "-p", "keel-api", "--bin", "forge", "--locked", "--", dir],
+  args: ["run", "-p", "api", "--bin", "forge", "--locked", "--", dir],
   cwd: root,
   stdin: "null",
   stdout: "null",

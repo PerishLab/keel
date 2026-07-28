@@ -6,7 +6,7 @@ root = "."
 [[sidecars]]
 name = "api"
 command = "cargo"
-args = ["run", "-p", "keel-api", "--locked"]
+args = ["run", "-p", "api", "--locked"]
 cwd = "."
 mode = "dev"
 health_url = "http://127.0.0.1:3000/health"

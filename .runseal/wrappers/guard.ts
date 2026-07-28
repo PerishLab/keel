@@ -55,6 +55,7 @@ await guard(
     { label: "smoke", runs: [scenario("smoke")] },
     { label: "course", runs: [scenario("course")] },
     { label: "forge", runs: [scenario("forge")] },
+    { label: "plumb doctor", runs: [["plumb", ["doctor", "."]]] },
   ],
   Deno.args,
   { checker: ["ectropy", ["--strict", "."]] },
