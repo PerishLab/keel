@@ -221,7 +221,7 @@ another top-level query, not nested links.
 If a closure would exceed an engine hard cap, the query **errors**. Silent
 truncation is forbidden.
 
-- **Seat**: engine constants (**C0**), not `keel.toml` for v1.
+- **Seat**: engine constants (**C0**), not caller policy for v1.
 - **Scope**: max live ties loaded per `link` bag in one request (exact number
   is an impl constant; document in code + raise later if needed).
 - Caps are not user `limit` on bond bags.

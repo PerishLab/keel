@@ -87,7 +87,7 @@ T-M4 end-event hydration.
 | Part | Content |
 |------|---------|
 | laws | cache law (to draft at stage entry): semantically invisible; key = digest × coverage × generations; write path never reads cache; eviction ≠ truncation |
-| surface | engine-integrated cache; `[cache]` in `keel.toml` |
+| surface | engine-integrated cache; caller-supplied switch at bind |
 | scenario | no new act — **every** prior scenario byte-equal with cache on and off |
 
 Open inside: generation granularity, eviction policy.

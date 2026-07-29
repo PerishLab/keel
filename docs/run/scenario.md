@@ -1,20 +1,20 @@
 # Scenario: student course selection
 
 Pressure pass of keel through a classic enroll / drop / schedule flow.
-Gates: L1 `tests/course.rs`, L2 `runseal :course` (also from `:guard`).
+Gates: L2 `cargo test -p keel --test route` (also from `:guard`).
 
 The flagship staged scenario is **`:forge`** (`docs/model/spec.md`): a thin
 Forgejo slice growing one act per delivery stage. Act 1 (S1 data
 completeness) covers unique login, per-owner repo names, per-repo issue
-serials, typed json, count packs, and ref-blocked ends over the `forge`
-binary (`crates/api/src/bin/forge.rs`). Act 2 (S2 capability): seed policy,
+serials, typed json, count packs, and ref-blocked ends over the forge rig
+(`crates/gate/tests/forge`). Act 2 (S2 capability): seed policy,
 authority matrix, subtree transfer, sudo window + journal. Act 3 (S3 gate):
 register / token / login / logout / self-revoke over `keel-gate`, sessions
 riding reign via lease. Act 4 (S4 trigger+relay): webhook delivery over
 `keel-relay` — coverage-bound, `@grant` changes observable, window backed
 by L1 `tests/pulse.rs`.
 
-## Model (keel-api)
+## Model (route scenario)
 
 | Unit | Fields | Bonds |
 |------|--------|-------|
@@ -64,7 +64,7 @@ yet.
 ## Commands
 
 ```sh
-runseal :course   # full scenario L2
-runseal :smoke    # thinner cold-start L2
+cargo test -p keel --test route
+cargo test -p keel-gate --test forge
 runseal :guard    # includes both
 ```

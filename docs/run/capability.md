@@ -87,11 +87,10 @@ Identity is decoupled: **keel never authenticates.** Caller middleware
 resolves credentials — api key, session, user id, mTLS; keel does not know
 or care which — and injects the resulting **operator**. keel consumes it.
 
-- One designated **identity unit** per deployment, named in `keel.toml`:
+- One designated **identity unit** per deployment, named by the caller:
 
-```toml
-[identity]
-unit = "Actor"
+```rust
+let core = core.identify("Actor")?;
 ```
 
 - An **operator** is a live row id of the identity unit — nothing else. The

@@ -20,22 +20,17 @@ engine projections, not business authoring surfaces.
   `.adopt()` is the explicit exact-projection ceremony for an unsealed estate;
   `.hook()` registers one idempotent non-estate derivative consumer.
 - **Engine face (`Core`)**: `put` / `set` / `live` / `end` / `tie` / `ties` / `cut`.
-- **Runtime policy**: repo-rooted `keel.toml`; the engine face owns
-  `[listen]`, `[identity]`, `[cache]`, `[estate.generation.cleanup]`
-  (cascading default < file < `KEEL_*` env; load via
-  `config::load(root)`; missing file => defaults,
-  127.0.0.1:3000; malformed file => refuse to boot). `[store]` is each
-  caller binary's own section: adaptors carry config fragments
-  (`adapt::db::Store`, `adapt::pg::Store`) and the caller composes one at
-  bootstrap, then hands the opened store to `bind` — the engine never
-  interprets store config. The environment is read only through the
-  cascade (plumb `docs/config.md`); config vocabulary is never imported
-  from plumb, only the mechanism.
+- **Runtime policy**: keel is a library and owns no configuration file. It
+  reads no file, discovers no path, and knows no environment variable. The
+  caller constructs values and hands them over: `Estate` (with `Generation`,
+  `Cleanup`, `Retain`) is keel vocabulary the caller fills and passes to
+  `bind(...).estate(&estate)`; listen host/port/prefix are arguments to
+  `listen`; the caller opens its own store and hands the opened store to
+  `bind`. A caller that wants a config file declares its own, in its own
+  format, under its own environment prefix.
 - **HTTP (axum)**: resource REST + edge **write** (`tie`/`cut` routes); no
-  association **reads**. Global `POST {prefix}/query` DSL; host/port/prefix
-  from `keel.toml`. Filter/order/page/link only inside DSL.
-- **Sidecar**: `sidecar.toml` manages `keel-api` process; health should match
-  `[listen]` in `keel.toml` (do not dual-author ports).
+  association **reads**. Global `POST {prefix}/query` DSL; host/port/prefix are
+  arguments the caller supplies. Filter/order/page/link only inside DSL.
 - **Edge**: always-pack `/query`; `link` → bond bags (H0); root-only order/page
   (`docs/model/edge.md`). Bond attrs + `has` + live-unique + K1
   (`docs/model/bond.md`).
@@ -79,28 +74,24 @@ done when its scenario is green; no stage begins against unlanded law.
 
 - `crates/keel/` — engine library
 - `crates/macro/` — proc macros
-- `crates/api/` — demo binaries (`keel-api`, `forge`) for sidecar/scenarios
 - `crates/gate/` — `keel-gate`: default credential package (caller space)
 - `crates/relay/` — `keel-relay`: default webhook package (caller space)
-- `keel.toml` — runtime policy (listen/store/identity/cache/estate)
-- `sidecar.toml` — local process plan
 - `docs/` — vocabulary, verify, edge, capability, trigger laws
 - `.runseal/` / `.forgejo/` — guard and CI
 
 ## Verification
 
-Cold-start contract: `docs/run/verify.md` (L1 unit / L2 smoke / L3 static).
-`:guard` runs L1+L3 and then `:smoke` (L2).
+Cold-start contract: `docs/run/verify.md` (L1 unit / L2 scenario / L3 static).
+`:guard` runs all three. L2 lives in `crates/keel/tests/route` and
+`crates/gate/tests/forge`; it drives the Router in process, and keel ships no
+binary for it to boot.
 
 ## Common commands
 
 ```sh
 runseal :init
 runseal :guard
-runseal :smoke
-runseal :course
-runseal :forge
 runseal :ship
-cargo run -p keel-api --locked
-sidecar start --config sidecar.toml
+cargo test -p keel --test route
+cargo test -p keel-gate --test forge
 ```

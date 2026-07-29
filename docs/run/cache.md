@@ -10,7 +10,7 @@ invalidation API, no cache headers, no business surface at all.
 
 ## Seat
 
-`keel.toml`:
+Caller-supplied at bind:
 
 ```toml
 [cache]

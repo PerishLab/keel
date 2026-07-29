@@ -94,57 +94,34 @@ Native REST per resource (**no association queries**):
 | `DELETE` | `{prefix}/{unit}/{id}/{bond}/{tie}` | `cut` |
 | `POST` | `{prefix}/query` | body `{"q":…}` → always pack |
 
-`listen.prefix` in `keel.toml` is the api prefix (default empty).
+The prefix passed to `app`/`listen` is the api prefix (default empty).
 
-## Runtime config (`keel.toml`)
+## Runtime values
 
-Repo-rooted. Missing file uses the same defaults:
-
-```toml
-[listen]
-host = "127.0.0.1"
-port = 3000
-prefix = ""
-# prefix = "/api"
-
-[store]
-kind = "memory"
-# kind = "file"
-# path = ".local/keel.sqlite"
-
-[cache]
-kind = "memory"
-# kind = "none"
-
-[estate.generation.cleanup]
-retain = "30d"
-```
+Keel is a library and reads no configuration file. The caller supplies every
+runtime value:
 
 ```rust
-let cfg = keel::config::load(".");
-let store = cfg.open()?;
-let core = bind(graph, store).estate(&cfg.estate).await?;
-// listen(core.share(), &cfg.listen.host, cfg.listen.port).await?;
+let estate = keel::config::Estate::default();
+let core = keel::bind(graph, store).estate(&estate).await?;
+keel::listen(core.share(), "127.0.0.1", 3000, "").await?;
 ```
 
-An empty store needs an explicit ceremony before ordinary bind:
+`Estate`, `Generation`, `Cleanup`, and `Retain` are keel vocabulary; they derive
+`Deserialize`, so a caller may carry them inside its own config file under its
+own environment prefix. Keel never discovers that file.
 
 ```rust
-let mut boot = keel::bootstrap(graph, store)?;
-let sudo = boot.mint().await?;
 custody.keep(&sudo)?;
 let core = boot.seal(&sudo).await?;
 ```
 
 `custody` belongs to the caller; Keel performs no file, webhook, Secret, or
-vault delivery and never prints sudo. The demo binary exposes this distinction
-as `keel-api ROOT --bootstrap PATH`, with `PATH` acting as its local caller
-artifact.
+vault delivery and never prints sudo.
 
-`keel-api [ROOT]` loads `ROOT/keel.toml` (default `ROOT=.`). CLI does not
-re-express policy keys — change the file. Cleanup retention accepts
-`<digits>s`, `m`, `h`, or `d`; `"0s"` makes retired generations immediately
-eligible and `"forever"` disables automatic collection.
+Cleanup retention accepts `<digits>s`, `m`, `h`, or `d`; `"0s"` makes retired
+generations immediately eligible and `"forever"` disables automatic
+collection.
 
 An existing nonempty namespace without an estate seal is refused by ordinary
 bind. `bind(graph, store).adopt().await` is the explicit exception: it succeeds
@@ -155,28 +132,13 @@ then seals it and reconstructs every permanent allocator high-water.
 consumer. Keel commits estate GC first, durably retains logical `path + key`
 events, and retries failed or unacknowledged delivery on later hooked binds.
 
-## Local process (sidecar)
-
-```sh
-# requires sidecar CLI installed
-sidecar start --config sidecar.toml
-# health: http://127.0.0.1:3000/health
-sidecar stop --config sidecar.toml
-```
-
-`keel-api` is a demo binary (Student/Course selection + store/listen from
-keel.toml). `forge` is the staged scenario binary (`docs/model/spec.md`);
-`keel-gate` ships the default credential package (`gate!(Actor)` + wall).
-
 ## Operating
 
 ```sh
 runseal :init
-runseal :guard    # unit tests + smoke + course + forge scenarios
-runseal :smoke    # thin L2
-runseal :course   # classic enroll/drop/schedule L2
-runseal :forge    # forge slice act 1: data completeness L2
-cargo run -p api --locked -- . --bootstrap .local/sudo
+runseal :guard    # unit + scenario tests + static discipline
+cargo test -p keel --test route
+cargo test -p keel-gate --test forge
 ```
 
 Scenario notes: `docs/run/scenario.md`.

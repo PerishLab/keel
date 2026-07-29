@@ -147,19 +147,6 @@ fn sql(err: sqlx::Error) -> Error {
     Error::Adapt(err.to_string())
 }
 
-#[derive(Clone, Debug, Default, serde::Deserialize, PartialEq, Eq, plumb::config::Cascade)]
-#[cascade(section)]
-#[serde(default)]
-pub struct Store {
-    pub url: String,
-}
-
-impl Store {
-    pub async fn open(&self) -> Result<Postgres, Error> {
-        Postgres::at(self.url.clone()).await
-    }
-}
-
 impl Postgres {
     pub async fn wipe(&mut self) -> Result<(), Error> {
         self.script("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")

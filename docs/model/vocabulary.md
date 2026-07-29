@@ -58,10 +58,7 @@ so the shared meaning stays true.
 - `store` — trait for engine row/edge lifecycle backends.
 - `serve` / `listen` — axum entrypoints projecting Core over HTTP.
 - `share` — wrap Core in Arc for concurrent HTTP handlers.
-- `config` — repo-rooted runtime policy load (`keel.toml`).
-- `listen` — host/port section of runtime policy.
-- `store` — also the toml section naming where data lives (memory/file).
-- `kind` — store backend selector (`memory` | `file`).
+- `config` — keel vocabulary the caller constructs; the library reads no file.
 - `query` — text DSL entry for engine reads; also the `/query` HTTP route.
 - `tree` — query AST (from + slice); execution only runs trees.
 - `slice` — time-slice primitive on a tree (currently only live).
@@ -82,7 +79,7 @@ so the shared meaning stays true.
 - `root` — pack field and tree `from` unit; sole subject of order/page.
 - `prefix` — HTTP api path prefix under listen.
 - `smoke` — L2 process verification of REST + /query.
-- `course` — classic student/course selection scenario gate (`:course`).
+- `course` — classic student/course selection scenario gate (route tests).
 - `bond` — also: many2many association may carry business field attrs on the join.
 - `verify` — cold-start verification boundary document.
 - `atom` — delta: atoms now `string`, `url`, `int`, `bool`; kinds Text/Link/Int/Bool.
@@ -160,8 +157,8 @@ so the shared meaning stays true.
 - `lease` — `end` completed with an instant (`docs/run/lease.md`): schedule
   death, renew while live, never resurrect; same verb, same coverage.
 - `fresh` — live with `expires_at` NULL (unleased); new edges require it.
-- `identity` — `keel.toml [identity] unit` names the operator unit;
-  `Core::identify` carries it; anon put on it mints to the created row
+- `identity` — `Core::identify` names the operator unit;
+  the caller chooses it; anon put on it mints to the created row
   (C-14 exception).
 - `keel-gate` — the default credential package crate (caller space):
   `gate!(Actor)` ships Token/Session bound to the caller's identity unit.

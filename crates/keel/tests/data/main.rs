@@ -2,7 +2,6 @@
 mod support;
 
 mod batch;
-mod config;
 mod frozen;
 mod name;
 mod only;

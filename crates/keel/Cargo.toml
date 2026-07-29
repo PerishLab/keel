@@ -17,7 +17,6 @@ http = ["dep:axum"]
 pg = ["sqlx/postgres"]
 
 [dependencies]
-plumb = { workspace = true }
 axum = { workspace = true, optional = true }
 getrandom = { workspace = true }
 keel-macro = { workspace = true }
@@ -28,11 +27,16 @@ tokio = { workspace = true }
 sqlx = { workspace = true }
 
 [dev-dependencies]
-plumb = { workspace = true }
+http-body-util = { workspace = true }
+tower = { workspace = true }
 
 [[test]]
 name = "cap"
 path = "tests/cap/main.rs"
+
+[[test]]
+name = "route"
+path = "tests/route/main.rs"
 
 [[test]]
 name = "query"

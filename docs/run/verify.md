@@ -8,8 +8,13 @@ start is done; failures mean cold start is not closed.
 | Layer | What | Gate |
 |-------|------|------|
 | L1 | unit tests (data/bond/query/cap/pulse/estate) | CI + `runseal :guard` |
-| L2 | process smoke + course scenario | `runseal :smoke` / `:course` (from `:guard`) |
+| L2 | scenario tests (`keel` route, `keel-gate` forge) | CI + `runseal :guard` |
 | L3 | static discipline (fmt/clippy/deno/ectropy) | `runseal :guard` |
+
+L2 drives the axum `Router` in process. It holds the REST surface, the `/query`
+DSL, the authority matrix, the gate doors, and relay delivery against a real
+local listener. It does not boot a separate process, so it does not cover cold
+start of a shipped binary; keel ships no binary.
 
 ## Must pass (in)
 
@@ -35,6 +40,7 @@ start is done; failures mean cold start is not closed.
 - `POST /query` always pack `{root,bags}`; optional `link` → bond bags (H0)
 - REST: resource CRUD + edge write (tie/cut); **no** association GET
 - guard green without docker daemon
+- scenario coverage holds without a shipped binary
 
 ## Must not require (out)
 
@@ -49,12 +55,12 @@ start is done; failures mean cold start is not closed.
 ## Commands
 
 ```sh
-runseal :guard    # L1 + L3 + L2 smoke + course
-runseal :smoke    # thin L2
-runseal :course   # student/course scenario L2
+runseal :guard              # L1 + L2 + L3
+cargo test -p keel --test route
+cargo test -p keel-gate --test forge
 ```
 
 ## Pass rule
 
-All L1 tests green, `:smoke` green, and this document matches behavior (no
-false claims of filter/page/capability support).
+All L1 and L2 tests green, and this document matches behavior (no false claims
+of filter/page/capability support).
