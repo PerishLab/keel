@@ -31,15 +31,26 @@ The private catalog is model-independent:
 | Seat | Meaning |
 |------|---------|
 | `@estate` | singleton private format, active generation key, and physical shape |
-| `@generation` | every active, candidate, and cleanup generation with canonical manifest and digest |
+| `@generation` | every active, candidate, and cleanup generation with its digest |
+| `@unit` `@bond` `@field` `@scope` `@value` | the schema itself, one row set per generation |
 | `@clock` | permanent named high-water values independent of every generation |
 | `@derivative` | durable logical purge atoms awaiting caller hook acknowledgement |
 
 Exactly one generation is active and `@estate.active` names it. Every
-generation state is one of `active`, `candidate`, or `cleanup`. Every stored
-manifest is canonical and matches its digest, including generations that are
-not active. Creation time is permanent; retirement time exists only for
-cleanup generations and is the retention clock.
+generation state is one of `active`, `candidate`, or `cleanup`. Creation time
+is permanent; retirement time exists only for cleanup generations and is the
+retention clock.
+
+The schema is rows, not text. Each generation writes `@unit`, `@bond`,
+`@field`, `@scope`, and `@value`; a unit row carries its generation and the
+rest hang from it, so retiring the set keeps the whole of it. Those rows are
+engine owned: only bootstrap, adoption, and evolution write them, and the
+ordinary put path refuses them the way it refuses `@pulse`.
+
+Bind gathers the active generation and holds it against its stored digest.
+Retired generations are not gathered on bind; cleanup checks one when it
+sweeps it. A retired generation that rots is therefore found later than an
+active one, which is the price of keeping no second copy.
 
 The logical manifest excludes engine units. Changes to `@grant`, `@seal`,
 `@pulse`, the catalog, or backend projection are Keel format changes, not
@@ -56,8 +67,8 @@ Bind is fail-closed:
 1. Lift and validate the complete requested graph without store access.
 2. If the namespace is empty, refuse `vacant` without writing; only the
    explicit bootstrap ceremony may create the first estate.
-3. If the catalog exists, require a known format, one canonical manifest
-   with a matching digest, and an exact physical snapshot.
+3. If the catalog exists, require a known format, an active generation whose
+   rows match its stored digest, and an exact physical snapshot.
 4. Attach when the requested manifest equals the active manifest; otherwise
    compile and execute its complete finite change.
 
@@ -180,8 +191,8 @@ retain = "30d"
 `retain` measures age from the generation retirement clock. It accepts an
 unsigned count followed by `s`, `m`, `h`, or `d`. `"0s"` makes a retired
 generation immediately eligible; `"forever"` explicitly disables automatic
-collection. The default is `"30d"`. The environment path is
-`KEEL_ESTATE_GENERATION_CLEANUP_RETAIN`.
+collection. The default is `"30d"`. The caller constructs the value and hands
+it to `bind`; keel reads no file and no environment for it.
 
 For every eligible generation, Keel derives the physical `@g<id>:` tables only
 from its canonical manifest. It drops those tables, removes the generation

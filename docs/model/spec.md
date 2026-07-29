@@ -99,7 +99,7 @@ Estate evolution begins under `docs/run/estate.md`.
 | Part | Content |
 |------|---------|
 | laws | nominal manifest identity; exact bind; closed delta compiler; out-of-place activation; Keel-owned cleanup |
-| surface | canonical manifest, estate/generation/clock/derivative catalog, permanent allocators, physical drift seal, generated evolution plan, configured cleanup retention, typed purge hook |
+| surface | canonical manifest as engine-owned schema rows, estate/generation/clock/derivative catalog, permanent allocators, physical drift seal, generated evolution plan, configured cleanup retention, typed purge hook |
 | scenario | estate act — fresh seal, exact reopen, drift refusal, additive evolution, contraction, cleanup |
 
 Open inside: the finite validator and cast matrices.
