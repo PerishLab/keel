@@ -225,8 +225,8 @@ async fn unknown() {
     drop(core);
     let mut wire = Sqlite::file(&path).await.expect("mutate");
     wire.run(
-        "UPDATE \"@generation\" SET manifest = ?1 WHERE id = ?2",
-        &[Val::Text(r#"{"version":4,"units":[]}"#.into()), Val::Int(1)],
+        "UPDATE \"@unit\" SET name = ?1",
+        &[Val::Text("Other".into())],
     )
     .await
     .expect("mutate");

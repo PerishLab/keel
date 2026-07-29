@@ -8,7 +8,7 @@ const TABLE: &str = "@estate";
 const CLOCK: &str = "@clock";
 const DERIVATIVE: &str = "@derivative";
 const GENERATION: &str = "@generation";
-pub(super) const FORMAT: i64 = 10;
+pub(super) const FORMAT: i64 = 11;
 
 pub(crate) struct Catalog<'a, W>(pub(crate) &'a mut W);
 
@@ -135,14 +135,12 @@ async fn seed<W: Wire>(
     }
     let generation = super::next(wire, "generation").await?;
     crate::cap::genesis(plan, wire, token).await?;
-    let text = manifest.write();
     wire.run(
-        "INSERT INTO \"@generation\" (id, state, digest, manifest, created, retired) VALUES (?1, ?2, ?3, ?4, ?5, NULL)",
+        "INSERT INTO \"@generation\" (id, state, digest, created, retired) VALUES (?1, ?2, ?3, ?4, NULL)",
         &[
             Val::Int(generation),
             Val::Text("active".into()),
             Val::Text(manifest.digest()),
-            Val::Text(text),
             Val::Int(crate::life::tick()),
         ],
     )
@@ -195,7 +193,7 @@ pub(super) fn script(grain: Grain) -> Vec<String> {
             "CREATE TABLE \"{TABLE}\" (id {int} PRIMARY KEY NOT NULL, format {int} NOT NULL, active {int} NOT NULL, shape TEXT NOT NULL);"
         ),
         format!(
-            "CREATE TABLE \"{GENERATION}\" (id {int} PRIMARY KEY NOT NULL, state TEXT NOT NULL, digest TEXT NOT NULL, manifest TEXT NOT NULL, created {int} NOT NULL, retired {int});"
+            "CREATE TABLE \"{GENERATION}\" (id {int} PRIMARY KEY NOT NULL, state TEXT NOT NULL, digest TEXT NOT NULL, created {int} NOT NULL, retired {int});"
         ),
         format!("CREATE TABLE \"{CLOCK}\" (name TEXT PRIMARY KEY NOT NULL, value {int} NOT NULL);"),
         format!(

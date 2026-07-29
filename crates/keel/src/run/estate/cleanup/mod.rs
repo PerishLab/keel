@@ -31,26 +31,39 @@ pub(super) async fn run<W: Wire>(
 async fn sweep<W: Wire>(policy: &Cleanup, active: &Manifest, wire: &mut W) -> Result<(), Error> {
     let rows = wire
         .rows(
-            "SELECT id, manifest, retired FROM \"@generation\" WHERE state = ?1 ORDER BY id",
+            "SELECT id, retired FROM \"@generation\" WHERE state = ?1 ORDER BY id",
             &[Val::Text("cleanup".into())],
         )
         .await?;
     let now = crate::life::tick();
     let mut due = Vec::new();
     for row in rows {
-        if row.len() != 3 {
+        if row.len() != 2 {
             return Err(unknown("cleanup record shape"));
         }
-        let retired = row[2].opt().ok_or_else(|| unknown("cleanup retirement"))?;
+        let retired = row[1].opt().ok_or_else(|| unknown("cleanup retirement"))?;
         if policy.retain.elapsed(retired, now) {
-            let manifest = Manifest::read(&row[1].text())
-                .map_err(|note| unknown(&format!("cleanup manifest {note}")))?;
-            due.push((row[0].int(), manifest));
+            due.push(row[0].int());
         }
     }
     if due.is_empty() {
         return Ok(());
     }
+    let frame = crate::plan::Plan::meta();
+    let mut due = {
+        let mut held = Vec::new();
+        for generation in due {
+            let lines = crate::life::Work::new(wire, &frame)
+                .recall(generation)
+                .await?;
+            let manifest = crate::model::manifest::rows::Sheet(&lines)
+                .gather()
+                .map_err(|note| unknown(&format!("cleanup schema {note}")))?;
+            held.push((generation, manifest));
+        }
+        held
+    };
+    due.sort_by_key(|(at, _)| *at);
     for (generation, manifest) in due {
         let gone = derivative::gone(generation, &manifest, active, wire).await?;
         save(generation, &gone, now, wire).await?;
@@ -68,6 +81,9 @@ async fn sweep<W: Wire>(policy: &Cleanup, active: &Manifest, wire: &mut W) -> Re
         if removed != 1 {
             return Err(unknown("cleanup generation changed"));
         }
+        crate::life::Work::new(wire, &frame)
+            .purge(generation)
+            .await?;
     }
     let shape = super::catalog::Catalog(wire).shape().await?;
     let changed = wire

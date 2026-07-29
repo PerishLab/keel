@@ -53,14 +53,12 @@ async fn migrate<W: Wire>(work: &Work<'_>, wire: &mut W) -> Result<(), Error> {
     )
     .await?;
     let next = super::next(wire, "generation").await?;
-    let text = requested.write();
     wire.run(
-        "INSERT INTO \"@generation\" (id, state, digest, manifest, created, retired) VALUES (?1, ?2, ?3, ?4, ?5, NULL)",
+        "INSERT INTO \"@generation\" (id, state, digest, created, retired) VALUES (?1, ?2, ?3, ?4, NULL)",
         &[
             Val::Int(next),
             Val::Text("candidate".into()),
             Val::Text(requested.digest()),
-            Val::Text(text),
             Val::Int(crate::life::tick()),
         ],
     )

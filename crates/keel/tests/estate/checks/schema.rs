@@ -2,6 +2,7 @@ use super::super::world::{clean, graph, spot};
 use keel::adapt::db::Sqlite;
 use keel::atom::Kind;
 use keel::spec::{Resource, Spec};
+use keel::wire::Wire;
 use keel::{Cell, Row, bind};
 
 struct Thin;
@@ -86,6 +87,51 @@ async fn tracked() {
     assert_eq!(units.len(), 1);
     let at = units[0].cells().get("generation").map(Cell::show);
     assert_eq!(at, Some("2".into()));
+    drop(core);
+    clean(&path);
+}
+
+#[tokio::test]
+async fn adopted() {
+    let path = spot("schema_adopted");
+    let core = crate::support::boot(graph::<Thin>(), Sqlite::file(&path).await.expect("first"))
+        .await
+        .expect("bind");
+    drop(core);
+    let mut wire = Sqlite::file(&path).await.expect("unseal");
+    for table in ["@estate", "@generation", "@clock", "@derivative"] {
+        wire.script(&format!("DROP TABLE {}", keel::ddl::col(table)))
+            .await
+            .expect("drop catalog");
+    }
+    for table in [
+        "@unit",
+        "@unit_@bond",
+        "@unit_@field",
+        "@field_@scope",
+        "@field_@value",
+    ] {
+        wire.script(&format!("DELETE FROM {}", keel::ddl::col(table)))
+            .await
+            .expect("clear schema");
+    }
+    drop(wire);
+    let core = bind(graph::<Thin>(), Sqlite::file(&path).await.expect("adopt"))
+        .adopt()
+        .await
+        .expect("adopt");
+    assert_eq!(
+        named(&core.live("@unit").await.expect("units")),
+        vec!["Card"]
+    );
+    drop(core);
+    let core = bind(graph::<Thin>(), Sqlite::file(&path).await.expect("again"))
+        .await
+        .expect("rebind");
+    assert_eq!(
+        named(&core.live("@unit").await.expect("units")),
+        vec!["Card"]
+    );
     drop(core);
     clean(&path);
 }

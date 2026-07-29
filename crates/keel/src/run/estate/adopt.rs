@@ -50,16 +50,19 @@ async fn stamp<W: Wire>(
     let generation = 1;
     super::clock::hold(wire, "generation".into(), generation).await?;
     wire.run(
-        "INSERT INTO \"@generation\" (id, state, digest, manifest, created, retired) VALUES (?1, ?2, ?3, ?4, ?5, NULL)",
+        "INSERT INTO \"@generation\" (id, state, digest, created, retired) VALUES (?1, ?2, ?3, ?4, NULL)",
         &[
             Val::Int(generation),
             Val::Text("active".into()),
             Val::Text(manifest.digest()),
-            Val::Text(manifest.write()),
             Val::Int(crate::life::tick()),
         ],
     )
     .await?;
+    let mut rows = crate::life::Work::new(wire, plan);
+    rows.erase().await?;
+    rows.etch(&crate::model::manifest::rows::spill(manifest), generation)
+        .await?;
     let shape = super::catalog::Catalog(wire).shape().await?;
     wire.run(
         "INSERT INTO \"@estate\" (id, format, active, shape) VALUES (?1, ?2, ?3, ?4)",

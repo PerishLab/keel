@@ -178,16 +178,17 @@ async fn verify<W: Wire>(wire: &mut W) -> Result<Bound, Error> {
     }
     let active = root[1].int();
     let held = root[2].text();
-    let (current, blob) = generations(wire, active).await?;
+    let current = generations(wire, active).await?;
     let frame = Plan::meta();
     let lines = crate::life::Work::new(wire, &frame).glean().await?;
     let grown = crate::model::manifest::rows::Sheet(&lines)
         .gather()
         .map_err(|note| Error::Estate(Fault::Unknown(format!("schema rows {note}"))))?;
-    debug_assert!(
-        grown.write() == blob.write(),
-        "schema rows disagree with the manifest"
-    );
+    if grown.digest() != current {
+        return Err(Error::Estate(Fault::Unknown(
+            "schema digest mismatch".into(),
+        )));
+    }
     let physical = catalog::Catalog(wire).shape().await?;
     if physical != held {
         return Err(Error::Estate(Fault::Drift {
@@ -202,10 +203,10 @@ async fn verify<W: Wire>(wire: &mut W) -> Result<Bound, Error> {
     })
 }
 
-async fn generations<W: Wire>(wire: &mut W, active: i64) -> Result<(String, Manifest), Error> {
+async fn generations<W: Wire>(wire: &mut W, active: i64) -> Result<String, Error> {
     let rows = wire
         .rows(
-            "SELECT id, state, digest, manifest, created, retired FROM \"@generation\" ORDER BY id",
+            "SELECT id, state, digest, created, retired FROM \"@generation\" ORDER BY id",
             &[],
         )
         .await
@@ -213,7 +214,7 @@ async fn generations<W: Wire>(wire: &mut W, active: i64) -> Result<(String, Mani
     let mut current = None;
     let mut actives = 0;
     for row in rows {
-        if row.len() != 6 {
+        if row.len() != 5 {
             return Err(Error::Estate(Fault::Unknown(
                 "generation record shape".into(),
             )));
@@ -222,27 +223,18 @@ async fn generations<W: Wire>(wire: &mut W, active: i64) -> Result<(String, Mani
         if !matches!(state.as_str(), "active" | "candidate" | "cleanup") {
             return Err(Error::Estate(Fault::Unknown(format!("state {state}"))));
         }
-        let created = row[4].int();
-        let retired = row[5].opt();
+        let created = row[3].int();
+        let retired = row[4].opt();
         if created <= 0
             || (state == "cleanup" && retired.is_none_or(|at| at < created))
-            || (state != "cleanup" && row[5].opt().is_some())
+            || (state != "cleanup" && row[4].opt().is_some())
         {
             return Err(Error::Estate(Fault::Unknown("generation lifecycle".into())));
-        }
-        let text = row[3].text();
-        let parsed = Manifest::read(&text)
-            .map_err(|note| Error::Estate(Fault::Unknown(format!("manifest {note}"))))?;
-        let sealed = row[2].text();
-        if parsed.digest() != sealed {
-            return Err(Error::Estate(Fault::Unknown(
-                "manifest digest mismatch".into(),
-            )));
         }
         if state == "active" {
             actives += 1;
             if row[0].int() == active {
-                current = Some((sealed, parsed));
+                current = Some(row[2].text());
             }
         }
     }
