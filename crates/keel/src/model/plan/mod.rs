@@ -81,6 +81,9 @@ impl Plan {
         for engine in [Unit::grant(), Unit::seal(), Unit::pulse()] {
             units.insert(engine.key(), engine);
         }
+        for engine in meta::all() {
+            units.insert(engine.key(), engine);
+        }
         let mut places = std::collections::BTreeSet::new();
         for unit in units.values() {
             if !places.insert(unit.table()) {
@@ -272,6 +275,7 @@ impl Reign {
     }
 }
 
+pub(crate) mod meta;
 mod mode;
 mod optional;
 mod scope;

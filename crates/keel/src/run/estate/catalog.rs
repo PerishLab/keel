@@ -8,7 +8,7 @@ const TABLE: &str = "@estate";
 const CLOCK: &str = "@clock";
 const DERIVATIVE: &str = "@derivative";
 const GENERATION: &str = "@generation";
-pub(super) const FORMAT: i64 = 9;
+pub(super) const FORMAT: i64 = 10;
 
 pub(crate) struct Catalog<'a, W>(pub(crate) &'a mut W);
 
@@ -147,6 +147,9 @@ async fn seed<W: Wire>(
         ],
     )
     .await?;
+    crate::life::Work::new(wire, plan)
+        .etch(&crate::model::manifest::rows::spill(manifest))
+        .await?;
     let sealed = Catalog(wire).shape().await?;
     wire.run(
         "INSERT INTO \"@estate\" (id, format, active, shape) VALUES (?1, ?2, ?3, ?4)",

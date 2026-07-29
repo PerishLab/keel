@@ -17,9 +17,20 @@ impl<'a, W: Wire> Work<'a, W> {
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
         }
+        if crate::plan::meta::owned(unit.name()) {
+            return Err(Error::Adapt("schema is engine owned".into()));
+        }
         if unit.name() == crate::cap::GRANT {
             crate::cap::vet(self.plan, fields)?;
         }
+        self.craft(unit, fields).await
+    }
+
+    pub(crate) async fn craft(
+        &mut self,
+        unit: &'a Unit,
+        fields: &[(&str, &str)],
+    ) -> Result<i64, Error> {
         unit.check(fields)?;
         let tick = now();
         let mut cols: Vec<String> = vec![ddl::KEY.into()];

@@ -100,6 +100,10 @@ async fn migrate<W: Wire>(work: &Work<'_>, wire: &mut W) -> Result<(), Error> {
         &[Val::Int(next), Val::Text(shape)],
     )
     .await?;
+    let mut rows = crate::life::Work::new(wire, plan);
+    rows.erase().await?;
+    rows.etch(&crate::model::manifest::rows::spill(requested))
+        .await?;
     Ok(())
 }
 

@@ -172,6 +172,7 @@ fn now() -> i64 {
 }
 
 mod edit;
+mod etch;
 mod link;
 mod make;
 mod util;

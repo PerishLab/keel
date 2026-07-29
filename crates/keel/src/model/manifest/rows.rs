@@ -210,12 +210,12 @@ impl Line {
         }
     }
 
-    fn pick(&self, head: &str) -> Result<String, String> {
+    pub(crate) fn pick(&self, head: &str) -> Result<String, String> {
         self.hold(head)
             .ok_or_else(|| format!("{} needs {head}", self.unit))
     }
 
-    fn look(&self, head: &str) -> String {
+    pub(crate) fn look(&self, head: &str) -> String {
         self.hold(head).unwrap_or_default()
     }
 

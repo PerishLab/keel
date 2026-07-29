@@ -6,6 +6,7 @@ use keel::estate::{Check, Fault};
 
 mod frozen;
 mod rule;
+mod schema;
 mod value;
 
 #[tokio::test]
