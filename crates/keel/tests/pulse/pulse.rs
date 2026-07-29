@@ -1,7 +1,7 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::resource;
-use keel::{Cell, Ends, Graph, bind};
+use keel::{Cell, Ends, Graph};
 
 #[resource]
 struct Room {
@@ -25,7 +25,7 @@ fn text(row: &keel::Row, name: &str) -> String {
 async fn beat() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Actor>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let ada = core.put("Actor", &[("login", "ada")]).await.expect("ada");
@@ -74,7 +74,7 @@ async fn beat() {
 async fn blame() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Actor>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let ada = core.put("Actor", &[("login", "ada")]).await.expect("ada");
@@ -111,7 +111,7 @@ async fn blame() {
 async fn heard() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Actor>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let sudo = core.sudo();
@@ -158,7 +158,7 @@ async fn heard() {
 async fn window() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Actor>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     for i in 0..4100 {

@@ -127,6 +127,20 @@ let core = bind(graph, store).estate(&cfg.estate).await?;
 // listen(core.share(), &cfg.listen.host, cfg.listen.port).await?;
 ```
 
+An empty store needs an explicit ceremony before ordinary bind:
+
+```rust
+let mut boot = keel::bootstrap(graph, store)?;
+let sudo = boot.mint().await?;
+custody.keep(&sudo)?;
+let core = boot.seal(&sudo).await?;
+```
+
+`custody` belongs to the caller; Keel performs no file, webhook, Secret, or
+vault delivery and never prints sudo. The demo binary exposes this distinction
+as `keel-api ROOT --bootstrap PATH`, with `PATH` acting as its local caller
+artifact.
+
 `keel-api [ROOT]` loads `ROOT/keel.toml` (default `ROOT=.`). CLI does not
 re-express policy keys — change the file. Cleanup retention accepts
 `<digits>s`, `m`, `h`, or `d`; `"0s"` makes retired generations immediately
@@ -162,7 +176,7 @@ runseal :guard    # unit tests + smoke + course + forge scenarios
 runseal :smoke    # thin L2
 runseal :course   # classic enroll/drop/schedule L2
 runseal :forge    # forge slice act 1: data completeness L2
-cargo run -p api --locked
+cargo run -p api --locked -- . --bootstrap .local/sudo
 ```
 
 Scenario notes: `docs/run/scenario.md`.

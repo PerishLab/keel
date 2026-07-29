@@ -42,7 +42,7 @@ fn capture(fail: bool) -> (Capture, Arc<Mutex<Vec<Purge>>>) {
 #[tokio::test]
 async fn facts() {
     let path = spot("hook-facts");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     let ended = core
@@ -82,7 +82,7 @@ async fn facts() {
 #[tokio::test]
 async fn fields() {
     let path = spot("hook-fields");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     let key = core
@@ -115,7 +115,7 @@ async fn fields() {
 #[tokio::test]
 async fn bonds() {
     let path = spot("hook-bonds");
-    let core = bind(
+    let core = crate::support::boot(
         pair::<Club, Member>(),
         Sqlite::file(&path).await.expect("first"),
     )
@@ -171,7 +171,7 @@ async fn bonds() {
 #[tokio::test]
 async fn retry() {
     let path = spot("hook-retry");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     let ended = core

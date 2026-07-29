@@ -1,7 +1,7 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::resource;
-use keel::{Ends, Graph, bind};
+use keel::{Ends, Graph};
 
 #[resource]
 struct Room {
@@ -32,7 +32,7 @@ fn late() -> i64 {
 async fn ride() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Guest>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let at = late();
@@ -57,7 +57,7 @@ async fn ride() {
 async fn strict() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Guest>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let at = late();

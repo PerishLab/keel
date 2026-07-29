@@ -7,7 +7,7 @@ use keel::estate::{Check, Fault};
 #[tokio::test]
 async fn cycle() {
     let path = spot("cycle");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     let alpha = core
@@ -42,7 +42,7 @@ async fn cycle() {
 #[tokio::test]
 async fn authority() {
     let path = spot("authority");
-    let core = bind(
+    let core = crate::support::boot(
         pair::<Alpha, Beta>(),
         Sqlite::file(&path).await.expect("first"),
     )

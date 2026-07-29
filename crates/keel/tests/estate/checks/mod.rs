@@ -11,7 +11,7 @@ mod value;
 #[tokio::test]
 async fn unique() {
     let path = spot("unique");
-    let core = bind(graph::<Loose>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Loose>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     core.put("Label", &[("code", "same")]).await.expect("one");

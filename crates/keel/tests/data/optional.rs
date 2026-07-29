@@ -1,7 +1,7 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::query::form;
-use keel::{Cell, Graph, bind, resource};
+use keel::{Cell, Graph, resource};
 
 #[resource]
 struct Note {
@@ -17,7 +17,7 @@ struct Note {
 async fn scalar() {
     let mut graph = Graph::new();
     graph.plug::<Note>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
 

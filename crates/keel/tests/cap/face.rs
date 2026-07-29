@@ -1,12 +1,14 @@
 use crate::world::*;
+use axum::http::{HeaderMap, StatusCode};
 use keel::adapt::db::Sqlite;
-use keel::{Graph, Who, bind};
+use keel::serve::{Operator, admit};
+use keel::{Graph, Who};
 
 #[tokio::test]
 async fn faces() {
     let mut graph = Graph::new();
     graph.plug::<Actor>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let ada = core.put("Actor", &[("login", "ada")]).await.expect("ada");
@@ -25,13 +27,28 @@ async fn faces() {
         0
     );
     assert_eq!(core.anon().who(), Who::Anon);
+
+    let headers = HeaderMap::new();
+    assert_eq!(
+        admit(&core, &headers, Some(&Operator(ada)), "see")
+            .await
+            .expect("admit")
+            .who(),
+        Who::Op(ada)
+    );
+    let mut bad = HeaderMap::new();
+    bad.insert("authorization", "sudo wrong".parse().expect("header"));
+    assert_eq!(
+        admit(&core, &bad, None, "see").await.err(),
+        Some(StatusCode::UNAUTHORIZED)
+    );
 }
 
 #[tokio::test]
 async fn birth() {
     let mut graph = Graph::new();
     graph.plug::<Actor>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind")
         .identify("Actor")
@@ -62,6 +79,21 @@ async fn birth() {
     assert!(
         core.of(eve + 1)
             .set("Actor", eve, &[("login", "x")])
+            .await
+            .is_err()
+    );
+
+    let root = sudo
+        .batch(async |tx| tx.birth(&[("login", "root")]).await)
+        .await
+        .expect("sudo birth");
+    core.of(root)
+        .set("Actor", root, &[("login", "rooted")])
+        .await
+        .expect("born operator owns itself");
+    assert!(
+        core.of(root)
+            .batch(async |tx| tx.birth(&[("login", "nested")]).await)
             .await
             .is_err()
     );

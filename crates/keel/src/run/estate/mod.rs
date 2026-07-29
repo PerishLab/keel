@@ -1,7 +1,7 @@
 use crate::adapt::Error;
 use crate::model::manifest::{Manifest, digest};
 use crate::plan::Plan;
-use crate::wire::{Val, Wire};
+use crate::wire::Wire;
 
 pub(crate) mod adopt;
 mod catalog;
@@ -13,11 +13,15 @@ mod guard;
 mod projection;
 mod tables;
 
+pub(crate) use catalog::{bootstrap, status};
 pub use cleanup::{Gone, Hook, Purge};
 pub(crate) use clock::next;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Fault {
+    Vacant,
+    Token,
+    Occupied,
     Unsealed,
     Unknown(String),
     Format { found: i64, expected: i64 },
@@ -59,6 +63,9 @@ pub enum Check {
 impl std::fmt::Display for Fault {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Vacant => write!(f, "vacant estate needs bootstrap"),
+            Self::Token => write!(f, "invalid sudo token"),
+            Self::Occupied => write!(f, "occupied estate refuses bootstrap"),
             Self::Unsealed => write!(f, "unsealed estate"),
             Self::Unknown(note) => write!(f, "unknown estate: {note}"),
             Self::Format { found, expected } => {
@@ -110,16 +117,15 @@ pub(crate) async fn attach<W: Wire>(
     manifest: &Manifest,
     policy: adopt::Policy<'_>,
     wire: &mut W,
-) -> Result<Option<String>, Error> {
-    let token = if !catalog::present(wire).await? {
+) -> Result<(), Error> {
+    if !catalog::present(wire).await? {
         if !catalog::empty(wire).await? {
             if !policy.adopt {
                 return Err(Error::Estate(Fault::Unsealed));
             }
             adopt::run(plan, manifest, wire).await?;
-            None
         } else {
-            install(plan, manifest, wire).await?
+            return Err(Error::Estate(Fault::Vacant));
         }
     } else {
         let bound = verify(wire).await?;
@@ -138,68 +144,9 @@ pub(crate) async fn attach<W: Wire>(
             )
             .await?;
         }
-        None
-    };
+    }
     cleanup::run(policy.cleanup, manifest, wire).await?;
-    Ok(token)
-}
-
-async fn install<W: Wire>(
-    plan: &Plan,
-    manifest: &Manifest,
-    wire: &mut W,
-) -> Result<Option<String>, Error> {
-    wire.script("BEGIN").await?;
-    let out = seed(plan, manifest, wire).await;
-    match out {
-        Ok(token) => {
-            wire.script("COMMIT").await?;
-            Ok(token)
-        }
-        Err(err) => {
-            let _ = wire.script("ROLLBACK").await;
-            Err(err)
-        }
-    }
-}
-
-async fn seed<W: Wire>(
-    plan: &Plan,
-    manifest: &Manifest,
-    wire: &mut W,
-) -> Result<Option<String>, Error> {
-    for stmt in crate::ddl::script(plan, wire.grain()) {
-        wire.script(&stmt).await?;
-    }
-    for stmt in catalog::script(wire.grain()) {
-        wire.script(&stmt).await?;
-    }
-    let generation = next(wire, "generation").await?;
-    let token = crate::cap::genesis(plan, wire).await?;
-    let text = manifest.write();
-    wire.run(
-        "INSERT INTO \"@generation\" (id, state, digest, manifest, created, retired) VALUES (?1, ?2, ?3, ?4, ?5, NULL)",
-        &[
-            Val::Int(generation),
-            Val::Text("active".into()),
-            Val::Text(manifest.digest()),
-            Val::Text(text),
-            Val::Int(crate::life::tick()),
-        ],
-    )
-    .await?;
-    let shape = catalog::shape(wire).await?;
-    wire.run(
-        "INSERT INTO \"@estate\" (id, format, active, shape) VALUES (?1, ?2, ?3, ?4)",
-        &[
-            Val::Int(1),
-            Val::Int(catalog::FORMAT),
-            Val::Int(generation),
-            Val::Text(shape),
-        ],
-    )
-    .await?;
-    Ok(token)
+    Ok(())
 }
 
 struct Bound {

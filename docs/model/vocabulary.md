@@ -150,12 +150,11 @@ so the shared meaning stays true.
 - `sift` / `strain` / `spot` — see-coverage filtering of reads (rows,
   packs incl. bond bags and count).
 - `broad` — coverage probe for all-scope on a unit (attenuation floor).
-- `@seal` — engine unit holding the sudo token hash; minted at first bind,
-  surfaced once on stderr; the unique wire window (`authorization: sudo`).
-- `genesis` / `sealed` — mint the axiom token / verify a presented token.
+- `@seal` — engine unit holding the bootstrap-kept sudo hash; the unique wire window.
+- `bootstrap` / `mint` / `seal` — open genesis / obtain sudo / commit estate; `genesis` / `sealed` store its hash / verify a token.
 - `operator` — HTTP extension (`Operator(id)`) injected by caller
   middleware; keel never authenticates (401 belongs to middleware).
-- `front` — serve helper: sudo window else injected operator else anon.
+- `front` / `admit` — serve projection/resolver: sudo, operator, or anon.
 - `gate` — forge demo middleware: `x-login` → operator (deliberately toy).
 - `app` — exported Router builder so caller middleware can wrap keel.
 - `lease` — `end` completed with an instant (`docs/run/lease.md`): schedule
@@ -166,7 +165,7 @@ so the shared meaning stays true.
   (C-14 exception).
 - `keel-gate` — the default credential package crate (caller space):
   `gate!(Actor)` ships Token/Session bound to the caller's identity unit.
-- `rise` — gate ceremony: seed the service operator's enumerable grants.
+- `rise` / `seed` / `ready` — gate construction / explicit seed / verification; `birth` is sudo-only identity+self-grant.
 - `wall` / `pass` — gate middleware seat: credentials → injected operator.
 - `doors` — shipped routes: register (anon put + possession token,
   mini-genesis), login (svc put Session + lease TTL), logout (operator end).
@@ -216,7 +215,8 @@ so the shared meaning stays true.
 - `clock` — atomically advance named high-water in the write transaction.
 - `format` — private storage format, outside business schema deltas.
 - `shape` — canonical physical namespace snapshot checked at bind.
-- `attach` / `seed` — verify exact seal or transactionally install one.
+- `attach` / `seed` — bind a catalogued estate / transactionally install one.
+- `status` / `vacant` / `token` / `occupied` — state / required / malformed / conflict.
 - `frame` — length-delimited canonical rendering of physical catalog rows.
 - `drift` — missing, changed, or extra physical object, never schema intent.
 - `unsealed` — nonempty namespace without `@estate`; ordinary bind refuses.

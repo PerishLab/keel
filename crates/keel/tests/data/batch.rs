@@ -1,7 +1,7 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::resource;
-use keel::{Ends, Graph, bind};
+use keel::{Ends, Graph};
 
 #[resource]
 struct Actor {
@@ -23,7 +23,7 @@ struct Team {
 async fn whole() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Team>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let ada = core.put("Actor", &[("login", "ada")]).await.expect("ada");
@@ -93,7 +93,7 @@ async fn whole() {
 async fn undo() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Team>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
 
@@ -125,7 +125,7 @@ async fn undo() {
 async fn cancel() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Team>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
 

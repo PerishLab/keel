@@ -8,7 +8,7 @@ use keel::{Cell, Ends, bind};
 #[tokio::test]
 async fn additive() {
     let path = spot("additive");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     drop(core);
@@ -37,7 +37,7 @@ async fn additive() {
 #[tokio::test]
 async fn blocked() {
     let path = spot("blocked");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     core.put("Alpha", &[("alpha", "1"), ("zeta", "held")])
@@ -59,7 +59,7 @@ async fn blocked() {
 #[tokio::test]
 async fn contract() {
     let path = spot("contract");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     let key = core
@@ -95,7 +95,7 @@ async fn contract() {
 #[tokio::test]
 async fn cast() {
     let path = spot("cast");
-    let core = bind(graph::<Words>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Words>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     let key = core.put("Cast", &[("value", "7")]).await.expect("put");
@@ -117,7 +117,7 @@ async fn cast() {
 #[tokio::test]
 async fn denied() {
     let path = spot("denied");
-    let core = bind(graph::<Linker>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Linker>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     drop(core);
@@ -151,7 +151,7 @@ async fn denied() {
 #[tokio::test]
 async fn bonded() {
     let path = spot("bonded");
-    let core = bind(
+    let core = crate::support::boot(
         pair::<Club, Member>(),
         Sqlite::file(&path).await.expect("first"),
     )
@@ -213,7 +213,7 @@ async fn bonded() {
 #[tokio::test]
 async fn required() {
     let path = spot("required");
-    let core = bind(
+    let core = crate::support::boot(
         pair::<Org, Optional>(),
         Sqlite::file(&path).await.expect("first"),
     )
@@ -242,7 +242,7 @@ async fn required() {
 #[tokio::test]
 async fn absent() {
     let path = spot("absent");
-    let core = bind(
+    let core = crate::support::boot(
         pair::<Org, Optional>(),
         Sqlite::file(&path).await.expect("first"),
     )

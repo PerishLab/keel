@@ -117,7 +117,7 @@ impl Resource for One {
 #[tokio::test]
 async fn add_default() {
     let path = spot("rule_add_default");
-    let core = bind(graph::<Seed>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Seed>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     core.put("Seed", &[("name", "held")]).await.expect("put");
@@ -140,7 +140,7 @@ async fn add_default() {
 #[tokio::test]
 async fn narrow() {
     let path = spot("rule_narrow");
-    let core = bind(graph::<Open>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Open>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     let key = core
@@ -190,7 +190,7 @@ async fn narrow() {
 #[tokio::test]
 async fn fill_null() {
     let path = spot("rule_fill_null");
-    let core = bind(graph::<Sparse>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Sparse>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     core.put("Presence", &[]).await.expect("put");
@@ -210,7 +210,7 @@ async fn fill_null() {
 #[tokio::test]
 async fn change_default() {
     let path = spot("rule_change_default");
-    let core = bind(graph::<Zero>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Zero>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     core.put("Counter", &[]).await.expect("zero");

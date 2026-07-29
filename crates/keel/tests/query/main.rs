@@ -1,3 +1,6 @@
+#[path = "../support/mod.rs"]
+mod support;
+
 mod build;
 mod cast;
 mod chart;

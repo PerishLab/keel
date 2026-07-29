@@ -1,13 +1,13 @@
 use crate::world::*;
+use keel::Graph;
 use keel::adapt::db::Sqlite;
 use keel::life::{Cell, Ends};
-use keel::{Graph, bind};
 
 #[tokio::test]
 async fn run() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let ada = core

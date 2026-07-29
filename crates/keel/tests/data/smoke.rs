@@ -3,7 +3,7 @@ use keel::adapt::http;
 use keel::atom::{string, url};
 use keel::ddl;
 use keel::resource;
-use keel::{Cell, Ends, Graph, bind};
+use keel::{Cell, Ends, Graph};
 
 #[resource]
 struct Class {
@@ -25,7 +25,7 @@ struct Student {
 async fn wire() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let student = core
@@ -57,7 +57,7 @@ async fn wire() {
 async fn life() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
 
@@ -126,7 +126,7 @@ async fn life() {
 async fn bond() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
 
@@ -194,7 +194,7 @@ async fn miss() {
 
     let mut graph = Graph::new();
     graph.plug::<Lone>();
-    match bind(graph, Sqlite::memory().await.expect("db")).await {
+    match crate::support::boot(graph, Sqlite::memory().await.expect("db")).await {
         Ok(_) => panic!("expected missing target"),
         Err(keel::adapt::Error::Missing(_)) => {}
         Err(err) => panic!("unexpected {err}"),
@@ -205,7 +205,7 @@ async fn miss() {
 async fn exact() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     core.put("Class", &[("title", "algebra")])

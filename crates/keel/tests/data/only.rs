@@ -1,7 +1,7 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::{int, string};
 use keel::resource;
-use keel::{Cell, Graph, bind};
+use keel::{Cell, Graph};
 
 #[resource]
 struct Org {
@@ -21,7 +21,7 @@ struct Repo {
 async fn sole() {
     let mut graph = Graph::new();
     graph.plug::<Org>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let lab = core.put("Org", &[("slug", "lab")]).await.expect("lab");
@@ -35,7 +35,7 @@ async fn sole() {
 async fn per() {
     let mut graph = Graph::new();
     graph.plug::<Org>().plug::<Repo>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let lab = core.put("Org", &[("slug", "lab")]).await.expect("lab");
@@ -87,7 +87,7 @@ struct Issue {
 async fn tally() {
     let mut graph = Graph::new();
     graph.plug::<Org>().plug::<Repo>().plug::<Issue>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let lab = core.put("Org", &[("slug", "lab")]).await.expect("lab");
@@ -165,7 +165,7 @@ struct React {
 async fn composite() {
     let mut graph = Graph::new();
     graph.plug::<Org>().plug::<Repo>().plug::<React>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let lab = core.put("Org", &[("slug", "lab")]).await.expect("lab");

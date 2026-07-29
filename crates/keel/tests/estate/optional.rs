@@ -89,7 +89,7 @@ impl Resource for Integer {
 #[tokio::test]
 async fn presence() {
     let path = spot("scalar_presence");
-    let core = bind(graph::<Sparse>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Sparse>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     core.put("Presence", &[("name", "empty")])
@@ -111,7 +111,7 @@ async fn presence() {
 #[tokio::test]
 async fn relax() {
     let path = spot("scalar_relax");
-    let core = bind(graph::<Dense>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Dense>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     let key = core
@@ -138,7 +138,7 @@ async fn relax() {
 #[tokio::test]
 async fn add() {
     let path = spot("optional_add");
-    let core = bind(graph::<Seed>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Seed>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     core.put("Seed", &[("name", "held")]).await.expect("put");
@@ -159,7 +159,7 @@ async fn add() {
 #[tokio::test]
 async fn cast() {
     let path = spot("nullable_cast");
-    let core = bind(graph::<Words>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Words>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     core.put("MaybeCast", &[]).await.expect("put null");

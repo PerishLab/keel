@@ -5,6 +5,30 @@ use keel::life::tick;
 use keel::{Op, Wire, form};
 
 impl<W: Wire + 'static> Gate<W> {
+    pub async fn seed(&self) -> Result<(), Error> {
+        let who = self.svc.to_string();
+        let unit = self.core.identity().unwrap_or("");
+        self.sow(&[
+            (&who, "see", "Token", "all"),
+            (&who, "see", "Session", "all"),
+            (&who, "see", unit, "all"),
+            (&who, "put", "Session", "all"),
+        ])
+        .await
+    }
+
+    pub async fn ready(&self) -> Result<bool, Error> {
+        let who = self.svc.to_string();
+        let unit = self.core.identity().unwrap_or("");
+        self.sown(&[
+            (&who, "see", "Token", "all"),
+            (&who, "see", "Session", "all"),
+            (&who, "see", unit, "all"),
+            (&who, "put", "Session", "all"),
+        ])
+        .await
+    }
+
     pub async fn whom(&self, headers: &HeaderMap) -> Option<i64> {
         crate::whom(self, headers).await
     }
@@ -15,21 +39,21 @@ impl<W: Wire + 'static> Gate<W> {
 
     pub async fn session(&self, actor: i64) -> Result<(i64, String), Error> {
         let sid = wild();
-        let row = self
-            .core
-            .of(self.svc)
+        let face = self.core.of(self.svc);
+        let row = face
             .put(
                 "Session",
                 &[("hash", &digest(&sid)), ("actor", &actor.to_string())],
             )
             .await?;
-        self.core.lease("Session", row, tick() + TTL).await?;
+        face.lease("Session", row, tick() + TTL).await?;
         Ok((row, sid))
     }
 
     pub async fn token(&self, actor: i64, name: &str) -> Result<String, Error> {
         let pat = wild();
         self.core
+            .of(actor)
             .put(
                 "Token",
                 &[
@@ -43,40 +67,20 @@ impl<W: Wire + 'static> Gate<W> {
     }
 
     pub async fn birth(&self, fields: &[(&str, &str)]) -> Result<i64, Error> {
-        let Some(unit) = self.core.identity() else {
+        if self.core.identity().is_none() {
             return Err(Error::Adapt("no identity unit".into()));
-        };
-        let unit = unit.to_string();
+        }
         self.core
             .sudo()
-            .batch(async |tx| {
-                let key = tx.put(&unit, fields).await?;
-                tx.put(
-                    "@grant",
-                    &[
-                        ("who", &key.to_string()),
-                        ("verb", "*"),
-                        ("unit", &unit),
-                        ("scope", &format!("row {key}")),
-                    ],
-                )
-                .await?;
-                Ok(key)
-            })
+            .batch(async |tx| tx.birth(fields).await)
             .await
     }
 
     pub async fn sow(&self, seeds: &[(&str, &str, &str, &str)]) -> Result<(), Error> {
         let sudo = self.core.sudo();
-        for (who, verb, unit, scope) in seeds {
-            let ask = form("@grant")
-                .when("who", Op::Eq, who)
-                .when("verb", Op::Eq, verb)
-                .when("unit", Op::Eq, unit)
-                .when("scope", Op::Eq, scope)
-                .count();
-            let held = sudo.ask(&ask).await?;
-            if held.count() == Some(0) {
+        for seed in seeds {
+            if !held(&sudo, seed).await? {
+                let (who, verb, unit, scope) = seed;
                 sudo.put(
                     "@grant",
                     &[
@@ -90,6 +94,16 @@ impl<W: Wire + 'static> Gate<W> {
             }
         }
         Ok(())
+    }
+
+    pub async fn sown(&self, seeds: &[(&str, &str, &str, &str)]) -> Result<bool, Error> {
+        let sudo = self.core.sudo();
+        for seed in seeds {
+            if !held(&sudo, seed).await? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     pub async fn logout(&self, sid: &str) -> Result<(), Deny> {
@@ -117,4 +131,18 @@ impl<W: Wire + 'static> Gate<W> {
             .map_err(Deny::from)?;
         Ok(())
     }
+}
+
+async fn held<W: Wire>(
+    face: &keel::Face<'_, W>,
+    seed: &(&str, &str, &str, &str),
+) -> Result<bool, Error> {
+    let (who, verb, unit, scope) = seed;
+    let ask = form("@grant")
+        .when("who", Op::Eq, who)
+        .when("verb", Op::Eq, verb)
+        .when("unit", Op::Eq, unit)
+        .when("scope", Op::Eq, scope)
+        .count();
+    Ok(face.ask(&ask).await?.count().is_some_and(|count| count > 0))
 }

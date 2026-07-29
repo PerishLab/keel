@@ -1,6 +1,6 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
-use keel::{Graph, bind, resource};
+use keel::{Graph, resource};
 
 #[resource(frozen)]
 struct Event {
@@ -14,7 +14,7 @@ struct Event {
 async fn fact() {
     let mut graph = Graph::new();
     graph.plug::<Event>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let key = core.put("Event", &[("tag", "evt_one")]).await.expect("put");

@@ -32,29 +32,16 @@ impl<W: Wire> Clone for Gate<W> {
 }
 
 impl<W: Wire + 'static> Gate<W> {
-    pub async fn rise(core: Arc<Core<W>>, svc: i64) -> Result<Self, keel::adapt::Error> {
-        let whom = core.identity().unwrap_or("").to_string();
-        let ask = keel::form("@grant")
-            .when("who", keel::Op::Eq, &svc.to_string())
-            .count();
-        let held = core.sudo().ask(&ask).await?;
-        let gate = Self {
+    pub fn rise(core: Arc<Core<W>>, svc: i64) -> Result<Self, keel::adapt::Error> {
+        if core.identity().is_none() {
+            return Err(keel::adapt::Error::Adapt("no identity unit".into()));
+        }
+        Ok(Self {
             core,
             svc,
             bar: None,
             secure: false,
-        };
-        if held.count() == Some(0) {
-            let who = svc.to_string();
-            gate.sow(&[
-                (&who, "see", "Token", "all"),
-                (&who, "see", "Session", "all"),
-                (&who, "see", &whom, "all"),
-                (&who, "put", "Session", "all"),
-            ])
-            .await?;
-        }
-        Ok(gate)
+        })
     }
 
     pub fn bar(mut self, field: &str) -> Self {

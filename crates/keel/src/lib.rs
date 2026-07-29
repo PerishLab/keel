@@ -10,7 +10,7 @@ pub mod serve;
 pub use model::{atom, bond, ddl, graph, name, plan, spec};
 pub use run::{cap, estate, face, life, query};
 
-pub use adapt::{Bind, bind};
+pub use adapt::{Bind, Bootstrap, Status, bind, bootstrap};
 pub use config::{Config, load};
 pub use graph::Graph;
 pub use keel_macro::resource;

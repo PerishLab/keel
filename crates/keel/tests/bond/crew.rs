@@ -1,7 +1,7 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::resource;
-use keel::{Ends, Graph, bind};
+use keel::{Ends, Graph};
 
 #[resource]
 struct Actor {
@@ -31,7 +31,7 @@ struct Repo {
 async fn group() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Team>().plug::<Repo>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let sudo = core.sudo();

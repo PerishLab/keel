@@ -5,6 +5,27 @@ behavior that lands must not violate this document. Depends on the
 `many2one` relation kind for root chains (§ root chain); until many2one
 lands, every row is its own root and only row/pred/all scopes apply.
 
+## Closure and seam
+
+Keel closes the resource-management domain. Resource identity, shape,
+lifecycle, relation, authority, transaction, storage projection, event,
+cache, estate, and genesis semantics live here. Authentication is outside:
+a caller proves a possession and injects one `Operator`; every resulting
+resource read or effect returns through that operator's `Face`.
+
+`Operator` is the only steady-state seam. A caller-owned ceremony may decide
+that a password, recovery code, session, API key, OIDC exchange, or another
+credential proves an identity, but it must not retell grant construction,
+capability checks, mint, lifecycle, or transaction behavior. Conversely,
+Keel must not learn the credential or product policy that produced the
+operator.
+
+Two possession-grounded exceptions remain explicit: estate genesis admits
+sudo; identity birth creates one identity row and its self grant. They are
+resource primitives, not alternate authentication products. Outside them, a
+credential package and its caller use ordinary service or identity faces,
+never ambient sudo.
+
 ## Bootstrap (self-hosting)
 
 Grants are rows of an engine unit **`@grant`**, governed by the same grant
@@ -30,7 +51,9 @@ No verb is ever added per unit or per deployment.
 One credential exists outside the grant system: the **super admin token** —
 the single axiom of an otherwise self-hosted authority graph.
 
-- Minted at first `bind`, surfaced exactly once, stored only as hash.
+- Minted explicitly by the bootstrap hotspot from OS entropy; the caller
+  durably keeps it before `seal`, which stores only its hash.
+- Never generated, read, printed, or delivered by ordinary `bind`; custody and replay follow `docs/run/bootstrap.md`.
 - **Pre-identity**: it resolves to the sudo face directly, never to a row of
   the identity unit.
 - **Unique window**: the only wire path to sudo, and the only credential
@@ -122,6 +145,11 @@ the law.
   pass layer alone (credential → operator, bar honored); `wall` adds
   the stock doors. A caller with its own ceremonies (invitation join,
   password floor) takes `screen` and keeps gate's grounding intact.
+- **The resource face is shared.** Keel's one sudo-window parser and
+  verifier is reusable by caller-owned routes alongside an injected
+  operator. A caller does not reproduce the `Authorization: sudo` scheme,
+  verification, or sudo journal merely because the surrounding ceremony
+  belongs to the caller.
 - **Primitives are package surface.** The ceremony bodies — session and
   token mint, logout and revoke by presented credential, operator
   resolution (`whom`) and the bar check — are public methods on the
@@ -133,11 +161,14 @@ the law.
   identity row under sudo and retells the engine's mint to the newborn
   — one batch, the same mini-genesis grounding as `register`, journaled
   loudly like every sudo act. The service face still never authors an
-  identity row.
-- **Sowing is idempotent.** `sow` ensures grant rows exist without
-  re-authoring live ones, so bootstrap ceremonies replay safely; it
-  never revokes. `rise` seeds its own four grants through it on first
-  boot only — an operator's later attenuation is not resurrected.
+  identity row. The primitive composes inside the caller's transaction so
+  consuming an invitation, creating the identity and self grant, and
+  creating the caller-owned floor credential can remain all-or-nothing;
+  the caller never reconstructs the self grant to obtain that atomicity.
+- **Sowing is idempotent.** `sow` ensures grant rows exist without re-authoring
+  live ones and never revokes. `seed` explicitly sows Gate's four grants;
+  `ready` verifies them; `rise` only constructs the package. Ordinary
+  runtime never resurrects an operator's later attenuation.
 - **Bearer secrets from the OS CSPRNG.** Sessions and tokens draw 256
   bits from `getrandom`, never a hash-table hasher. Session cookies are
   `HttpOnly; SameSite=Lax; Path=/`; `.secure()` adds `Secure` behind

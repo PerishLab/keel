@@ -43,29 +43,48 @@ pub fn app<W: Wire + 'static>(core: Arc<Core<W>>, prefix: &str) -> Router {
     }
 }
 
+pub async fn admit<'a, W: Wire>(
+    core: &'a Core<W>,
+    headers: &HeaderMap,
+    op: Option<&Operator>,
+    verb: &str,
+) -> Result<Face<'a, W>, StatusCode> {
+    let told = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok());
+    if let Some(token) = told.and_then(|value| value.strip_prefix("sudo ")) {
+        if core
+            .seal(token)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        {
+            eprintln!("keel: sudo {verb}");
+            return Ok(core.sudo());
+        }
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    Ok(match op {
+        Some(Operator(id)) => core.of(*id),
+        None => core.anon(),
+    })
+}
+
 async fn front<'a, W: Wire>(
     core: &'a Core<W>,
     headers: &HeaderMap,
     op: Option<&Operator>,
     verb: &str,
 ) -> Result<Face<'a, W>, Fault> {
-    let told = headers
-        .get("authorization")
-        .and_then(|value| value.to_str().ok());
-    if let Some(token) = told.and_then(|value| value.strip_prefix("sudo ")) {
-        if core.seal(token).await.map_err(Fault::from)? {
-            eprintln!("keel: sudo {verb}");
-            return Ok(core.sudo());
-        }
-        return Err(Fault {
-            status: StatusCode::UNAUTHORIZED,
-            note: "bad sudo token".into(),
-        });
-    }
-    Ok(match op {
-        Some(Operator(id)) => core.of(*id),
-        None => core.anon(),
-    })
+    admit(core, headers, op, verb)
+        .await
+        .map_err(|status| Fault {
+            status,
+            note: if status == StatusCode::UNAUTHORIZED {
+                "bad sudo token".into()
+            } else {
+                "sudo verification failed".into()
+            },
+        })
 }
 
 pub async fn listen<W: Wire + 'static>(

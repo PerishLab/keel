@@ -1,13 +1,13 @@
 use crate::world::*;
 use keel::adapt::db::Sqlite;
 use keel::life::Cell;
-use keel::{Graph, Row, bind};
+use keel::{Graph, Row};
 
 #[tokio::test]
 async fn cast() {
     let mut graph = Graph::new();
     graph.plug::<Score>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let low = core

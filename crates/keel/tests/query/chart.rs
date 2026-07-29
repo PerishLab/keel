@@ -1,7 +1,7 @@
 use crate::world::*;
+use keel::Graph;
 use keel::adapt::db::Sqlite;
 use keel::query;
-use keel::{Graph, bind};
 
 fn shape(text: &str) -> String {
     query::shape(&query::parse(text).expect("parse"))
@@ -37,7 +37,7 @@ fn keys() {
 async fn cells() {
     let mut graph = Graph::new();
     graph.plug::<Score>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     core.put(
@@ -75,7 +75,7 @@ async fn cells() {
 async fn sorts() {
     let mut graph = Graph::new();
     graph.plug::<Score>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     core.query("from Score order by points")
@@ -88,7 +88,7 @@ async fn sorts() {
 async fn bonds() {
     let mut graph = Graph::new();
     graph.plug::<Class>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
 

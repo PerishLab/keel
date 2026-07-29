@@ -5,14 +5,16 @@ use keel::adapt::db::Sqlite;
 use keel::atom::{int, string};
 use keel::config;
 use keel::resource;
-use keel::{Cell, Core, Graph, Operator, app, bind};
+use keel::{Cell, Core, Graph, Operator, app, bind, bootstrap};
 use keel_gate::Gate;
 use keel_relay::Relay;
 
+#[path = "../../boot.rs"]
+mod boot;
 mod gear;
 use clap::Parser;
 use gear::{plug, wire};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 #[resource]
@@ -51,6 +53,8 @@ struct Issue {
 struct Cli {
     #[arg(default_value = ".")]
     root: String,
+    #[arg(long, value_name = "PATH")]
+    bootstrap: Option<PathBuf>,
 }
 
 #[derive(Default, plumb::config::Cascade)]
@@ -61,7 +65,8 @@ struct Rig {
 
 #[tokio::main]
 async fn main() {
-    let start = Cli::parse().root;
+    let cli = Cli::parse();
+    let start = cli.root;
     let (cfg, root) = match config::load(Path::new(&start)) {
         Ok(found) => found,
         Err(err) => {
@@ -88,14 +93,21 @@ async fn main() {
     graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
     plug(&mut graph);
     wire(&mut graph);
-    let made = bind(graph, store)
-        .estate(&cfg.estate)
-        .await
-        .and_then(|core| core.identify("Actor"))
-        .map(|core| match cfg.cache.kind {
-            keel::config::Hold::Memory => core,
-            keel::config::Hold::None => core.bare(),
-        });
+    let made = match cli.bootstrap {
+        Some(path) => match bootstrap(graph, store) {
+            Ok(mut open) => match boot::sudo(&mut open, &path).await {
+                Ok(sudo) => open.seal(&sudo).await,
+                Err(note) => Err(keel::adapt::Error::Adapt(format!("custody {note}"))),
+            },
+            Err(err) => Err(err),
+        },
+        None => bind(graph, store).estate(&cfg.estate).await,
+    }
+    .and_then(|core| core.identify("Actor"))
+    .map(|core| match cfg.cache.kind {
+        keel::config::Hold::Memory => core,
+        keel::config::Hold::None => core.bare(),
+    });
     let core = match made {
         Ok(core) => core.share(),
         Err(err) => {
@@ -125,13 +137,17 @@ async fn main() {
         }
     };
     mail.run();
-    let door = match Gate::rise(core.clone(), svc).await {
+    let door = match Gate::rise(core.clone(), svc) {
         Ok(door) => door,
         Err(err) => {
             eprintln!("forge: rise: {err}");
             std::process::exit(1);
         }
     };
+    if let Err(err) = door.seed().await {
+        eprintln!("forge: gate seed: {err}");
+        std::process::exit(1);
+    }
     let router = door
         .wall(app(core.clone(), &cfg.listen.prefix))
         .layer(middleware::from_fn_with_state(core.clone(), gate));

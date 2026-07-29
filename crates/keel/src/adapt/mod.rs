@@ -36,6 +36,18 @@ pub struct Bind<W, H = ()> {
     hook: Option<H>,
 }
 
+pub struct Bootstrap<W> {
+    plan: crate::plan::Plan,
+    manifest: crate::model::manifest::Manifest,
+    wire: W,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Status {
+    Vacant,
+    Occupied,
+}
+
 pub fn bind<W: Wire>(graph: crate::graph::Graph, wire: W) -> Bind<W> {
     Bind {
         graph,
@@ -43,6 +55,36 @@ pub fn bind<W: Wire>(graph: crate::graph::Graph, wire: W) -> Bind<W> {
         estate: crate::config::Estate::default(),
         adopt: false,
         hook: None,
+    }
+}
+
+pub fn bootstrap<W: Wire>(graph: crate::graph::Graph, wire: W) -> Result<Bootstrap<W>, Error> {
+    let (plan, manifest) = prepare(&graph)?;
+    Ok(Bootstrap {
+        plan,
+        manifest,
+        wire,
+    })
+}
+
+impl<W: Wire> Bootstrap<W> {
+    pub async fn status(&mut self) -> Result<Status, Error> {
+        crate::estate::status(&mut self.wire).await
+    }
+
+    pub async fn mint(&mut self) -> Result<String, Error> {
+        if self.status().await? != Status::Vacant {
+            return Err(Error::Estate(crate::estate::Fault::Occupied));
+        }
+        crate::cap::wild()
+    }
+
+    pub async fn seal(mut self, token: &str) -> Result<crate::face::Core<W>, Error> {
+        if !crate::cap::token(token) {
+            return Err(Error::Estate(crate::estate::Fault::Token));
+        }
+        crate::estate::bootstrap(&self.plan, &self.manifest, token, &mut self.wire).await?;
+        Ok(crate::face::Core::new(self.plan, self.wire))
     }
 }
 
@@ -94,7 +136,25 @@ async fn ready<W: Wire, H: crate::estate::Hook>(
         adopt,
         mut hook,
     } = bind;
-    let plan = crate::plan::Plan::lift(&graph)?;
+    let (plan, manifest) = prepare(&graph)?;
+    crate::estate::attach(
+        &plan,
+        &manifest,
+        crate::estate::adopt::Policy {
+            cleanup: &estate.generation.cleanup,
+            adopt,
+        },
+        &mut wire,
+    )
+    .await?;
+    crate::estate::cleanup::deliver(hook.as_mut(), &mut wire).await?;
+    Ok(crate::face::Core::new(plan, wire))
+}
+
+fn prepare(
+    graph: &crate::graph::Graph,
+) -> Result<(crate::plan::Plan, crate::model::manifest::Manifest), Error> {
+    let plan = crate::plan::Plan::lift(graph)?;
     if plan.units().is_empty() {
         return Err(Error::Adapt("db plan is empty".into()));
     }
@@ -105,19 +165,5 @@ async fn ready<W: Wire, H: crate::estate::Hook>(
         }
     }
     let manifest = crate::model::manifest::Manifest::lift(&plan);
-    if let Some(token) = crate::estate::attach(
-        &plan,
-        &manifest,
-        crate::estate::adopt::Policy {
-            cleanup: &estate.generation.cleanup,
-            adopt,
-        },
-        &mut wire,
-    )
-    .await?
-    {
-        eprintln!("keel: sudo token {token}");
-    }
-    crate::estate::cleanup::deliver(hook.as_mut(), &mut wire).await?;
-    Ok(crate::face::Core::new(plan, wire))
+    Ok((plan, manifest))
 }

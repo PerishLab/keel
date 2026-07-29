@@ -1,9 +1,9 @@
+use keel::Graph;
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::ddl::Grain;
 use keel::resource;
 use keel::wire::{Val, Wire};
-use keel::{Graph, bind};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -59,7 +59,7 @@ async fn stand(graph: Graph, tally: Arc<Tally>) -> keel::Core<Count<Sqlite>> {
         inner: Sqlite::memory().await.expect("db"),
         tally,
     };
-    bind(graph, wire).await.expect("bind")
+    crate::support::boot(graph, wire).await.expect("bind")
 }
 
 #[tokio::test]
@@ -111,7 +111,10 @@ async fn bared() {
         inner: Sqlite::memory().await.expect("db"),
         tally: tally.clone(),
     };
-    let core = bind(graph, wire).await.expect("bind").bare();
+    let core = crate::support::boot(graph, wire)
+        .await
+        .expect("bind")
+        .bare();
     core.put("Org", &[("name", "lab")]).await.expect("org");
     core.put(
         "@grant",

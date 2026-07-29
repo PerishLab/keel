@@ -54,12 +54,17 @@ is drift just as a missing or altered object is.
 Bind is fail-closed:
 
 1. Lift and validate the complete requested graph without store access.
-2. If the namespace is empty, create the plan, genesis seal, catalog, and
-   physical snapshot in one transaction.
+2. If the namespace is empty, refuse `vacant` without writing; only the
+   explicit bootstrap ceremony may create the first estate.
 3. If the catalog exists, require a known format, one canonical manifest
    with a matching digest, and an exact physical snapshot.
 4. Attach when the requested manifest equals the active manifest; otherwise
    compile and execute its complete finite change.
+
+Bootstrap validates by the same rules, but has one narrower purpose: install
+the plan, caller-supplied genesis seal, catalog, and physical snapshot in one
+transaction. Its call direction, custody boundary, replay, and concurrency
+law are fixed in `docs/run/bootstrap.md`.
 
 A nonempty namespace without `@estate` is unsealed and is never adopted by
 ordinary bind. `.adopt()` is the one explicit exception. Keel builds the
@@ -220,6 +225,9 @@ model.
 
 | Refusal | Meaning |
 |---------|---------|
+| vacant | an empty namespace requires explicit bootstrap |
+| token | a proposed genesis possession has noncanonical shape |
+| occupied | bootstrap found an estate it cannot exactly replay |
 | unsealed | a nonempty namespace has no Keel catalog |
 | unknown | the catalog or manifest is not canonical and recognized |
 | format | the private Keel storage format differs |

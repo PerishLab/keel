@@ -1,12 +1,12 @@
 use crate::world::*;
+use keel::Graph;
 use keel::adapt::db::Sqlite;
-use keel::{Graph, bind};
 
 #[tokio::test]
 async fn cover() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let sudo = core.sudo();
@@ -168,7 +168,7 @@ async fn cover() {
 async fn descend() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let sudo = core.sudo();
@@ -244,7 +244,7 @@ async fn descend() {
 async fn confine() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Repo>().plug::<Issue>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let sudo = core.sudo();

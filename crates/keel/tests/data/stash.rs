@@ -1,7 +1,7 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::resource;
-use keel::{Ends, Graph, bind};
+use keel::{Ends, Graph};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[resource]
@@ -29,7 +29,7 @@ fn tick() -> i64 {
 async fn unseen() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Actor>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let ada = core.put("Actor", &[("login", "ada")]).await.expect("ada");
@@ -72,7 +72,7 @@ async fn unseen() {
 async fn horizon() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Actor>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let den = core.put("Room", &[("name", "den")]).await.expect("den");
@@ -89,12 +89,12 @@ async fn horizon() {
 async fn twin() {
     let mut graph = Graph::new();
     graph.plug::<Room>().plug::<Actor>();
-    let live = bind(graph, Sqlite::memory().await.expect("db"))
+    let live = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let mut copy = Graph::new();
     copy.plug::<Room>().plug::<Actor>();
-    let bare = bind(copy, Sqlite::memory().await.expect("db"))
+    let bare = crate::support::boot(copy, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind")
         .bare();

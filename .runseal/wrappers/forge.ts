@@ -22,6 +22,7 @@ flags(args).positionals("forge");
 
 const root = await bin("git").text(["rev-parse", "--show-toplevel"]);
 const dir = `${root}/.local/forge`;
+const sudoPath = `${dir}/sudo`;
 await Deno.mkdir(dir, { recursive: true });
 const toml = `[listen]
 host = "${host}"
@@ -41,7 +42,18 @@ await bin("cargo").run(
 
 io.print(`==> boot forge on ${base}`);
 const child = new Deno.Command("cargo", {
-  args: ["run", "-p", "api", "--bin", "forge", "--locked", "--", dir],
+  args: [
+    "run",
+    "-p",
+    "api",
+    "--bin",
+    "forge",
+    "--locked",
+    "--",
+    dir,
+    "--bootstrap",
+    sudoPath,
+  ],
   cwd: root,
   stdin: "null",
   stdout: "null",
@@ -663,13 +675,16 @@ async function query(
 
 async function token(): Promise<string> {
   for (let i = 0; i < 40; i++) {
-    const hit = boot.match(/sudo token ([0-9a-f]+)/);
-    if (hit) {
-      return hit[1];
+    try {
+      return (await Deno.readTextFile(sudoPath)).trim();
+    } catch (err) {
+      if (!(err instanceof Deno.errors.NotFound)) {
+        throw err;
+      }
     }
     await sleep(250);
   }
-  throw new Error("no sudo token in boot log");
+  throw new Error("no sudo custody artifact");
 }
 
 function num(value: unknown): number {

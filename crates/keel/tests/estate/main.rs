@@ -1,8 +1,11 @@
 use keel::adapt::Error;
 use keel::adapt::db::Sqlite;
-use keel::bind;
 use keel::estate::Fault;
 use keel::wire::{Val, Wire};
+use keel::{bind, bootstrap};
+
+#[path = "../support/mod.rs"]
+mod support;
 
 mod adopt;
 mod checks;
@@ -17,9 +20,13 @@ use world::*;
 
 #[tokio::test]
 async fn fresh() {
-    let core = bind(graph::<Alpha>(), Sqlite::memory().await.expect("db"))
-        .await
-        .expect("bind");
+    let wire = Sqlite::memory().await.expect("db");
+    let mut boot = bootstrap(graph::<Alpha>(), wire).expect("bootstrap");
+    assert_eq!(boot.status().await.expect("status"), keel::Status::Vacant);
+    let token = boot.mint().await.expect("mint");
+    assert_eq!(token.len(), 64);
+    let core = boot.seal(&token).await.expect("seal");
+    assert!(core.seal(&token).await.expect("sudo"));
     assert!(core.has("@estate").await.expect("estate"));
     assert!(core.has("@generation").await.expect("generation"));
     assert!(core.has("@clock").await.expect("clock"));
@@ -27,9 +34,126 @@ async fn fresh() {
 }
 
 #[tokio::test]
+async fn vacant() {
+    let path = spot("vacant");
+    match bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("bind")).await {
+        Err(Error::Estate(Fault::Vacant)) => {}
+        Err(err) => panic!("unexpected {err}"),
+        Ok(_) => panic!("expected vacant"),
+    }
+    assert!(fail::tables(&path).await.is_empty());
+    clean(&path);
+}
+
+#[tokio::test]
+async fn token() {
+    let path = spot("token");
+    let boot =
+        bootstrap(graph::<Alpha>(), Sqlite::file(&path).await.expect("boot")).expect("bootstrap");
+    match boot.seal("bad").await {
+        Err(Error::Estate(Fault::Token)) => {}
+        Err(err) => panic!("unexpected {err}"),
+        Ok(_) => panic!("expected token refusal"),
+    }
+    assert!(fail::tables(&path).await.is_empty());
+    clean(&path);
+}
+
+#[tokio::test]
+async fn replay() {
+    let path = spot("replay");
+    let sudo = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let boot =
+        bootstrap(graph::<Alpha>(), Sqlite::file(&path).await.expect("first")).expect("bootstrap");
+    let core = boot.seal(sudo).await.expect("seal");
+    drop(core);
+
+    let mut boot =
+        bootstrap(graph::<Alpha>(), Sqlite::file(&path).await.expect("replay")).expect("bootstrap");
+    assert_eq!(boot.status().await.expect("status"), keel::Status::Occupied);
+    match boot.mint().await {
+        Err(Error::Estate(Fault::Occupied)) => {}
+        Err(err) => panic!("unexpected {err}"),
+        Ok(_) => panic!("expected occupied"),
+    }
+    let core = boot.seal(sudo).await.expect("replay");
+    drop(core);
+
+    let boot =
+        bootstrap(graph::<Grow>(), Sqlite::file(&path).await.expect("changed")).expect("bootstrap");
+    match boot.seal(sudo).await {
+        Err(Error::Estate(Fault::Occupied)) => {}
+        Err(err) => panic!("unexpected {err}"),
+        Ok(_) => panic!("expected occupied"),
+    }
+
+    let other = "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let boot = bootstrap(
+        graph::<Alpha>(),
+        Sqlite::file(&path).await.expect("conflict"),
+    )
+    .expect("bootstrap");
+    match boot.seal(other).await {
+        Err(Error::Estate(Fault::Occupied)) => {}
+        Err(err) => panic!("unexpected {err}"),
+        Ok(_) => panic!("expected occupied"),
+    }
+    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("bind"))
+        .await
+        .expect("bind");
+    assert!(core.seal(sudo).await.expect("sudo"));
+    drop(core);
+    clean(&path);
+}
+
+#[tokio::test]
+async fn race() {
+    let path = spot("race");
+    let left = path.clone();
+    let right = path.clone();
+    let sudo = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let first = tokio::spawn(async move {
+        let wire = Sqlite::file(left).await.expect("left");
+        bootstrap(graph::<Alpha>(), wire)
+            .expect("bootstrap")
+            .seal(sudo)
+            .await
+    });
+    let second = tokio::spawn(async move {
+        let wire = Sqlite::file(right).await.expect("right");
+        bootstrap(graph::<Alpha>(), wire)
+            .expect("bootstrap")
+            .seal(sudo)
+            .await
+    });
+    let first = first.await.expect("first");
+    let second = second.await.expect("second");
+    assert!(first.is_ok() || second.is_ok());
+    drop(first);
+    drop(second);
+
+    let wire = Sqlite::file(&path).await.expect("retry");
+    let core = bootstrap(graph::<Alpha>(), wire)
+        .expect("bootstrap")
+        .seal(sudo)
+        .await
+        .expect("replay");
+    assert!(core.seal(sudo).await.expect("sudo"));
+    drop(core);
+    let mut wire = Sqlite::file(&path).await.expect("inspect");
+    let rows = wire
+        .rows("SELECT COUNT(*) FROM \"@generation\"", &[])
+        .await
+        .expect("generation");
+    assert_eq!(rows[0][0], Val::Int(1));
+    drop(wire);
+    clean(&path);
+}
+
+#[tokio::test]
 async fn exact() {
     let path = spot("exact");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     core.put("Alpha", &[("zeta", "held"), ("alpha", "7")])
@@ -72,7 +196,7 @@ async fn unsealed() {
 #[tokio::test]
 async fn drift() {
     let path = spot("drift");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     drop(core);
@@ -95,7 +219,7 @@ async fn drift() {
 #[tokio::test]
 async fn unknown() {
     let path = spot("unknown");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     drop(core);
@@ -138,7 +262,7 @@ async fn preflight() {
 #[tokio::test]
 async fn monotonic() {
     let path = spot("monotonic");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     assert_eq!(

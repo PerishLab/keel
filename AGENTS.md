@@ -6,7 +6,17 @@ engine projections, not business authoring surfaces.
 
 ## Product boundary
 
+- **Resource closure**: keel owns resource identity, shape, lifecycle,
+  relations, authority, transactions, storage projection, events, cache,
+  estate evolution, and the genesis possession that grounds them. The closure
+  ends at `Operator`.
+- **Authentication boundary**: callers prove credentials and inject one live
+  identity row id as `Operator`. Keel never learns login, password, session,
+  recovery, OIDC, or product identity policy. Once admitted, every resource
+  effect returns through the corresponding operator face.
 - **Business**: `#[resource]`, `#[field]`, `#[relation]`, `Graph::plug`, `bind`;
+  ordinary bind never installs an empty estate; `bootstrap` exposes Keel's
+  possession mint and transactional seal hotspots without choosing custody;
   `.adopt()` is the explicit exact-projection ceremony for an unsealed estate;
   `.hook()` registers one idempotent non-estate derivative consumer.
 - **Engine face (`Core`)**: `put` / `set` / `live` / `end` / `tie` / `ties` / `cut`.
@@ -50,6 +60,7 @@ done when its scenario is green; no stage begins against unlanded law.
 - Boundaries and registered compound terms in `ectropy.toml`.
 - Edge navigation: `docs/model/edge.md` (flat bags; root-only order/page).
 - Capability: `docs/run/capability.md` (six verbs, `@grant`, operator, gate).
+- Bootstrap: `docs/run/bootstrap.md` (caller custody, explicit seal, replay).
 - Trigger: `docs/run/trigger.md` (thin events, observe-only, relay).
 - Unique: `docs/model/unique.md` (serialized write path; live-unique; serial).
 - Cache: `docs/run/cache.md` (invisible; under coverage; generations+horizon).

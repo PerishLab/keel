@@ -1,7 +1,7 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::resource;
-use keel::{Cell, Graph, bind};
+use keel::{Cell, Graph};
 
 #[resource]
 struct Author {
@@ -33,7 +33,7 @@ struct Card {
 async fn point() {
     let mut graph = Graph::new();
     graph.plug::<Author>().plug::<Post>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let ada = core.put("Author", &[("name", "ada")]).await.expect("ada");
@@ -100,7 +100,7 @@ async fn point() {
 async fn lone() {
     let mut graph = Graph::new();
     graph.plug::<Author>().plug::<Card>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let ada = core.put("Author", &[("name", "ada")]).await.expect("ada");
@@ -139,7 +139,7 @@ async fn lone() {
 async fn mirror() {
     let mut graph = Graph::new();
     graph.plug::<Author>().plug::<Post>().plug::<Card>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let ada = core.put("Author", &[("name", "ada")]).await.expect("ada");

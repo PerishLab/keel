@@ -6,6 +6,29 @@ use crate::query::{self};
 use crate::wire::Wire;
 
 impl<W: Wire> Tx<'_, W> {
+    pub async fn birth(&mut self, fields: &[(&str, &str)]) -> Result<i64, Error> {
+        if self.who != Who::Sudo {
+            return Err(Error::Adapt("identity birth needs sudo".into()));
+        }
+        let unit = self
+            .core
+            .identity()
+            .ok_or_else(|| Error::Adapt("no identity unit".into()))?
+            .to_string();
+        let key = self.craft(&unit, fields).await?;
+        self.craft(
+            cap::GRANT,
+            &[
+                ("who", &key.to_string()),
+                ("verb", "*"),
+                ("unit", &unit),
+                ("scope", &format!("row {key}")),
+            ],
+        )
+        .await?;
+        Ok(key)
+    }
+
     pub async fn put(&mut self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
         if self.free() {
             return self.craft(name, fields).await;

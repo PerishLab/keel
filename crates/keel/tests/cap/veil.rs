@@ -1,7 +1,7 @@
+use keel::Graph;
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::resource;
-use keel::{Graph, bind};
 
 #[resource]
 struct Actor {
@@ -21,7 +21,7 @@ struct Pass {
 async fn shrouded() {
     let mut graph = Graph::new();
     graph.plug::<Actor>().plug::<Pass>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
 

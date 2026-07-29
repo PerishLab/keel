@@ -71,7 +71,7 @@ async fn blocked<T: Resource>(path: &std::path::Path) {
 #[tokio::test]
 async fn range() {
     let path = spot("rule_range");
-    let core = bind(graph::<Open>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Open>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     let key = core.put("Count", &[("value", "3")]).await.expect("put");
@@ -102,7 +102,7 @@ async fn range() {
 #[tokio::test]
 async fn boolean() {
     let path = spot("rule_bool");
-    let core = bind(graph::<Any>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Any>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     core.put("Flag", &[("value", "true")]).await.expect("put");

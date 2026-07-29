@@ -1,12 +1,12 @@
 use crate::world::*;
 use keel::adapt::db::Sqlite;
-use keel::{Graph, Who, bind};
+use keel::{Graph, Who};
 
 #[tokio::test]
 async fn grant() {
     let mut graph = Graph::new();
     graph.plug::<Actor>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let sudo = core.sudo();
@@ -41,7 +41,7 @@ async fn grant() {
 async fn vet() {
     let mut graph = Graph::new();
     graph.plug::<Actor>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let sudo = core.sudo();

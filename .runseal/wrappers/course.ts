@@ -22,6 +22,7 @@ flags(args).positionals("course");
 
 const root = await bin("git").text(["rev-parse", "--show-toplevel"]);
 const dir = `${root}/.local/course`;
+const sudo = `${dir}/sudo`;
 await Deno.mkdir(dir, { recursive: true });
 const toml = `[listen]
 host = "${host}"
@@ -38,7 +39,7 @@ await bin("cargo").run(["build", "-p", "api", "--locked"], { cwd: root });
 
 io.print(`==> boot keel-api on ${base}`);
 const child = new Deno.Command("cargo", {
-  args: ["run", "-p", "api", "--locked", "--", dir],
+  args: ["run", "-p", "api", "--locked", "--", dir, "--bootstrap", sudo],
   cwd: root,
   stdin: "null",
   stdout: "null",

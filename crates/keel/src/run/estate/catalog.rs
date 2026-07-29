@@ -1,5 +1,7 @@
 use crate::adapt::Error;
 use crate::ddl::Grain;
+use crate::model::manifest::Manifest;
+use crate::plan::Plan;
 use crate::wire::{Val, Wire};
 
 const TABLE: &str = "@estate";
@@ -46,6 +48,96 @@ pub(super) async fn empty<W: Wire>(wire: &mut W) -> Result<bool, Error> {
         }
     };
     Ok(rows.is_empty())
+}
+
+pub(crate) async fn status<W: Wire>(wire: &mut W) -> Result<crate::Status, Error> {
+    if present(wire).await? {
+        super::verify(wire).await?;
+        return Ok(crate::Status::Occupied);
+    }
+    if empty(wire).await? {
+        return Ok(crate::Status::Vacant);
+    }
+    Err(Error::Estate(super::Fault::Unsealed))
+}
+
+pub(crate) async fn bootstrap<W: Wire>(
+    plan: &Plan,
+    manifest: &Manifest,
+    token: &str,
+    wire: &mut W,
+) -> Result<(), Error> {
+    wire.script("BEGIN").await?;
+    let out = open(plan, manifest, token, wire).await;
+    match out {
+        Ok(()) => {
+            wire.script("COMMIT").await?;
+            Ok(())
+        }
+        Err(err) => {
+            let _ = wire.script("ROLLBACK").await;
+            Err(err)
+        }
+    }
+}
+
+async fn open<W: Wire>(
+    plan: &Plan,
+    manifest: &Manifest,
+    token: &str,
+    wire: &mut W,
+) -> Result<(), Error> {
+    if present(wire).await? {
+        let bound = super::verify(wire).await?;
+        if bound.digest != manifest.digest() || !crate::cap::sealed(plan, wire, token).await? {
+            return Err(Error::Estate(super::Fault::Occupied));
+        }
+        return Ok(());
+    }
+    if !empty(wire).await? {
+        return Err(Error::Estate(super::Fault::Unsealed));
+    }
+    seed(plan, manifest, token, wire).await
+}
+
+async fn seed<W: Wire>(
+    plan: &Plan,
+    manifest: &Manifest,
+    token: &str,
+    wire: &mut W,
+) -> Result<(), Error> {
+    for stmt in crate::ddl::script(plan, wire.grain()) {
+        wire.script(&stmt).await?;
+    }
+    for stmt in script(wire.grain()) {
+        wire.script(&stmt).await?;
+    }
+    let generation = super::next(wire, "generation").await?;
+    crate::cap::genesis(plan, wire, token).await?;
+    let text = manifest.write();
+    wire.run(
+        "INSERT INTO \"@generation\" (id, state, digest, manifest, created, retired) VALUES (?1, ?2, ?3, ?4, ?5, NULL)",
+        &[
+            Val::Int(generation),
+            Val::Text("active".into()),
+            Val::Text(manifest.digest()),
+            Val::Text(text),
+            Val::Int(crate::life::tick()),
+        ],
+    )
+    .await?;
+    let sealed = shape(wire).await?;
+    wire.run(
+        "INSERT INTO \"@estate\" (id, format, active, shape) VALUES (?1, ?2, ?3, ?4)",
+        &[
+            Val::Int(1),
+            Val::Int(FORMAT),
+            Val::Int(generation),
+            Val::Text(sealed),
+        ],
+    )
+    .await?;
+    Ok(())
 }
 
 pub(super) async fn shape<W: Wire>(wire: &mut W) -> Result<String, Error> {

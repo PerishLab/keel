@@ -34,10 +34,20 @@ impl<W: Wire> Wire for Fail<W> {
     }
 }
 
+pub(super) async fn tables(path: &std::path::Path) -> Vec<Vec<Val>> {
+    let mut wire = Sqlite::file(path).await.expect("inspect");
+    wire.rows(
+        "SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'",
+        &[],
+    )
+    .await
+    .expect("tables")
+}
+
 #[tokio::test]
 async fn rollback() {
     let path = spot("rollback");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     drop(core);

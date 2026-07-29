@@ -38,7 +38,7 @@ impl<W: Wire> Wire for Fail<W> {
 #[tokio::test]
 async fn expired() {
     let path = spot("cleanup-expired");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     drop(core);
@@ -95,7 +95,7 @@ async fn expired() {
 #[tokio::test]
 async fn immediate() {
     let path = spot("cleanup-immediate");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     drop(core);
@@ -115,7 +115,7 @@ async fn immediate() {
 #[tokio::test]
 async fn forever() {
     let path = spot("cleanup-forever");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     drop(core);
@@ -146,7 +146,7 @@ async fn forever() {
 #[tokio::test]
 async fn rollback() {
     let path = spot("cleanup-rollback");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     drop(core);

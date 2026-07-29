@@ -1,6 +1,6 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::{int, string};
-use keel::{Cell, Graph, bind, resource};
+use keel::{Cell, Graph, resource};
 
 #[resource]
 struct Job {
@@ -22,7 +22,7 @@ struct Broken {
 async fn field() {
     let mut graph = Graph::new();
     graph.plug::<Job>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
 
@@ -48,7 +48,7 @@ async fn field() {
 async fn shape() {
     let mut graph = Graph::new();
     graph.plug::<Broken>();
-    match bind(graph, Sqlite::memory().await.expect("db")).await {
+    match crate::support::boot(graph, Sqlite::memory().await.expect("db")).await {
         Err(err) => assert!(err.to_string().contains("optional field")),
         Ok(_) => panic!("expected optional default refusal"),
     }

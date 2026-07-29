@@ -19,6 +19,7 @@ pg = ["sqlx/postgres"]
 [dependencies]
 plumb = { workspace = true }
 axum = { workspace = true, optional = true }
+getrandom = { workspace = true }
 keel-macro = { workspace = true }
 serde = { workspace = true }
 sha2 = { workspace = true }

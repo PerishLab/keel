@@ -35,7 +35,7 @@ impl Resource for Frozen {
 #[tokio::test]
 async fn mode() {
     let path = spot("frozen_mode");
-    let core = bind(
+    let core = crate::support::boot(
         graph::<Mutable>(),
         Sqlite::file(&path).await.expect("first"),
     )

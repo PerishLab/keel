@@ -4,15 +4,14 @@ use crate::life::Work;
 use crate::plan::Plan;
 use crate::wire::Wire;
 
-pub async fn genesis<W: Wire>(plan: &Plan, wire: &mut W) -> Result<Option<String>, Error> {
+pub async fn genesis<W: Wire>(plan: &Plan, wire: &mut W, token: &str) -> Result<(), Error> {
     let node = plan.find(SEAL)?;
     let mut work = Work::new(wire, plan);
     if !work.scan(node).await?.is_empty() {
-        return Ok(None);
+        return Err(Error::Estate(crate::estate::Fault::Occupied));
     }
-    let token = wild();
-    work.put(SEAL, &[("hash", &digest(&token))]).await?;
-    Ok(Some(token))
+    work.put(SEAL, &[("hash", &digest(token))]).await?;
+    Ok(())
 }
 
 pub async fn sealed<W: Wire>(plan: &Plan, wire: &mut W, token: &str) -> Result<bool, Error> {
@@ -22,15 +21,17 @@ pub async fn sealed<W: Wire>(plan: &Plan, wire: &mut W, token: &str) -> Result<b
     Ok(rows.first().is_some_and(|row| cell(row, "hash") == want))
 }
 
-pub(crate) fn wild() -> String {
-    use std::collections::hash_map::RandomState;
-    use std::hash::{BuildHasher, Hasher};
-    let mut out = String::new();
-    for _ in 0..4 {
-        let word = RandomState::new().build_hasher().finish();
-        out.push_str(&format!("{word:016x}"));
-    }
-    out
+pub(crate) fn wild() -> Result<String, Error> {
+    let mut seed = [0u8; 32];
+    getrandom::fill(&mut seed).map_err(|_| Error::Adapt("os entropy unavailable".into()))?;
+    Ok(seed.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+pub(crate) fn token(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 pub(crate) fn digest(token: &str) -> String {

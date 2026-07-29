@@ -47,7 +47,7 @@ async fn unseal(path: &std::path::Path) {
 #[tokio::test]
 async fn exact() {
     let path = spot("adopt-exact");
-    let core = bind(
+    let core = crate::support::boot(
         pair::<Club, Member>(),
         Sqlite::file(&path).await.expect("first"),
     )
@@ -118,7 +118,7 @@ async fn exact() {
 #[tokio::test]
 async fn serial() {
     let path = spot("adopt-serial");
-    let core = bind(
+    let core = crate::support::boot(
         pair::<Ledger, Ticket>(),
         Sqlite::file(&path).await.expect("first"),
     )
@@ -154,7 +154,7 @@ async fn serial() {
 #[tokio::test]
 async fn drift() {
     let path = spot("adopt-drift");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     drop(core);
@@ -188,7 +188,7 @@ async fn drift() {
 #[tokio::test]
 async fn rollback() {
     let path = spot("adopt-rollback");
-    let core = bind(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
+    let core = crate::support::boot(graph::<Alpha>(), Sqlite::file(&path).await.expect("first"))
         .await
         .expect("bind");
     core.put("Alpha", &[("alpha", "1"), ("zeta", "held")])

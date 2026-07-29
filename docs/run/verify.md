@@ -14,7 +14,11 @@ start is done; failures mean cold start is not closed.
 ## Must pass (in)
 
 - Business-only resource DSL; reign columns engine-owned
-- Empty-store transactional seal; exact canonical reopen
+- Ordinary bind refuses an empty store without writes
+- Explicit bootstrap custody-before-seal; transactional install and exact replay
+- Malformed, conflicting, failed, and concurrent bootstrap paths fail closed
+- Bootstrap status prevents mint against an occupied estate
+- Gate rise is write-free; explicit seed and ready delimit package bootstrap
 - Unsealed, corrupt, changed, and physically drifted estates fail closed
 - Generated additive/contraction/cast evolution with atomic rollback
 - Live fact, point relation, tie, key, and serial preservation across generations

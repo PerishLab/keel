@@ -4,7 +4,7 @@ use keel::adapt::pg::Postgres;
 use keel::atom::string;
 use keel::life::Ends;
 use keel::resource;
-use keel::{Cell, Graph, bind};
+use keel::{Cell, Graph};
 
 #[resource]
 struct Course {
@@ -46,7 +46,7 @@ async fn revived() {
     let store = reset().await;
     let mut graph = Graph::new();
     graph.plug::<Course>().plug::<Student>();
-    let core = bind(graph, store).await.expect("bind");
+    let core = crate::support::boot(graph, store).await.expect("bind");
     core.put("Course", &[("code", "CS101")])
         .await
         .expect("before");
@@ -74,7 +74,7 @@ async fn portable() {
     let store = reset().await;
     let mut graph = Graph::new();
     graph.plug::<Course>().plug::<Student>();
-    let core = bind(graph, store).await.expect("bind");
+    let core = crate::support::boot(graph, store).await.expect("bind");
 
     let algo = core
         .put("Course", &[("code", "CS101")])

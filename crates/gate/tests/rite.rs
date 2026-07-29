@@ -1,7 +1,7 @@
 use axum::http::HeaderMap;
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
-use keel::{Graph, bind, resource};
+use keel::{Core, Graph, Wire, bootstrap, resource};
 use keel_gate::{Gate, bake};
 
 #[resource]
@@ -14,14 +14,19 @@ struct Actor {
 
 keel_gate::gate!(Actor);
 
+async fn boot<W: Wire>(graph: Graph, wire: W) -> Core<W> {
+    let mut boot = bootstrap(graph, wire).expect("bootstrap");
+    let token = boot.mint().await.expect("mint");
+    boot.seal(&token).await.expect("seal")
+}
+
 #[tokio::test]
 async fn rites() {
     let mut graph = Graph::new();
     graph.plug::<Actor>();
     plug(&mut graph);
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = boot(graph, Sqlite::memory().await.expect("db"))
         .await
-        .expect("bind")
         .identify("Actor")
         .expect("identify")
         .share();
@@ -46,10 +51,10 @@ async fn rites() {
         .put("Actor", &[("login", "svc"), ("barred", "false")])
         .await
         .expect("svc");
-    let gate = Gate::rise(core.clone(), svc)
-        .await
-        .expect("rise")
-        .bar("barred");
+    let gate = Gate::rise(core.clone(), svc).expect("rise").bar("barred");
+    assert!(!gate.ready().await.expect("unready"));
+    gate.seed().await.expect("seed");
+    assert!(gate.ready().await.expect("ready"));
 
     let (_, sid) = gate.session(ada).await.expect("session");
     let mut jar = HeaderMap::new();
@@ -78,6 +83,40 @@ async fn rites() {
     worn.insert("cookie", format!("session={held}").parse().expect("worn"));
     assert!(gate.whom(&worn).await.is_none());
 
+    let flow = core.flow(0).await.expect("flow");
+    let svc_who = svc.to_string();
+    let ada_who = ada.to_string();
+    let trail: Vec<_> = flow
+        .iter()
+        .map(|row| {
+            (
+                row.text("unit").unwrap_or_default(),
+                row.text("verb").unwrap_or_default(),
+                row.text("who").unwrap_or_default(),
+            )
+        })
+        .collect();
+    assert!(
+        flow.iter().any(|row| {
+            row.text("unit")
+                .is_some_and(|unit| unit.ends_with(":session"))
+                && row.text("verb") == Some("end")
+                && row.text("who") == Some(svc_who.as_str())
+        }),
+        "{trail:?}"
+    );
+    assert!(flow.iter().any(|row| {
+        row.text("unit")
+            .is_some_and(|unit| unit.ends_with(":token"))
+            && row.text("verb") == Some("put")
+            && row.text("who") == Some(ada_who.as_str())
+    }));
+    assert!(flow.iter().all(|row| {
+        !row.text("unit")
+            .is_some_and(|unit| unit.ends_with(":session") || unit.ends_with(":token"))
+            || row.text("who") != Some("sudo")
+    }));
+
     assert!(bake("s", true).contains("Secure"));
     assert!(!bake("s", false).contains("Secure"));
 }
@@ -87,9 +126,8 @@ async fn seeds() {
     let mut graph = Graph::new();
     graph.plug::<Actor>();
     plug(&mut graph);
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = boot(graph, Sqlite::memory().await.expect("db"))
         .await
-        .expect("bind")
         .identify("Actor")
         .expect("identify")
         .share();
@@ -97,7 +135,11 @@ async fn seeds() {
         .put("Actor", &[("login", "svc"), ("barred", "false")])
         .await
         .expect("svc");
-    let gate = Gate::rise(core.clone(), svc).await.expect("rise");
+    let gate = Gate::rise(core.clone(), svc).expect("rise");
+    assert!(!gate.ready().await.expect("unready"));
+    gate.seed().await.expect("seed");
+    gate.seed().await.expect("reseed");
+    assert!(gate.ready().await.expect("ready"));
 
     let eve = gate
         .birth(&[("login", "eve"), ("barred", "false")])

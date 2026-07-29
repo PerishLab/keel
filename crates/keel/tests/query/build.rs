@@ -1,12 +1,12 @@
 use crate::world::*;
 use keel::adapt::db::Sqlite;
-use keel::{Graph, Op, Rank, bind, form};
+use keel::{Graph, Op, Rank, form};
 
 #[tokio::test]
 async fn build() {
     let mut graph = Graph::new();
     graph.plug::<Score>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     for (name, points, passed) in [

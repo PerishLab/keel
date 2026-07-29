@@ -1,8 +1,8 @@
+use keel::Graph;
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::life::{Cell, Ends};
 use keel::resource;
-use keel::{Graph, bind};
 
 #[resource]
 struct Course {
@@ -26,7 +26,7 @@ struct Student {
 async fn select() {
     let mut graph = Graph::new();
     graph.plug::<Course>().plug::<Student>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
 

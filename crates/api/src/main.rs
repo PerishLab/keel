@@ -2,9 +2,10 @@ use clap::Parser;
 use keel::atom::string;
 use keel::config;
 use keel::resource;
-use keel::{Graph, bind, listen};
-use std::path::Path;
+use keel::{Graph, bind, bootstrap, listen};
+use std::path::{Path, PathBuf};
 
+mod boot;
 #[resource]
 struct Course {
     #[field(string)]
@@ -27,6 +28,8 @@ struct Student {
 struct Cli {
     #[arg(default_value = ".")]
     root: String,
+    #[arg(long, value_name = "PATH")]
+    bootstrap: Option<PathBuf>,
 }
 
 #[derive(Default, plumb::config::Cascade)]
@@ -37,7 +40,8 @@ struct Rig {
 
 #[tokio::main]
 async fn main() {
-    let start = Cli::parse().root;
+    let cli = Cli::parse();
+    let start = cli.root;
     let (cfg, root) = match config::load(Path::new(&start)) {
         Ok(found) => found,
         Err(err) => {
@@ -62,13 +66,20 @@ async fn main() {
     };
     let mut graph = Graph::new();
     graph.plug::<Course>().plug::<Student>();
-    let made = bind(graph, store)
-        .estate(&cfg.estate)
-        .await
-        .map(|core| match cfg.cache.kind {
-            keel::config::Hold::Memory => core,
-            keel::config::Hold::None => core.bare(),
-        });
+    let made = match cli.bootstrap {
+        Some(path) => match bootstrap(graph, store) {
+            Ok(mut open) => match boot::sudo(&mut open, &path).await {
+                Ok(sudo) => open.seal(&sudo).await,
+                Err(note) => Err(keel::adapt::Error::Adapt(format!("custody {note}"))),
+            },
+            Err(err) => Err(err),
+        },
+        None => bind(graph, store).estate(&cfg.estate).await,
+    }
+    .map(|core| match cfg.cache.kind {
+        keel::config::Hold::Memory => core,
+        keel::config::Hold::None => core.bare(),
+    });
     let core = match made {
         Ok(core) => core.share(),
         Err(err) => {

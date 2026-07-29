@@ -1,7 +1,7 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::resource;
-use keel::{Ends, Graph, bind};
+use keel::{Ends, Graph};
 
 #[tokio::test]
 async fn rooted() {
@@ -21,7 +21,7 @@ async fn rooted() {
 
     let mut graph = Graph::new();
     graph.plug::<Org>().plug::<Label>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
     let label = core
@@ -102,7 +102,7 @@ async fn twin() {
         .plug::<team::Team>()
         .plug::<team::Tag>()
         .plug::<Note>();
-    let core = bind(graph, Sqlite::memory().await.expect("db"))
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
         .await
         .expect("bind");
 
