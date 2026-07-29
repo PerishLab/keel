@@ -67,25 +67,18 @@ pub struct Bond {
     crew: bool,
 }
 
-pub struct Builder {
-    name: String,
-    fields: Vec<Field>,
-    bonds: Vec<Bond>,
-    veil: bool,
-    frozen: bool,
-    faults: Vec<String>,
-}
+pub struct Builder(Spec);
 
 impl Spec {
     pub fn build(name: impl Into<String>) -> Builder {
-        Builder {
+        Builder(Spec {
             name: name.into(),
             fields: Vec::new(),
             bonds: Vec::new(),
             veil: false,
             frozen: false,
             faults: Vec::new(),
-        }
+        })
     }
 
     pub fn name(&self) -> &str {

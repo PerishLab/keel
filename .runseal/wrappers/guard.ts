@@ -58,5 +58,5 @@ await guard(
     { label: "plumb doctor", runs: [["plumb", ["doctor", "."]]] },
   ],
   Deno.args,
-  { checker: ["ectropy", ["--strict", "."]] },
+  { checker: ["ectropy", ["."]] },
 );

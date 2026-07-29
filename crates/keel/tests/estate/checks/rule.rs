@@ -115,7 +115,7 @@ impl Resource for One {
 }
 
 #[tokio::test]
-async fn add_default() {
+async fn graft() {
     let path = spot("rule_add_default");
     let core = crate::support::boot(graph::<Seed>(), Sqlite::file(&path).await.expect("first"))
         .await
@@ -188,7 +188,7 @@ async fn narrow() {
 }
 
 #[tokio::test]
-async fn fill_null() {
+async fn fill() {
     let path = spot("rule_fill_null");
     let core = crate::support::boot(graph::<Sparse>(), Sqlite::file(&path).await.expect("first"))
         .await
@@ -208,7 +208,7 @@ async fn fill_null() {
 }
 
 #[tokio::test]
-async fn change_default() {
+async fn swap() {
     let path = spot("rule_change_default");
     let core = crate::support::boot(graph::<Zero>(), Sqlite::file(&path).await.expect("first"))
         .await

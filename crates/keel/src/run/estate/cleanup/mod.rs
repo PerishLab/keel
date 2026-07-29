@@ -69,7 +69,7 @@ async fn sweep<W: Wire>(policy: &Cleanup, active: &Manifest, wire: &mut W) -> Re
             return Err(unknown("cleanup generation changed"));
         }
     }
-    let shape = super::catalog::shape(wire).await?;
+    let shape = super::catalog::Catalog(wire).shape().await?;
     let changed = wire
         .run(
             "UPDATE \"@estate\" SET shape = ?1 WHERE id = 1",

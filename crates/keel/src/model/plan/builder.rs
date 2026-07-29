@@ -24,7 +24,7 @@ impl Builder {
     }
 
     fn scalar(mut self, name: impl Into<String>, kind: atom::Kind, only: Only, need: bool) -> Self {
-        self.fields.push(Field {
+        self.0.fields.push(Field {
             name: name.into(),
             kind,
             only,
@@ -36,16 +36,16 @@ impl Builder {
     }
 
     pub fn rule(mut self, name: &str, rule: Rule) -> Self {
-        match self.fields.iter_mut().find(|field| field.name == name) {
+        match self.0.fields.iter_mut().find(|field| field.name == name) {
             Some(field) if field.serial.is_none() => field.rule = rule,
-            Some(_) => self.faults.push(format!("serial field {name} has rule")),
-            None => self.faults.push(format!("unknown rule field {name}")),
+            Some(_) => self.0.faults.push(format!("serial field {name} has rule")),
+            None => self.0.faults.push(format!("unknown rule field {name}")),
         }
         self
     }
 
     pub fn serial(mut self, name: impl Into<String>, scope: impl Into<String>) -> Self {
-        self.fields.push(Field {
+        self.0.fields.push(Field {
             name: name.into(),
             kind: atom::Kind::Int,
             only: Only::Free,
@@ -143,7 +143,7 @@ impl Builder {
                 rule: Rule::new(),
             })
             .collect();
-        self.bonds.push(Bond {
+        self.0.bonds.push(Bond {
             name,
             kind,
             target,
@@ -156,23 +156,16 @@ impl Builder {
     }
 
     pub fn veil(mut self) -> Self {
-        self.veil = true;
+        self.0.veil = true;
         self
     }
 
     pub fn freeze(mut self) -> Self {
-        self.frozen = true;
+        self.0.frozen = true;
         self
     }
 
     pub fn seal(self) -> Spec {
-        Spec {
-            name: self.name,
-            fields: self.fields,
-            bonds: self.bonds,
-            veil: self.veil,
-            frozen: self.frozen,
-            faults: self.faults,
-        }
+        self.0
     }
 }

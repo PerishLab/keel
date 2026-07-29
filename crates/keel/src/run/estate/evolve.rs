@@ -94,7 +94,7 @@ async fn migrate<W: Wire>(work: &Work<'_>, wire: &mut W) -> Result<(), Error> {
         &[Val::Text("active".into()), Val::Int(next)],
     )
     .await?;
-    let shape = super::catalog::shape(wire).await?;
+    let shape = super::catalog::Catalog(wire).shape().await?;
     wire.run(
         "UPDATE \"@estate\" SET active = ?1, shape = ?2 WHERE id = 1",
         &[Val::Int(next), Val::Text(shape)],

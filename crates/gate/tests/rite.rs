@@ -84,8 +84,8 @@ async fn rites() {
     assert!(gate.whom(&worn).await.is_none());
 
     let flow = core.flow(0).await.expect("flow");
-    let svc_who = svc.to_string();
-    let ada_who = ada.to_string();
+    let staff = svc.to_string();
+    let guest = ada.to_string();
     let trail: Vec<_> = flow
         .iter()
         .map(|row| {
@@ -101,7 +101,7 @@ async fn rites() {
             row.text("unit")
                 .is_some_and(|unit| unit.ends_with(":session"))
                 && row.text("verb") == Some("end")
-                && row.text("who") == Some(svc_who.as_str())
+                && row.text("who") == Some(staff.as_str())
         }),
         "{trail:?}"
     );
@@ -109,7 +109,7 @@ async fn rites() {
         row.text("unit")
             .is_some_and(|unit| unit.ends_with(":token"))
             && row.text("verb") == Some("put")
-            && row.text("who") == Some(ada_who.as_str())
+            && row.text("who") == Some(guest.as_str())
     }));
     assert!(flow.iter().all(|row| {
         !row.text("unit")

@@ -13,7 +13,7 @@ mod guard;
 mod projection;
 mod tables;
 
-pub(crate) use catalog::{bootstrap, status};
+pub(crate) use catalog::{Catalog, bootstrap};
 pub use cleanup::{Gone, Hook, Purge};
 pub(crate) use clock::next;
 
@@ -118,8 +118,8 @@ pub(crate) async fn attach<W: Wire>(
     policy: adopt::Policy<'_>,
     wire: &mut W,
 ) -> Result<(), Error> {
-    if !catalog::present(wire).await? {
-        if !catalog::empty(wire).await? {
+    if !catalog::Catalog(wire).present().await? {
+        if !catalog::Catalog(wire).empty().await? {
             if !policy.adopt {
                 return Err(Error::Estate(Fault::Unsealed));
             }
@@ -179,7 +179,7 @@ async fn verify<W: Wire>(wire: &mut W) -> Result<Bound, Error> {
     let active = root[1].int();
     let held = root[2].text();
     let (current, prior) = generations(wire, active).await?;
-    let physical = catalog::shape(wire).await?;
+    let physical = catalog::Catalog(wire).shape().await?;
     if physical != held {
         return Err(Error::Estate(Fault::Drift {
             expected: digest(&held),

@@ -69,7 +69,7 @@ pub fn bootstrap<W: Wire>(graph: crate::graph::Graph, wire: W) -> Result<Bootstr
 
 impl<W: Wire> Bootstrap<W> {
     pub async fn status(&mut self) -> Result<Status, Error> {
-        crate::estate::status(&mut self.wire).await
+        crate::estate::Catalog(&mut self.wire).status().await
     }
 
     pub async fn mint(&mut self) -> Result<String, Error> {

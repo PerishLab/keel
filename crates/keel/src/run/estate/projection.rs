@@ -25,7 +25,7 @@ impl Projection<'_> {
     async fn lite(&self) -> Result<String, Error> {
         let mut wire = crate::adapt::db::Sqlite::memory().await?;
         self.build(&mut wire).await?;
-        super::catalog::shape(&mut wire).await
+        super::catalog::Catalog(&mut wire).shape().await
     }
 
     async fn pg<W: Wire>(&self, wire: &mut W) -> Result<String, Error> {
@@ -55,7 +55,7 @@ impl Projection<'_> {
         ))
         .await?;
         self.build(wire).await?;
-        super::catalog::shape(wire).await
+        super::catalog::Catalog(wire).shape().await
     }
 
     async fn build<W: Wire>(&self, wire: &mut W) -> Result<(), Error> {

@@ -208,7 +208,12 @@ pub(crate) fn atom(attrs: &[Attribute]) -> syn::Result<Option<Made>> {
             }
             only = attr.only(item)?;
         }
-        return Ok(Some(Made::Atom(kind, only, need, guard)));
+        return Ok(Some(Made::Atom(crate::Bud {
+            kind,
+            only,
+            need,
+            guard,
+        })));
     }
     Ok(None)
 }

@@ -10,8 +10,12 @@ const DERIVATIVE: &str = "@derivative";
 const GENERATION: &str = "@generation";
 pub(super) const FORMAT: i64 = 9;
 
-pub(super) async fn present<W: Wire>(wire: &mut W) -> Result<bool, Error> {
-    let rows = match wire.grain() {
+pub(crate) struct Catalog<'a, W>(pub(crate) &'a mut W);
+
+impl<W: Wire> Catalog<'_, W> {
+    pub(super) async fn present(&mut self) -> Result<bool, Error> {
+        let wire = &mut *self.0;
+        let rows = match wire.grain() {
         Grain::Lite => {
             wire.rows(
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1",
@@ -27,11 +31,12 @@ pub(super) async fn present<W: Wire>(wire: &mut W) -> Result<bool, Error> {
             .await?
         }
     };
-    Ok(!rows.is_empty())
-}
+        Ok(!rows.is_empty())
+    }
 
-pub(super) async fn empty<W: Wire>(wire: &mut W) -> Result<bool, Error> {
-    let rows = match wire.grain() {
+    pub(super) async fn empty(&mut self) -> Result<bool, Error> {
+        let wire = &mut *self.0;
+        let rows = match wire.grain() {
         Grain::Lite => {
             wire.rows(
                 "SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' LIMIT 1",
@@ -47,18 +52,34 @@ pub(super) async fn empty<W: Wire>(wire: &mut W) -> Result<bool, Error> {
             .await?
         }
     };
-    Ok(rows.is_empty())
-}
+        Ok(rows.is_empty())
+    }
 
-pub(crate) async fn status<W: Wire>(wire: &mut W) -> Result<crate::Status, Error> {
-    if present(wire).await? {
-        super::verify(wire).await?;
-        return Ok(crate::Status::Occupied);
+    pub(crate) async fn status(&mut self) -> Result<crate::Status, Error> {
+        if self.present().await? {
+            super::verify(&mut *self.0).await?;
+            return Ok(crate::Status::Occupied);
+        }
+        if self.empty().await? {
+            return Ok(crate::Status::Vacant);
+        }
+        Err(Error::Estate(super::Fault::Unsealed))
     }
-    if empty(wire).await? {
-        return Ok(crate::Status::Vacant);
+
+    pub(super) async fn shape(&mut self) -> Result<String, Error> {
+        let wire = &mut *self.0;
+        let rows = match wire.grain() {
+        Grain::Lite => {
+            wire.rows(
+                "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name",
+                &[],
+            )
+            .await?
+        }
+        Grain::Pg => wire.rows(POSTGRES, &[]).await?,
+    };
+        Ok(frame(&rows))
     }
-    Err(Error::Estate(super::Fault::Unsealed))
 }
 
 pub(crate) async fn bootstrap<W: Wire>(
@@ -87,14 +108,14 @@ async fn open<W: Wire>(
     token: &str,
     wire: &mut W,
 ) -> Result<(), Error> {
-    if present(wire).await? {
+    if Catalog(wire).present().await? {
         let bound = super::verify(wire).await?;
         if bound.digest != manifest.digest() || !crate::cap::sealed(plan, wire, token).await? {
             return Err(Error::Estate(super::Fault::Occupied));
         }
         return Ok(());
     }
-    if !empty(wire).await? {
+    if !Catalog(wire).empty().await? {
         return Err(Error::Estate(super::Fault::Unsealed));
     }
     seed(plan, manifest, token, wire).await
@@ -126,7 +147,7 @@ async fn seed<W: Wire>(
         ],
     )
     .await?;
-    let sealed = shape(wire).await?;
+    let sealed = Catalog(wire).shape().await?;
     wire.run(
         "INSERT INTO \"@estate\" (id, format, active, shape) VALUES (?1, ?2, ?3, ?4)",
         &[
@@ -138,20 +159,6 @@ async fn seed<W: Wire>(
     )
     .await?;
     Ok(())
-}
-
-pub(super) async fn shape<W: Wire>(wire: &mut W) -> Result<String, Error> {
-    let rows = match wire.grain() {
-        Grain::Lite => {
-            wire.rows(
-                "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name",
-                &[],
-            )
-            .await?
-        }
-        Grain::Pg => wire.rows(POSTGRES, &[]).await?,
-    };
-    Ok(frame(&rows))
 }
 
 fn frame(rows: &[Vec<Val>]) -> String {

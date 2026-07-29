@@ -36,7 +36,7 @@ async fn stamp<W: Wire>(
     expected: &str,
     wire: &mut W,
 ) -> Result<(), Error> {
-    let found = super::catalog::shape(wire).await?;
+    let found = super::catalog::Catalog(wire).shape().await?;
     if found != expected {
         return Err(Error::Estate(super::Fault::Drift {
             expected: crate::model::manifest::digest(expected),
@@ -60,7 +60,7 @@ async fn stamp<W: Wire>(
         ],
     )
     .await?;
-    let shape = super::catalog::shape(wire).await?;
+    let shape = super::catalog::Catalog(wire).shape().await?;
     wire.run(
         "INSERT INTO \"@estate\" (id, format, active, shape) VALUES (?1, ?2, ?3, ?4)",
         &[

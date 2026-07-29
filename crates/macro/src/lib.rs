@@ -117,7 +117,7 @@ pub(crate) fn one(
     let mark = quote! { #ty };
     if let Some(made) = atom(&field.attrs)? {
         let row = match made {
-            Made::Atom(atom, only, need, guard) => grow(&label, &atom, &only, need, &guard),
+            Made::Atom(bud) => grow(&label, &bud),
             Made::Serial(scope) => quote! { .serial(#label, #scope) },
         };
         return Ok((mark, Some(row), None));
@@ -165,8 +165,15 @@ pub(crate) enum Only {
     Per(Vec<String>),
 }
 
+pub(crate) struct Bud {
+    pub kind: Ident,
+    pub only: Only,
+    pub need: bool,
+    pub guard: Guard,
+}
+
 pub(crate) enum Made {
-    Atom(Ident, Only, bool, Guard),
+    Atom(Bud),
     Serial(String),
 }
 
@@ -178,13 +185,14 @@ pub(crate) struct Guard {
     pub max: Option<i64>,
 }
 
-pub(crate) fn grow(
-    label: &str,
-    atom: &Ident,
-    only: &Only,
-    need: bool,
-    guard: &Guard,
-) -> proc_macro2::TokenStream {
+pub(crate) fn grow(label: &str, bud: &Bud) -> proc_macro2::TokenStream {
+    let Bud {
+        kind: atom,
+        only,
+        need,
+        guard,
+    } = bud;
+    let need = *need;
     let field = match (only, need) {
         (Only::Free, true) => quote! { .field(#label, ::keel::atom::Kind::#atom) },
         (Only::Free, false) => {
