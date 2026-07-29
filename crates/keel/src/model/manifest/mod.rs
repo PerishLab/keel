@@ -1,3 +1,5 @@
+pub(crate) mod hydrate;
+
 use crate::atom;
 use crate::bond;
 use crate::plan::Plan;
@@ -82,6 +84,24 @@ pub(crate) enum Limit {
 
 impl Manifest {
     pub(crate) fn lift(plan: &Plan) -> Self {
+        let held = Self::raw(plan);
+        debug_assert!(held.mirrors(), "manifest is not round trip stable");
+        held
+    }
+
+    #[cfg(debug_assertions)]
+    fn mirrors(&self) -> bool {
+        let text = self.write();
+        let Ok(graph) = crate::graph::Graph::read(&text) else {
+            return false;
+        };
+        match Plan::lift(&graph) {
+            Ok(plan) => Self::raw(&plan).write() == text,
+            Err(_) => false,
+        }
+    }
+
+    fn raw(plan: &Plan) -> Self {
         let mut units: Vec<Unit> = plan
             .units()
             .values()

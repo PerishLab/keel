@@ -16,12 +16,19 @@ impl Graph {
     }
 
     pub fn plug<R: Resource>(&mut self) -> &mut Self {
-        let spec = R::spec();
+        self.add(R::spec())
+    }
+
+    pub fn add(&mut self, spec: Spec) -> &mut Self {
         let key = spec.key();
         if self.nodes.insert(key.clone(), spec).is_some() {
             self.conflicts.insert(key);
         }
         self
+    }
+
+    pub fn read(text: &str) -> Result<Self, crate::adapt::Error> {
+        crate::model::manifest::hydrate::read(text)
     }
 
     pub fn nodes(&self) -> &BTreeMap<String, Spec> {
