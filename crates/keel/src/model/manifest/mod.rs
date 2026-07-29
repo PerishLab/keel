@@ -1,4 +1,5 @@
 pub(crate) mod hydrate;
+pub(crate) mod rows;
 
 use crate::atom;
 use crate::bond;
@@ -95,8 +96,14 @@ impl Manifest {
         let Ok(graph) = crate::graph::Graph::read(&text) else {
             return false;
         };
-        match Plan::lift(&graph) {
-            Ok(plan) => Self::raw(&plan).write() == text,
+        let Ok(plan) = Plan::lift(&graph) else {
+            return false;
+        };
+        if Self::raw(&plan).write() != text {
+            return false;
+        }
+        match rows::Sheet(&rows::spill(self)).gather() {
+            Ok(back) => back.write() == text,
             Err(_) => false,
         }
     }
