@@ -53,6 +53,10 @@ async fn etched() {
         held.cells().get("veil").map(Cell::show),
         Some("false".into())
     );
+    assert_eq!(
+        held.cells().get("generation").map(Cell::show),
+        Some("1".into())
+    );
     let fields = core.live("@field").await.expect("fields");
     assert_eq!(named(&fields), vec!["code".to_string()]);
     let owner = fields.first().expect("field").cells().get("unit").cloned();
@@ -78,7 +82,10 @@ async fn tracked() {
         .expect("evolve");
     let fields = core.live("@field").await.expect("two");
     assert_eq!(named(&fields), vec!["code".to_string(), "tag".to_string()]);
-    assert_eq!(core.live("@unit").await.expect("units").len(), 1);
+    let units = core.live("@unit").await.expect("units");
+    assert_eq!(units.len(), 1);
+    let at = units[0].cells().get("generation").map(Cell::show);
+    assert_eq!(at, Some("2".into()));
     drop(core);
     clean(&path);
 }

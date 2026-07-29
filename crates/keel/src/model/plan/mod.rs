@@ -49,6 +49,14 @@ pub struct Reign {
 }
 
 impl Plan {
+    pub(crate) fn meta() -> Self {
+        let mut units = BTreeMap::new();
+        for unit in meta::all() {
+            units.insert(unit.key(), unit);
+        }
+        Self { units }
+    }
+
     pub(crate) fn lift(graph: &Graph) -> Result<Self, crate::adapt::Error> {
         if let Some(key) = graph.conflicts().first() {
             return Err(crate::adapt::Error::Adapt(format!("duplicate unit {key}")));

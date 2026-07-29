@@ -178,7 +178,16 @@ async fn verify<W: Wire>(wire: &mut W) -> Result<Bound, Error> {
     }
     let active = root[1].int();
     let held = root[2].text();
-    let (current, prior) = generations(wire, active).await?;
+    let (current, blob) = generations(wire, active).await?;
+    let frame = Plan::meta();
+    let lines = crate::life::Work::new(wire, &frame).glean().await?;
+    let grown = crate::model::manifest::rows::Sheet(&lines)
+        .gather()
+        .map_err(|note| Error::Estate(Fault::Unknown(format!("schema rows {note}"))))?;
+    debug_assert!(
+        grown.write() == blob.write(),
+        "schema rows disagree with the manifest"
+    );
     let physical = catalog::Catalog(wire).shape().await?;
     if physical != held {
         return Err(Error::Estate(Fault::Drift {
@@ -189,7 +198,7 @@ async fn verify<W: Wire>(wire: &mut W) -> Result<Bound, Error> {
     Ok(Bound {
         generation: active,
         digest: current,
-        manifest: prior,
+        manifest: grown,
     })
 }
 

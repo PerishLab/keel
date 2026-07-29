@@ -20,6 +20,7 @@ fn unit() -> Unit {
             slot("name", atom::Kind::Text, true),
             slot("veil", atom::Kind::Bool, true),
             slot("frozen", atom::Kind::Bool, true),
+            slot("generation", atom::Kind::Int, true),
         ],
         Vec::new(),
     )

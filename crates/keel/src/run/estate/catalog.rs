@@ -148,7 +148,7 @@ async fn seed<W: Wire>(
     )
     .await?;
     crate::life::Work::new(wire, plan)
-        .etch(&crate::model::manifest::rows::spill(manifest))
+        .etch(&crate::model::manifest::rows::spill(manifest), generation)
         .await?;
     let sealed = Catalog(wire).shape().await?;
     wire.run(

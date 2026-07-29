@@ -84,10 +84,13 @@ impl<W: Wire> Work<'_, W> {
         Ok(())
     }
 
-    pub(crate) async fn etch(&mut self, lines: &[Line]) -> Result<(), Error> {
+    pub(crate) async fn etch(&mut self, lines: &[Line], at: i64) -> Result<(), Error> {
         let mut seen = Seen::default();
         for line in lines {
-            let cells = tag(line, &seen)?;
+            let mut cells = tag(line, &seen)?;
+            if line.unit == UNIT {
+                cells.push(("generation".into(), at.to_string()));
+            }
             let pairs: Vec<(&str, &str)> = cells
                 .iter()
                 .map(|(head, value)| (head.as_str(), value.as_str()))
