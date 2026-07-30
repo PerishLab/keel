@@ -1,6 +1,6 @@
 {
   "imports": {
-    "@perish/sealkit": "jsr:@perish/sealkit@^0.3.1"
+    "@perish/sealkit": "jsr:@perish/sealkit"
   },
   "compilerOptions": {
     "strict": true
