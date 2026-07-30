@@ -1,0 +1,3 @@
+[release.cargo]
+registry = "perish"
+packages = ["keel-macro", "keel", "keel-relay", "keel-blob", "keel-gate"]
