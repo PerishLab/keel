@@ -61,6 +61,14 @@ description = "Foreign std IntoFuture associated type required by the awaitable 
 name = "IntoFuture"
 
 [[vocabulary.term]]
+description = "Foreign sqlx Type trait method implemented so a null carries no parameter type and postgres infers it from the target column."
+name = "type_info"
+
+[[vocabulary.term]]
+description = "Foreign sqlx Encode trait method implemented so a null encodes as a null with no payload."
+name = "encode_by_ref"
+
+[[vocabulary.term]]
 description = "Foreign std FromStr trait method implementing strict human-duration parsing for estate retention."
 name = "from_str"
 

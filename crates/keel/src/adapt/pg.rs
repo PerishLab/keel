@@ -2,10 +2,31 @@ use crate::adapt::Error;
 use crate::ddl;
 use crate::ddl::Grain;
 use crate::wire::{Val, Wire};
-use sqlx::postgres::{PgConnectOptions, PgConnection, PgRow};
+use sqlx::encode::IsNull;
+use sqlx::error::BoxDynError;
+use sqlx::postgres::types::Oid;
+use sqlx::postgres::{PgArgumentBuffer, PgConnectOptions, PgConnection, PgRow, PgTypeInfo};
 use sqlx::{
     AssertSqlSafe, ConnectOptions as _, Connection as _, Row as _, TypeInfo as _, ValueRef as _,
 };
+
+struct Void;
+
+impl sqlx::Type<sqlx::Postgres> for Void {
+    fn type_info() -> PgTypeInfo {
+        PgTypeInfo::with_oid(Oid(0))
+    }
+
+    fn compatible(_: &PgTypeInfo) -> bool {
+        true
+    }
+}
+
+impl sqlx::Encode<'_, sqlx::Postgres> for Void {
+    fn encode_by_ref(&self, _: &mut PgArgumentBuffer) -> Result<IsNull, BoxDynError> {
+        Ok(IsNull::Yes)
+    }
+}
 
 pub struct Postgres {
     conn: PgConnection,
@@ -105,7 +126,7 @@ fn load(
     let mut query = sqlx::query::<sqlx::Postgres>(AssertSqlSafe(text.to_string()));
     for arg in args {
         query = match arg {
-            Val::Null => query.bind(None::<i64>),
+            Val::Null => query.bind(Void),
             Val::Int(value) => query.bind(*value),
             Val::Text(value) => query.bind(value.clone()),
         };

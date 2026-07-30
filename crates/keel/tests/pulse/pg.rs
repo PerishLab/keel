@@ -1,7 +1,7 @@
 #![cfg(feature = "pg")]
 
 use keel::adapt::pg::Postgres;
-use keel::atom::string;
+use keel::atom::{int, string};
 use keel::life::Ends;
 use keel::resource;
 use keel::{Cell, Graph};
@@ -20,6 +20,30 @@ struct Student {
     name: string,
     #[relation(Course, many2many, grade = string)]
     courses: Course,
+}
+
+#[resource]
+struct Ledger {
+    #[field(string, unique)]
+    tag: string,
+}
+
+#[resource]
+struct Entry {
+    #[field(serial, scope = ledger)]
+    index: int,
+    #[field(string)]
+    note: string,
+    #[relation(Ledger, many2one, root)]
+    ledger: Ledger,
+}
+
+#[resource]
+struct Note {
+    #[field(string, unique)]
+    tag: string,
+    #[field(string, opt)]
+    body: string,
 }
 
 static GATE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -120,5 +144,49 @@ async fn portable() {
     assert_eq!(
         after[0].cells().get("name"),
         Some(&Cell::Text("ada2".into()))
+    );
+}
+
+#[tokio::test]
+async fn scoped() {
+    let _hold = GATE.lock().await;
+    let store = reset().await;
+    let mut graph = Graph::new();
+    graph.plug::<Ledger>().plug::<Entry>();
+    let core = crate::support::boot(graph, store).await.expect("bind");
+
+    let book = core.put("Ledger", &[("tag", "L01")]).await.expect("ledger");
+    let seat = book.to_string();
+    core.put("Entry", &[("note", "one"), ("ledger", &seat)])
+        .await
+        .expect("one");
+    core.put("Entry", &[("note", "two"), ("ledger", &seat)])
+        .await
+        .expect("two");
+
+    let held = core.live("Entry").await.expect("live");
+    assert_eq!(held.len(), 2);
+    assert_eq!(held[0].cells().get("index"), Some(&Cell::Int(1)));
+    assert_eq!(held[1].cells().get("index"), Some(&Cell::Int(2)));
+}
+
+#[tokio::test]
+async fn spare() {
+    let _hold = GATE.lock().await;
+    let store = reset().await;
+    let mut graph = Graph::new();
+    graph.plug::<Note>();
+    let core = crate::support::boot(graph, store).await.expect("bind");
+
+    core.put("Note", &[("tag", "N01")]).await.expect("bare");
+    core.put("Note", &[("tag", "N02"), ("body", "held")])
+        .await
+        .expect("held");
+
+    let held = core.live("Note").await.expect("live");
+    assert_eq!(held.len(), 2);
+    assert_eq!(
+        held[1].cells().get("body"),
+        Some(&Cell::Text("held".into()))
     );
 }
