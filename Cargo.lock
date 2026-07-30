@@ -734,7 +734,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "keel"
-version = "0.10.1"
+version = "0.10.2"
 dependencies = [
  "axum",
  "getrandom 0.3.4",
@@ -750,7 +750,7 @@ dependencies = [
 
 [[package]]
 name = "keel-blob"
-version = "0.10.1"
+version = "0.10.2"
 dependencies = [
  "axum",
  "keel",
@@ -761,7 +761,7 @@ dependencies = [
 
 [[package]]
 name = "keel-gate"
-version = "0.10.1"
+version = "0.10.2"
 dependencies = [
  "axum",
  "getrandom 0.3.4",
@@ -776,7 +776,7 @@ dependencies = [
 
 [[package]]
 name = "keel-macro"
-version = "0.10.1"
+version = "0.10.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -785,7 +785,7 @@ dependencies = [
 
 [[package]]
 name = "keel-relay"
-version = "0.10.1"
+version = "0.10.2"
 dependencies = [
  "keel",
  "serde_json",

@@ -90,7 +90,6 @@ impl Manifest {
         held
     }
 
-    #[cfg(debug_assertions)]
     fn mirrors(&self) -> bool {
         let text = self.write();
         let Ok(graph) = crate::graph::Graph::read(&text) else {
