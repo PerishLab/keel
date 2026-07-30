@@ -201,7 +201,7 @@ so the shared meaning stays true.
 - `bare` — Core builder: cache off (`[cache] kind = "none"`).
 - `hold` — cache capacity constant; overflow clears (eviction, never error).
 - `involved` — units a tree reads; the invalidation footprint of a cache entry.
-- `ship` — idempotently publish the crate family from clean main.
+- `release` — idempotently publish the crate family from clean main.
 - `estate` — Keel-owned manifest, generation, retention, and cleanup namespace.
 - `manifest` — canonical caller model; nominal finite paths, order erased.
 - `@estate` — private format, active generation, and physical shape root.

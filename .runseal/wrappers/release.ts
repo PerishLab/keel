@@ -6,7 +6,7 @@ const INDEX = "https://git.perish.top/api/packages/PerishLab/cargo";
 const CRATES = ["keel-macro", "keel", "keel-relay", "keel-blob", "keel-gate"];
 
 function usage(): void {
-  io.print("Usage: runseal :ship");
+  io.print("Usage: runseal :release");
   io.print("");
   io.print("Publish the keel crate family to the perish cargo registry.");
   io.print("Runs from a clean main; crates already at this version are skipped.");
@@ -14,24 +14,24 @@ function usage(): void {
 
 const args = cli.parse(Deno.args, { boolean: ["help", "h"] });
 if (flags(args).help()) {
-  flags(args).positionals("ship", { allowHelp: true });
+  flags(args).positionals("release", { allowHelp: true });
   usage();
   Deno.exit(0);
 }
-flags(args).positionals("ship");
+flags(args).positionals("release");
 
 const root = await bin("git").text(["rev-parse", "--show-toplevel"]);
 const branch = await bin("git").text(["branch", "--show-current"]);
 if (branch !== "main") {
-  io.fail(`ship: publish from main, not ${branch}`);
+  io.fail(`release: publish from main, not ${branch}`);
 }
 const dirty = await bin("git").text(["status", "--short"]);
 if (dirty.trim() !== "") {
-  io.fail("ship: working tree must be clean");
+  io.fail("release: working tree must be clean");
 }
 
 const version = await current(root);
-io.print(`==> ship v${version}`);
+io.print(`==> release v${version}`);
 for (const crate of CRATES) {
   if (await published(crate, version)) {
     io.print(`==> ${crate} v${version} already in the registry`);
@@ -43,13 +43,13 @@ for (const crate of CRATES) {
     { cwd: root },
   );
 }
-io.print("ship: clean");
+io.print("release: clean");
 
 async function current(root: string): Promise<string> {
   const text = await Deno.readTextFile(`${root}/Cargo.toml`);
   const hit = text.match(/^version = "([^"]+)"$/m);
   if (!hit) {
-    return io.fail("ship: missing workspace version");
+    return io.fail("release: missing workspace version");
   }
   return hit[1];
 }

@@ -91,7 +91,7 @@ binary for it to boot.
 ```sh
 runseal :init
 runseal :guard
-runseal :ship
+runseal :release
 cargo test -p keel --test route
 cargo test -p keel-gate --test forge
 ```

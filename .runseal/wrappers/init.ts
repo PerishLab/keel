@@ -33,7 +33,7 @@ await init({
     ".runseal/wrappers/guard.ts",
     ".runseal/wrappers/init.ts",
     ".runseal/wrappers/land.ts",
-    ".runseal/wrappers/ship.ts",
+    ".runseal/wrappers/release.ts",
     ".forgejo/workflows/guard.yml",
     "docs/run/verify.md",
   ],
