@@ -20,11 +20,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install Ectropy
-        uses: PerishLab/actions/setup-ectropy@main
+      - name: Install stable Ectropy
+        uses: PerishLab/actions/setup-binary@main
+        env:
+          PERISH_SETUP_PRODUCT: ectropy
 
-      - name: Install Plumb
-        uses: PerishLab/actions/setup-plumb@main
+      - name: Install stable Plumb
+        uses: PerishLab/actions/setup-binary@main
+        env:
+          PERISH_SETUP_PRODUCT: plumb
 
       - name: Guard
         run: |
