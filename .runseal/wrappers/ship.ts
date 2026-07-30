@@ -3,7 +3,7 @@ import { bin } from "@perish/sealkit/cmd";
 import { io } from "@perish/sealkit/io";
 
 const INDEX = "https://git.perish.top/api/packages/PerishLab/cargo";
-const CRATES = ["keel-macro", "keel", "keel-gate", "keel-relay", "keel-blob"];
+const CRATES = ["keel-macro", "keel", "keel-relay", "keel-blob", "keel-gate"];
 
 function usage(): void {
   io.print("Usage: runseal :ship");
