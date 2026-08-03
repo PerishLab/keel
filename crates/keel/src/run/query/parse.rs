@@ -40,7 +40,13 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
     if !scan.done() {
         return Err(Error::Adapt("query has trailing tokens".into()));
     }
-    let more = !links.is_empty() || !sorts.is_empty() || limit.is_some() || after.is_some();
+    let projection = (
+        !links.is_empty(),
+        !sorts.is_empty(),
+        limit.is_some(),
+        after.is_some(),
+    );
+    let more = projection != (false, false, false, false);
     if tally && more {
         return Err(Error::Adapt("count stands alone".into()));
     }

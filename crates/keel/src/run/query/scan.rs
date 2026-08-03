@@ -63,8 +63,13 @@ impl<'a> Scan<'a> {
         let rest = self.rest();
         let mut end = 0;
         for c in rest.chars() {
-            let head = end == 0 && c == '@';
-            if c.is_ascii_alphanumeric() || c == '_' || c == ':' || head {
+            let admitted = match c {
+                held if held.is_ascii_alphanumeric() => true,
+                '_' | ':' => true,
+                '@' if end == 0 => true,
+                _ => false,
+            };
+            if admitted {
                 end += c.len_utf8();
             } else {
                 break;

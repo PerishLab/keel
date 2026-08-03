@@ -217,11 +217,13 @@ pub(crate) fn grow(label: &str, bud: &Bud) -> proc_macro2::TokenStream {
             }
         }
     };
-    if guard.fallback.is_none()
-        && guard.values.is_empty()
-        && guard.min.is_none()
-        && guard.max.is_none()
-    {
+    let shape = (
+        guard.fallback.is_some(),
+        !guard.values.is_empty(),
+        guard.min.is_some(),
+        guard.max.is_some(),
+    );
+    if shape == (false, false, false, false) {
         return field;
     }
     let fallback = guard

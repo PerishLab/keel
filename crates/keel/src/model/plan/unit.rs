@@ -272,12 +272,14 @@ impl Unit {
         if fields.is_empty() {
             return Err(crate::adapt::Error::Adapt("empty set".into()));
         }
+        const CONTROL: [&str; 4] = [
+            crate::ddl::KEY,
+            crate::ddl::EXPIRES,
+            crate::ddl::CREATED,
+            crate::ddl::UPDATED,
+        ];
         for (k, _) in fields {
-            if *k == crate::ddl::KEY
-                || *k == crate::ddl::EXPIRES
-                || *k == crate::ddl::CREATED
-                || *k == crate::ddl::UPDATED
-            {
+            if CONTROL.contains(k) {
                 return Err(crate::adapt::Error::Adapt(format!("control field {k}")));
             }
             let held = self

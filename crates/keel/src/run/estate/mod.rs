@@ -225,10 +225,12 @@ async fn generations<W: Wire>(wire: &mut W, active: i64) -> Result<String, Error
         }
         let created = row[3].int();
         let retired = row[4].opt();
-        if created <= 0
-            || (state == "cleanup" && retired.is_none_or(|at| at < created))
-            || (state != "cleanup" && row[4].opt().is_some())
-        {
+        let lifecycle = match (state.as_str(), retired) {
+            ("cleanup", Some(at)) if at >= created => true,
+            ("active" | "candidate", None) => true,
+            _ => false,
+        };
+        if created <= 0 || !lifecycle {
             return Err(Error::Estate(Fault::Unknown("generation lifecycle".into())));
         }
         if state == "active" {
