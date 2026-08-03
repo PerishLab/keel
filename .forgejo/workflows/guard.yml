@@ -34,13 +34,9 @@ jobs:
         run: |
           set -eu
           export PATH="$HOME/.local/bin:$PATH"
-          deno run \
-            --allow-read \
-            --allow-write \
-            --allow-env \
-            --allow-net \
-            --allow-run \
-            --config .runseal/deno.json \
-            --lock .runseal/deno.lock \
-            --frozen=true \
-            .runseal/wrappers/guard.ts --fresh
+          cargo fmt --all --check
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo test --locked --workspace
+          cargo check --locked --workspace --all-features --release
+          plumb doctor .
+          ectropy .
