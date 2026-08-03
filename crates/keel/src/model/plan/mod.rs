@@ -243,14 +243,16 @@ impl Edge {
     }
 
     pub(crate) fn part(&self, fields: &[(&str, &str)]) -> Result<(), crate::adapt::Error> {
+        const CONTROL: [&str; 6] = [
+            "right",
+            "left",
+            crate::ddl::KEY,
+            crate::ddl::EXPIRES,
+            crate::ddl::CREATED,
+            crate::ddl::UPDATED,
+        ];
         for (k, _) in fields {
-            if *k == "right"
-                || *k == "left"
-                || *k == crate::ddl::KEY
-                || *k == crate::ddl::EXPIRES
-                || *k == crate::ddl::CREATED
-                || *k == crate::ddl::UPDATED
-            {
+            if CONTROL.contains(k) {
                 return Err(crate::adapt::Error::Adapt(format!("control field {k}")));
             }
             if !self.fields.iter().any(|s| s.name() == *k) {
