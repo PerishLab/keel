@@ -24,7 +24,6 @@ impl Unit {
             frozen: false,
         }
     }
-
     pub(crate) fn pulse() -> Self {
         let mut fields: Vec<Slot> = ["verb", "unit", "who"]
             .iter()
@@ -125,7 +124,7 @@ impl Unit {
                 })
             })
             .collect::<Result<_, crate::adapt::Error>>()?;
-        let bonds: Vec<Edge> = spec
+        let mut bonds: Vec<Edge> = spec
             .bonds()
             .iter()
             .map(|bond| Edge {
@@ -147,8 +146,11 @@ impl Unit {
                 need: bond.need(),
                 root: bond.root(),
                 crew: bond.crew(),
+                closure: bond.closure(),
+                derived: false,
             })
             .collect();
+        super::closure::expand(spec, &names, &mut bonds)?;
         let roots = bonds.iter().filter(|e| e.root).count();
         if roots > 1 {
             return Err(crate::adapt::Error::Adapt("unit has two roots".into()));

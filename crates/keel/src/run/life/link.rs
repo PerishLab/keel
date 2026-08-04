@@ -14,6 +14,7 @@ impl<'a, W: Wire> Work<'a, W> {
         fields: &[(&str, &str)],
     ) -> Result<i64, Error> {
         let (unit, edge) = self.plan.edge(owner, bond)?;
+        super::closure::writable(edge)?;
         if unit.frozen() {
             return Err(Error::Adapt(format!("frozen unit {}", unit.name())));
         }
@@ -33,6 +34,9 @@ impl<'a, W: Wire> Work<'a, W> {
         }
         if self.paired(owner, bond, ends.left, ends.right).await? {
             return Err(Error::Adapt("live pair exists".into()));
+        }
+        if edge.closure() && self.cycle(unit, edge, ends).await? {
+            return Err(Error::Adapt("cycle denied".into()));
         }
         let tick = now();
         let src = ddl::col(&ddl::side(unit.name()));
@@ -69,6 +73,7 @@ impl<'a, W: Wire> Work<'a, W> {
         vals.push(Val::Int(tick));
         vals.push(Val::Int(tick));
         self.wire.run(&text, &vals).await?;
+        self.refresh(unit, edge).await?;
         Ok(key)
     }
 
@@ -80,6 +85,7 @@ impl<'a, W: Wire> Work<'a, W> {
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
         let (unit, edge) = self.plan.edge(owner, bond)?;
+        super::closure::writable(edge)?;
         if unit.frozen() {
             return Err(Error::Adapt(format!("frozen unit {}", unit.name())));
         }
@@ -197,6 +203,7 @@ impl<'a, W: Wire> Work<'a, W> {
 
     pub(crate) async fn cut(&mut self, owner: &str, bond: &str, key: i64) -> Result<(), Error> {
         let (unit, edge) = self.plan.edge(owner, bond)?;
+        super::closure::writable(edge)?;
         if unit.frozen() {
             return Err(Error::Adapt(format!("frozen unit {}", unit.name())));
         }
@@ -215,6 +222,7 @@ impl<'a, W: Wire> Work<'a, W> {
         if n == 0 {
             return Err(Error::Adapt(format!("missing tie {key}")));
         }
+        self.refresh(unit, edge).await?;
         Ok(())
     }
 

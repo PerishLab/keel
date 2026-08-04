@@ -29,6 +29,7 @@ enum Cast {
     Free,
     Root,
     Crew,
+    Closure,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -65,6 +66,7 @@ pub struct Bond {
     need: bool,
     root: bool,
     crew: bool,
+    closure: bool,
 }
 
 pub struct Builder(Spec);
@@ -286,6 +288,10 @@ impl Bond {
 
     pub fn crew(&self) -> bool {
         self.crew
+    }
+
+    pub fn closure(&self) -> bool {
+        self.closure
     }
 }
 

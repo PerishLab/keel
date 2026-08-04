@@ -172,6 +172,9 @@ fn bond(path: &str, active: &Edge, requested: &Edge, steps: &mut Vec<Step>) -> R
     if active.crew != requested.crew {
         steps.push(Step::new(path.into(), Act::Alter, Some(Check::Authority)));
     }
+    if active.closure != requested.closure {
+        steps.push(Step::new(path.into(), Act::Alter, None));
+    }
     fields(path, &active.fields, &requested.fields, steps)
 }
 

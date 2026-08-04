@@ -77,6 +77,7 @@ async fn migrate<W: Wire>(work: &Work<'_>, wire: &mut W) -> Result<(), Error> {
         wire,
     )
     .await?;
+    crate::life::Work::new(wire, plan).refreshes().await?;
     contract(active, requested, wire).await?;
     wire.run(
         "UPDATE \"@generation\" SET state = ?1, retired = ?2 WHERE id = ?3",

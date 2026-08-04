@@ -8,7 +8,7 @@ const TABLE: &str = "@estate";
 const CLOCK: &str = "@clock";
 const DERIVATIVE: &str = "@derivative";
 const GENERATION: &str = "@generation";
-pub(super) const FORMAT: i64 = 11;
+pub(super) const FORMAT: i64 = 12;
 
 pub(crate) struct Catalog<'a, W>(pub(crate) &'a mut W);
 

@@ -11,6 +11,10 @@ pub(super) fn of(manifest: &Manifest) -> BTreeSet<String> {
             .filter(|edge| edge.kind == Bond::Many2many)
         {
             out.insert(crate::ddl::joiner(&unit.table(), &edge.name));
+            if edge.closure {
+                let name = format!("{}_closure", edge.name);
+                out.insert(crate::ddl::joiner(&unit.table(), &name));
+            }
         }
     }
     out

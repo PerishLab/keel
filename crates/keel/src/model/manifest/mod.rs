@@ -6,7 +6,7 @@ use crate::bond;
 use crate::plan::Plan;
 use crate::spec::Only;
 
-const VERSION: u32 = 4;
+const VERSION: u32 = 5;
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
@@ -56,6 +56,7 @@ pub(crate) struct Edge {
     pub(crate) need: bool,
     pub(crate) root: bool,
     pub(crate) crew: bool,
+    pub(crate) closure: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -129,6 +130,7 @@ impl Manifest {
                 let mut bonds: Vec<Edge> = unit
                     .bonds()
                     .iter()
+                    .filter(|edge| !edge.derived())
                     .map(|edge| {
                         let mut fields: Vec<Field> = edge
                             .fields()
@@ -151,6 +153,7 @@ impl Manifest {
                             need: edge.need(),
                             root: edge.root(),
                             crew: edge.crew(),
+                            closure: edge.closure(),
                         }
                     })
                     .collect();

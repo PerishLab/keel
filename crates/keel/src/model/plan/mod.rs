@@ -39,6 +39,8 @@ pub struct Edge {
     need: bool,
     root: bool,
     crew: bool,
+    closure: bool,
+    derived: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -285,6 +287,7 @@ impl Reign {
     }
 }
 
+mod closure;
 pub(crate) mod meta;
 mod mode;
 mod optional;

@@ -130,11 +130,16 @@ pub(crate) fn one(
             need,
             root,
             crew,
+            closure,
         } = link;
         let pairs = slots.iter().map(|(n, k)| {
             quote! { (#n, ::keel::atom::Kind::#k) }
         });
-        let row = if root {
+        let row = if closure {
+            quote! {
+                .closure(#label, ::keel::bond::Kind::#card, #target, &[#(#pairs),*])
+            }
+        } else if root {
             quote! {
                 .root(#label, ::keel::bond::Kind::#card, #target)
             }

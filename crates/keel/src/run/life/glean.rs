@@ -116,7 +116,7 @@ impl<W: Wire> Work<'_, W> {
             back.bonds.insert(row.key(), name);
             cells.extend(draw(
                 &row,
-                &["name", "kind", "target", "need", "root", "crew"],
+                &["name", "kind", "target", "need", "root", "crew", "closure"],
             ));
             out.push(Line { unit: BOND, cells });
         }

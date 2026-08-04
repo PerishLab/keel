@@ -45,6 +45,7 @@ pub(crate) fn spill(manifest: &Manifest) -> Vec<Line> {
                     ("need".into(), flag(edge.need)),
                     ("root".into(), flag(edge.root)),
                     ("crew".into(), flag(edge.crew)),
+                    ("closure".into(), flag(edge.closure)),
                 ],
             });
             for field in &edge.fields {
@@ -142,6 +143,7 @@ impl Sheet<'_> {
                 need: line.pick("need")? == "true",
                 root: line.pick("root")? == "true",
                 crew: line.pick("crew")? == "true",
+                closure: line.pick("closure")? == "true",
             });
         }
         Ok(out)

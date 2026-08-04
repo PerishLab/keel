@@ -10,6 +10,7 @@ pub(crate) struct Link {
     pub need: bool,
     pub root: bool,
     pub crew: bool,
+    pub closure: bool,
 }
 
 impl Link {
@@ -25,6 +26,9 @@ impl Link {
         }
         if self.crew && self.card != "Many2many" {
             return Err(syn::Error::new_spanned(attr, "crew is many2many only"));
+        }
+        if self.closure && self.card != "Many2many" {
+            return Err(syn::Error::new_spanned(attr, "closure is many2many only"));
         }
         if self.root && !self.need {
             return Err(syn::Error::new_spanned(attr, "root is always required"));
@@ -238,12 +242,14 @@ pub(crate) fn link(attrs: &[Attribute], ty: &Type) -> syn::Result<Option<Link>> 
             need: true,
             root: false,
             crew: false,
+            closure: false,
         };
         for item in items.iter().skip(2) {
             match item.ident().ok().map(|word| word.to_string()).as_deref() {
                 Some("opt") => link.need = false,
                 Some("root") => link.root = true,
                 Some("crew") => link.crew = true,
+                Some("closure") => link.closure = true,
                 _ => link.slots.push(item.slot()?),
             }
         }

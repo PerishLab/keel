@@ -53,6 +53,14 @@ fn sow(held: Builder, field: &Field) -> Builder {
 
 fn tie(held: Builder, edge: &Edge) -> Builder {
     let kind = link(edge.kind);
+    if edge.closure {
+        let fields: Vec<(&str, atom::Kind)> = edge
+            .fields
+            .iter()
+            .map(|field| (field.name.as_str(), sort(field.kind)))
+            .collect();
+        return held.closure(&edge.name, kind, &edge.target, &fields);
+    }
     if edge.root {
         return held.root(&edge.name, kind, &edge.target);
     }

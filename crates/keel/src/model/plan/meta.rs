@@ -36,6 +36,7 @@ fn bond() -> Unit {
             slot("need", atom::Kind::Bool, true),
             slot("root", atom::Kind::Bool, true),
             slot("crew", atom::Kind::Bool, true),
+            slot("closure", atom::Kind::Bool, true),
         ],
         vec![edge("unit", UNIT, true)],
     )
@@ -105,5 +106,7 @@ fn edge(name: &str, target: &str, root: bool) -> Edge {
         need: root,
         root,
         crew: false,
+        closure: false,
+        derived: false,
     }
 }

@@ -171,6 +171,7 @@ fn now() -> i64 {
         .unwrap_or(0)
 }
 
+mod closure;
 mod edit;
 mod etch;
 mod glean;

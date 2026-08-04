@@ -29,6 +29,10 @@ struct Card {
     owner: Author,
 }
 
+fn ends(left: i64, right: i64) -> keel::Ends {
+    keel::Ends { left, right }
+}
+
 #[tokio::test]
 async fn point() {
     let mut graph = Graph::new();
@@ -173,4 +177,29 @@ async fn mirror() {
     assert!(core.end("Author", ada).await.is_err());
     core.cut("Author", "follows", tie).await.expect("cut");
     core.end("Author", bob).await.expect("end bob");
+}
+
+#[tokio::test]
+async fn cycle() {
+    let mut graph = Graph::new();
+    graph.plug::<Author>();
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    let ada = core.put("Author", &[("name", "ada")]).await.expect("ada");
+    let bob = core.put("Author", &[("name", "bob")]).await.expect("bob");
+    let cy = core.put("Author", &[("name", "cy")]).await.expect("cy");
+
+    core.tie("Author", "follows", ends(ada, ada), &[])
+        .await
+        .expect("undeclared self tie");
+    core.tie("Author", "follows", ends(ada, bob), &[])
+        .await
+        .expect("ada follows bob");
+    core.tie("Author", "follows", ends(bob, cy), &[])
+        .await
+        .expect("bob follows cy");
+    core.tie("Author", "follows", ends(cy, ada), &[])
+        .await
+        .expect("undeclared cycle");
 }

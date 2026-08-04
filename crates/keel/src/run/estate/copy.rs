@@ -44,9 +44,38 @@ pub(super) async fn run<W: Wire>(
                 wire,
             )
             .await?;
+            if old.closure && edge.closure {
+                closure(prior, edge, generation, wire).await?;
+            }
         }
     }
     Ok(())
+}
+
+async fn closure<W: Wire>(
+    owner: &Unit,
+    edge: &Edge,
+    generation: i64,
+    wire: &mut W,
+) -> Result<(), Error> {
+    let name = format!("{}_closure", edge.name);
+    let src = crate::ddl::side(&owner.name);
+    let dst = crate::ddl::mate(&owner.name, &name, &edge.target);
+    let mut cols = vec![
+        crate::ddl::KEY.into(),
+        crate::ddl::col(&src),
+        crate::ddl::col(&dst),
+    ];
+    let mut vals = cols.clone();
+    reign(&mut cols, &mut vals);
+    let table = crate::ddl::joiner(&owner.table(), &name);
+    let sheet = Sheet {
+        target: crate::ddl::stage(generation, &table),
+        source: table,
+        cols,
+        vals,
+    };
+    transfer(wire, &sheet).await
 }
 
 async fn unit<W: Wire>(

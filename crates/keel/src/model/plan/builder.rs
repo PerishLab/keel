@@ -125,6 +125,24 @@ impl Builder {
         )
     }
 
+    pub fn closure(
+        self,
+        name: impl Into<String>,
+        kind: bond::Kind,
+        target: impl Into<String>,
+        fields: &[(&str, atom::Kind)],
+    ) -> Self {
+        self.join(
+            Wale {
+                name: name.into(),
+                kind,
+                target: target.into(),
+                cast: Cast::Closure,
+            },
+            fields,
+        )
+    }
+
     fn join(mut self, wale: Wale, fields: &[(&str, atom::Kind)]) -> Self {
         let Wale {
             name,
@@ -151,6 +169,7 @@ impl Builder {
             need: cast != Cast::Free,
             root: cast == Cast::Root,
             crew: cast == Cast::Crew,
+            closure: cast == Cast::Closure,
         });
         self
     }
