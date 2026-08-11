@@ -67,8 +67,12 @@ done when its scenario is green; no stage begins against unlanded law.
 ## Operating
 
 - Never commit on `main`; branch, then commit.
-- `runseal :guard` before land; `runseal :land` only landing path.
-- Operator flows: `.runseal/wrappers` TypeScript only.
+- `.forgejo/workflows/guard.yml` is the canonical guard lane. Run it before
+  land: `cargo fmt --all --check`, `cargo clippy --locked --workspace
+  --all-targets -- -D warnings`, `cargo test --locked --workspace`, `cargo
+  check --locked --workspace --all-features --release`, `plumb doctor .`,
+  `ectropy .`.
+- Land only through `plumb land`.
 
 ## Directory map
 
@@ -77,21 +81,22 @@ done when its scenario is green; no stage begins against unlanded law.
 - `crates/gate/` — `keel-gate`: default credential package (caller space)
 - `crates/relay/` — `keel-relay`: default webhook package (caller space)
 - `docs/` — vocabulary, verify, edge, capability, trigger laws
-- `.runseal/` / `.forgejo/` — guard and CI
+- `.forgejo/` — guard and CI
 
 ## Verification
 
 Cold-start contract: `docs/run/verify.md` (L1 unit / L2 scenario / L3 static).
-`:guard` runs all three. L2 lives in `crates/keel/tests/route` and
+The guard lane runs all three. L2 lives in `crates/keel/tests/route` and
 `crates/gate/tests/forge`; it drives the Router in process, and keel ships no
 binary for it to boot.
 
 ## Common commands
 
 ```sh
-runseal :init
-runseal :guard
-runseal :release
+plumb doctor .
+ectropy .
+plumb land
+plumb release dispatch --channel <channel> --version <version>
 cargo test -p keel --test route
 cargo test -p keel-gate --test forge
 ```
