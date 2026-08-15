@@ -111,21 +111,24 @@ coverage may descend for `see`, but write predicates never expand down a
 subtree. A crew bond can make one resource row a group principal. Grants combine
 by union; there are no deny rows, overrides, or precedence rules.
 
-`put` treats a predicate as a postcondition. `set` requires it before and after.
-Tie and cut require the verb on the left chain plus visibility of the right.
-Creating a row mints its creator full row coverage; anonymous identity birth is
-the one exception and mints ownership to the newborn row.
+`put` treats a predicate as a postcondition. `set` requires a predicate before
+and after, because a predicate describes the row's content and a write must not
+falsify it. Row and subtree coverage answers the state the write started in: a
+holder may move a row out of their own reach, which is how a thing is handed
+over, and afterwards they no longer hold it. Tie and cut require the verb on the
+left chain plus visibility of the right.
+
+Creating a row mints its creator full row coverage only when nothing the creator
+already holds covers it. Coverage that repeats a live grant is not written, so
+the authority ledger measures deliberate delegation and never data volume, and
+coverage does not outlive the coverage that authorized it. Anonymous identity
+birth remains the one unconditional mint and gives ownership to the newborn row.
 
 Delegation is attenuation: an operator may create or revoke only a grant it
 could have issued from its own live coverage. Wildcards remain genesis-only.
 Unseen rows behave as absent and never disclose a 403; writes may disclose
 refusal. The reverse question “who can see this row?” is not promised as a
 simulator.
-
-`allows` asks whether the current face could perform one existing verb on one
-row now. It performs nothing and grants nothing. The answer is an instantaneous
-reading, not a reservation; a caller that stretches it into a presigned URL or
-other interval owns that risk window.
 
 ## Ceremony-only resources
 

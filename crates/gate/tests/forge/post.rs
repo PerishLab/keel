@@ -70,6 +70,9 @@ async fn bound() {
     assert!(open.status.is_success(), "{}", open.body);
     let vault = json!({ "name": "vault", "visibility": "private", "owner": stage.dave });
     rig.made("/repo", vault, &him()).await;
+    let loose =
+        json!({ "title": "loose", "closed": false, "repo": stage.den, "author": stage.dave });
+    rig.made("/issue", loose, &him()).await;
     tokio::time::sleep(Duration::from_millis(1500)).await;
 
     let seen = inbox.lock().await.clone();

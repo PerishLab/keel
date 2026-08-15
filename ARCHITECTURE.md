@@ -68,8 +68,9 @@ optional identity-unit designation. It is the in-process possession surface and
 can create a `sudo`, `anon`, or operator `Face`.
 
 A `Face` closes every operation over one `Who`. It exposes reads, the six
-resource verbs, query, batch, flow, and the non-mutating `allows` probe through
-one capability decision procedure. `Tx` threads the same face and connection
+resource verbs, query, batch, and flow through one capability decision
+procedure. A write mints row coverage for its creator only when no live grant
+already covers the new row. `Tx` threads the same face and connection
 through a batch so earlier deeds are visible to later ones before commit.
 
 Lifecycle modules operate on typed `Cell`, `Row`, and `Tie` values. Business

@@ -220,7 +220,7 @@ async fn covered() {
         .expect("put");
     }
     println!(
-        "covered by a row grant, still mints  {:.2}ms each, grants {}",
+        "covered by a row grant, mints nothing  {:.2}ms each, grants {}",
         each(started, ROUNDS),
         grants(&core).await
     );

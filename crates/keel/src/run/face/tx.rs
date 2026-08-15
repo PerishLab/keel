@@ -181,6 +181,30 @@ impl<W: Wire> Tx<'_, W> {
         Ok(self.core.deeds.keep(step, rows))
     }
 
+    pub(super) async fn moves(
+        &mut self,
+        verb: &str,
+        unit: &str,
+        mark: &cap::Mark<'_>,
+        after: &cap::Mark<'_>,
+    ) -> Result<(), Error> {
+        let held = self.core.plan().find(unit)?.key();
+        let deeds = self.deeds().await?;
+        let plea = cap::Plea {
+            who: self.who,
+            verb,
+            unit: &held,
+            mark,
+        };
+        let held = cap::Court::new(self.core.plan(), &mut self.seat.wire, &deeds)
+            .shift(&plea, after)
+            .await?;
+        match held {
+            true => Ok(()),
+            false => Err(Error::Adapt(format!("refused {verb}"))),
+        }
+    }
+
     pub(super) async fn held(
         &mut self,
         verb: &str,
@@ -195,7 +219,9 @@ impl<W: Wire> Tx<'_, W> {
             unit: &unit,
             mark,
         };
-        cap::check(self.core.plan(), &mut self.seat.wire, &plea, &deeds).await
+        cap::Court::new(self.core.plan(), &mut self.seat.wire, &deeds)
+            .check(&plea)
+            .await
     }
 
     pub(super) async fn may(
