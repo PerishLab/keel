@@ -5,6 +5,7 @@ use axum::Extension;
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
+use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::sync::Arc;
@@ -89,7 +90,7 @@ pub(crate) async fn edit<W: Wire>(
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
     Json(body): Json<Map<String, Value>>,
-) -> Result<Json<Value>, Fault> {
+) -> Result<Response, Fault> {
     let name = core.as_ref().unit(&unit)?;
     let fields = cells(&body, &[])?;
     let pairs: Vec<(&str, &str)> = fields
@@ -101,11 +102,8 @@ pub(crate) async fn edit<W: Wire>(
     let q = format!(r#"from {name} where id = "{id}""#);
     let pack = face.query(&q).await.map_err(Fault::from)?;
     match pack.rows().first() {
-        Some(row) => Ok(Json(row.emit())),
-        None => Err(Fault {
-            status: StatusCode::NOT_FOUND,
-            note: format!("missing row {id}"),
-        }),
+        Some(row) => Ok(Json(row.emit()).into_response()),
+        None => Ok(StatusCode::NO_CONTENT.into_response()),
     }
 }
 

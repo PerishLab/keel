@@ -157,7 +157,7 @@ async fn moved() {
     let shift = rig
         .patch(&path, json!({ "owner": stage.dave }), &her())
         .await;
-    assert_eq!(shift.status, StatusCode::OK, "{}", shift.body);
+    assert!(shift.status.is_success(), "{}", shift.body);
     let late = rig.post("/@grant", sent, &him()).await;
     assert_eq!(late.status, StatusCode::CREATED, "{}", late.body);
 }

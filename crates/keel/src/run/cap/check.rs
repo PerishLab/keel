@@ -89,9 +89,10 @@ impl Deed<'_> {
         &self,
         plan: &Plan,
         work: &mut Work<'_, W>,
-        plea: &Plea<'_>,
-        chain: &[Hop],
+        case: &Case<'_>,
     ) -> Result<bool, Error> {
+        let plea = case.plea;
+        let chain = case.chain;
         if !self.bears(plan, work, plea.who).await? || !self.does(plea.verb) {
             return Ok(false);
         }
@@ -111,7 +112,7 @@ impl Deed<'_> {
             return Ok(false);
         };
         if anchor == plea.unit {
-            return Ok(plea.mark.suits(plea.unit, pred, plea.who));
+            return Ok(case.held.suits(plea.unit, pred, plea.who));
         }
         if plea.verb != "see" {
             return Ok(false);
@@ -120,41 +121,91 @@ impl Deed<'_> {
     }
 }
 
-pub async fn check<W: Wire>(
-    plan: &Plan,
-    wire: &mut W,
-    plea: &Plea<'_>,
-    deeds: &[Row],
-) -> Result<bool, Error> {
-    let mut work = Work::new(wire, plan);
-    let chain = plea.mark.anchors(plan, &mut work, plea.unit).await?;
-    for deed in deeds {
-        if Deed(deed).held(plan, &mut work, plea, &chain).await? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
+pub struct Case<'a> {
+    pub plea: &'a Plea<'a>,
+    pub chain: &'a [Hop],
+    pub held: &'a Mark<'a>,
 }
 
-pub async fn broad<W: Wire>(
-    plan: &Plan,
-    wire: &mut W,
-    plea: &Plea<'_>,
-    deeds: &[Row],
-) -> Result<bool, Error> {
-    let mut work = Work::new(wire, plan);
-    for deed in deeds {
-        let deed = Deed(deed);
-        if !deed.bears(plan, &mut work, plea.who).await? || !deed.does(plea.verb) {
-            continue;
-        }
-        let anchor = deed.anchor(plan);
-        let wide = anchor == "*" || anchor == plea.unit;
-        if wide && deed.span() == "all" {
-            return Ok(true);
-        }
+pub struct Court<'a, W: Wire> {
+    plan: &'a Plan,
+    wire: &'a mut W,
+    deeds: &'a [Row],
+}
+
+impl<'a, W: Wire> Court<'a, W> {
+    pub fn new(plan: &'a Plan, wire: &'a mut W, deeds: &'a [Row]) -> Self {
+        Self { plan, wire, deeds }
     }
-    Ok(false)
+
+    pub async fn check(&mut self, plea: &Plea<'_>) -> Result<bool, Error> {
+        self.weigh(plea, plea.mark).await
+    }
+
+    pub async fn shift(&mut self, plea: &Plea<'_>, after: &Mark<'_>) -> Result<bool, Error> {
+        self.weigh(plea, after).await
+    }
+
+    pub async fn spans(&mut self, plea: &Plea<'_>) -> Result<bool, Error> {
+        let mut work = Work::new(self.wire, self.plan);
+        let chain = plea.mark.anchors(self.plan, &mut work, plea.unit).await?;
+        for verb in VERBS {
+            let seen = Plea {
+                who: plea.who,
+                verb,
+                unit: plea.unit,
+                mark: plea.mark,
+            };
+            let case = Case {
+                plea: &seen,
+                chain: &chain,
+                held: plea.mark,
+            };
+            let mut held = false;
+            for deed in self.deeds {
+                if Deed(deed).held(self.plan, &mut work, &case).await? {
+                    held = true;
+                    break;
+                }
+            }
+            if !held {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    pub async fn broad(&mut self, plea: &Plea<'_>) -> Result<bool, Error> {
+        let mut work = Work::new(self.wire, self.plan);
+        for deed in self.deeds {
+            let deed = Deed(deed);
+            if !deed.bears(self.plan, &mut work, plea.who).await? || !deed.does(plea.verb) {
+                continue;
+            }
+            let anchor = deed.anchor(self.plan);
+            let wide = anchor == "*" || anchor == plea.unit;
+            if wide && deed.span() == "all" {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    async fn weigh(&mut self, plea: &Plea<'_>, held: &Mark<'_>) -> Result<bool, Error> {
+        let mut work = Work::new(self.wire, self.plan);
+        let chain = plea.mark.anchors(self.plan, &mut work, plea.unit).await?;
+        let case = Case {
+            plea,
+            chain: &chain,
+            held,
+        };
+        for deed in self.deeds {
+            if Deed(deed).held(self.plan, &mut work, &case).await? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
 }
 
 pub(crate) fn descend(anchor: &str, pred: &str, who: Who, chain: &[Hop]) -> bool {

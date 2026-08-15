@@ -28,7 +28,7 @@ impl<W: Wire> Tx<'_, W> {
             key: Some(key),
             cells: &post,
         };
-        self.may("set", &unit, &after).await?;
+        self.moves("set", &unit, &mark, &after).await?;
         self.shift(&unit, key, fields).await
     }
 
@@ -51,7 +51,7 @@ impl<W: Wire> Tx<'_, W> {
             key: Some(key),
             cells: &post,
         };
-        self.may("set", &unit, &after).await?;
+        self.moves("set", &unit, &mark, &after).await?;
         self.loosen(&unit, key, fields).await
     }
 

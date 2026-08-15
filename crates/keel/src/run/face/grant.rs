@@ -1,9 +1,10 @@
 use super::*;
 use crate::adapt::Error;
 use crate::cap;
-use crate::life::Work;
+use crate::life::{Cell, Work};
 use crate::query::{self};
 use crate::wire::Wire;
+use std::collections::BTreeMap;
 
 impl<W: Wire> Tx<'_, W> {
     pub async fn birth(&mut self, fields: &[(&str, &str)]) -> Result<i64, Error> {
@@ -45,11 +46,16 @@ impl<W: Wire> Tx<'_, W> {
         };
         self.may("put", &unit, &mark).await?;
         let key = self.craft(&unit, fields).await?;
-        self.mint(&unit, key).await?;
+        self.mint(&unit, key, &cells).await?;
         Ok(key)
     }
 
-    pub(super) async fn mint(&mut self, unit: &str, key: i64) -> Result<(), Error> {
+    pub(super) async fn mint(
+        &mut self,
+        unit: &str,
+        key: i64,
+        cells: &BTreeMap<String, Cell>,
+    ) -> Result<(), Error> {
         if unit == cap::GRANT {
             return Ok(());
         }
@@ -58,6 +64,9 @@ impl<W: Wire> Tx<'_, W> {
             Who::Anon if self.core.identity() == Some(unit) => key,
             _ => return Ok(()),
         };
+        if self.spans(unit, key, cells).await? {
+            return Ok(());
+        }
         self.craft(
             cap::GRANT,
             &[
@@ -69,6 +78,28 @@ impl<W: Wire> Tx<'_, W> {
         )
         .await?;
         Ok(())
+    }
+
+    async fn spans(
+        &mut self,
+        unit: &str,
+        key: i64,
+        cells: &BTreeMap<String, Cell>,
+    ) -> Result<bool, Error> {
+        let deeds = self.deeds().await?;
+        let mark = cap::Mark {
+            key: Some(key),
+            cells,
+        };
+        let plea = cap::Plea {
+            who: self.who,
+            verb: "*",
+            unit,
+            mark: &mark,
+        };
+        cap::Court::new(self.core.plan(), &mut self.seat.wire, &deeds)
+            .spans(&plea)
+            .await
     }
 
     pub(super) async fn revoke(&mut self, key: i64) -> Result<(), Error> {
@@ -146,7 +177,10 @@ impl<W: Wire> Tx<'_, W> {
             unit,
             mark: &cap::Mark::none(),
         };
-        if cap::broad(self.core.plan(), &mut self.seat.wire, &plea, &deeds).await? {
+        if cap::Court::new(self.core.plan(), &mut self.seat.wire, &deeds)
+            .broad(&plea)
+            .await?
+        {
             return Ok(());
         }
         Err(Error::Adapt("refused put".into()))
