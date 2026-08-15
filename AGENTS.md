@@ -78,6 +78,7 @@ Plumb owns publication of `keel-macro`, `keel`, `keel-relay`, `keel-blob`, and
 `docs/CHANGELOG/v<version>/{en,zh}/{INDEX.md,MIGRATION.md}`. A release with no
 caller migration still says so explicitly.
 
-```sh
-plumb release dispatch --channel <channel> --version <version>
-```
+Publication runs in the forge, not from a workstation: dispatch
+`.forgejo/workflows/release-exact.yml` with an exact channel and version, and
+`publish: false` first to rehearse without mutation. `plumb release` reads
+`PLUMB_RELEASE_URL` and `PLUMB_RELEASE_VERSION` from that lane.
