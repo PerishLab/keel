@@ -35,6 +35,10 @@ name = "cap"
 path = "tests/cap/main.rs"
 
 [[test]]
+name = "cost"
+path = "tests/cost/main.rs"
+
+[[test]]
 name = "route"
 path = "tests/route/main.rs"
 
