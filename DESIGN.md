@@ -43,10 +43,17 @@ lifecycle. Promote it to a resource when it needs its own edges, workflow,
 multiple live occurrences for one pair, or root-level query/order/page. The two
 forms never coexist as shadows.
 
-Bond reads remain flat ties. New and updated ties require live endpoints, and a
-resource cannot end while live inbound or outbound ties remain. Live pair
-uniqueness is enforced on the serialized write path; physical indexes are
+Bond reads remain flat ties. New and updated ties require live endpoints. A
+resource may end while the ties it declared are still live, because a bond has
+no lifecycle of its own and a row does not answer to the relations it holds; a
+resource still cannot end while a live tie points at it from elsewhere. Live
+pair uniqueness is enforced on the serialized write path; physical indexes are
 defense in depth rather than the semantic contract.
+
+A group principal is honored only while its own row is live. Membership carries
+authority, so retiring the group revokes every grant that named it in the same
+write, rather than leaving the caller to unpick members one at a time and pass
+through a half-dissolved group on the way.
 
 ## Fields and lifecycle
 

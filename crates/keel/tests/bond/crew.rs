@@ -80,6 +80,23 @@ async fn group() {
         .expect("leave");
     assert_eq!(core.of(ada).live("Repo").await.expect("left").len(), 0);
 
+    sudo.tie(
+        "Team",
+        "members",
+        Ends {
+            left: crew,
+            right: bob,
+        },
+        &[],
+    )
+    .await
+    .expect("rejoin");
+    assert_eq!(core.of(bob).live("Repo").await.expect("member").len(), 1);
+    sudo.end("Team", crew).await.expect("dissolve");
+    assert_eq!(core.of(bob).live("Repo").await.expect("dissolved").len(), 0);
+    let held = sudo.ties("Team", "members", crew).await.expect("ties");
+    assert_eq!(held.len(), 1);
+
     assert!(
         sudo.put(
             "@grant",

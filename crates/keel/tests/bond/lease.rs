@@ -81,13 +81,12 @@ async fn strict() {
     )
     .await
     .expect("tie");
-    assert!(core.lease("Room", room, at).await.is_err());
+    core.lease("Room", room, at).await.expect("lease");
     let ties = core.ties("Room", "guests", room).await.expect("ties");
+    assert_eq!(ties.len(), 1);
     core.cut("Room", "guests", ties[0].key())
         .await
         .expect("cut");
-
-    core.lease("Room", room, at).await.expect("lease");
     assert!(
         core.tie(
             "Room",
