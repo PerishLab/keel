@@ -81,6 +81,9 @@ impl Deed<'_> {
         let Some(edge) = node.crew() else {
             return Ok(false);
         };
+        if !work.alive(node, id).await? {
+            return Ok(false);
+        }
         let ties = work.ties(node, edge, id).await?;
         Ok(ties.iter().any(|tie| tie.right() == op))
     }

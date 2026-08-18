@@ -4,15 +4,15 @@ packages = ["keel-macro", "keel", "keel-relay", "keel-blob", "keel-gate"]
 
 [[document]]
 strategy = "agent"
-source = [{ path = ".", seal = "c2622a06eff1d381ce6ba4c8138910060237bd1d4bcf8f856441f78bd780e79d" }]
+source = [{ path = ".", seal = "52ca2cd7bec72f96e6acbe3efa64b8b7060fe8829931491b8124f8a822be352e" }]
 target-seal = "053bed75b733f6f45d9aa569d8106e5559c407d363a60bd8f5a20a3cb217005e"
 
 [[document]]
 strategy = "architecture"
-source = [{ path = ".", seal = "c2622a06eff1d381ce6ba4c8138910060237bd1d4bcf8f856441f78bd780e79d" }]
+source = [{ path = ".", seal = "52ca2cd7bec72f96e6acbe3efa64b8b7060fe8829931491b8124f8a822be352e" }]
 target-seal = "501f8b10fd2142129f563298261597c94117167e7e805ad92d7347668b2924c9"
 
 [[document]]
 strategy = "design"
-source = [{ path = ".", seal = "c2622a06eff1d381ce6ba4c8138910060237bd1d4bcf8f856441f78bd780e79d" }]
-target-seal = "978f36074b2aa86f87e0d2d019d5fc1d318a06677405453c29467ec6f9410b18"
+source = [{ path = ".", seal = "52ca2cd7bec72f96e6acbe3efa64b8b7060fe8829931491b8124f8a822be352e" }]
+target-seal = "9fa5fb7c184393f0835b41389d41dd55c292f6521acbc674ff7fe7f40a841f0d"

@@ -174,7 +174,9 @@ async fn mirror() {
     assert_eq!(pack.rows()[0].key(), ada);
 
     assert!(core.end("Author", bob).await.is_err());
-    assert!(core.end("Author", ada).await.is_err());
+    core.end("Author", ada)
+        .await
+        .expect("a row its own tie hangs from may retire");
     core.cut("Author", "follows", tie).await.expect("cut");
     core.end("Author", bob).await.expect("end bob");
 }

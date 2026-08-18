@@ -191,13 +191,15 @@ async fn select() {
         .await
         .is_err()
     );
-    assert!(core.end("Student", ada).await.is_err());
     assert!(core.end("Course", algo).await.is_err());
     let pack = core
         .query(r#"from Student where no = "S01" link courses"#)
         .await
         .expect("last");
     let last = pack.bond("student.courses").expect("ties")[0].key();
+    core.end("Student", ada)
+        .await
+        .expect("an enrolment does not hold its student open");
     core.cut("Student", "courses", last)
         .await
         .expect("cut last");
@@ -209,5 +211,4 @@ async fn select() {
     let knot = pack.bond("student.courses").expect("ties")[0].key();
     core.cut("Student", "courses", knot).await.expect("cut bob");
     core.end("Course", algo).await.expect("end algo");
-    core.end("Student", ada).await.expect("end ada");
 }

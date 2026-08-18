@@ -1,6 +1,5 @@
 use super::*;
 use crate::adapt::Error;
-use crate::bond;
 use crate::ddl;
 use crate::plan::{Edge, Unit};
 use crate::wire::{Val, Wire};
@@ -19,7 +18,7 @@ impl<'a, W: Wire> Work<'a, W> {
         if at < tick {
             return Err(Error::Adapt("lease is not the past".into()));
         }
-        if self.inbound(unit.name(), key).await? || self.outbound(unit, key).await? {
+        if self.inbound(unit.name(), key).await? {
             return Err(Error::Adapt("live ties remain".into()));
         }
         let text = format!(
@@ -138,32 +137,6 @@ impl<'a, W: Wire> Work<'a, W> {
             .rows(&text, &[Val::Int(key), Val::Int(tick)])
             .await?
             .is_empty())
-    }
-
-    pub(super) async fn outbound(&mut self, unit: &Unit, key: i64) -> Result<bool, Error> {
-        let tick = now();
-        for edge in unit.bonds() {
-            if edge.kind() != bond::Kind::Many2many {
-                continue;
-            }
-            let left = ddl::col(&ddl::side(unit.name()));
-            let text = format!(
-                "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
-                ddl::joint(unit, edge.name()),
-                left,
-                ddl::EXPIRES,
-                ddl::EXPIRES
-            );
-            if !self
-                .wire
-                .rows(&text, &[Val::Int(key), Val::Int(tick)])
-                .await?
-                .is_empty()
-            {
-                return Ok(true);
-            }
-        }
-        Ok(false)
     }
 
     pub(crate) async fn set(
