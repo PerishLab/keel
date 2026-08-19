@@ -13,7 +13,7 @@ async fn estate() -> Core<Sqlite> {
         .expect("bind")
 }
 
-async fn open<W: Wire>(core: &Core<W>) {
+pub(crate) async fn open<W: Wire>(core: &Core<W>) {
     let sudo = core.sudo();
     for unit in ["Flat", "Deep", "Deeper"] {
         sudo.put(
@@ -30,7 +30,7 @@ async fn open<W: Wire>(core: &Core<W>) {
     }
 }
 
-fn each(started: Instant, count: usize) -> f64 {
+pub(crate) fn each(started: Instant, count: usize) -> f64 {
     started.elapsed().as_secs_f64() * 1000.0 / count as f64
 }
 
