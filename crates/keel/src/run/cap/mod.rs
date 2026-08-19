@@ -31,11 +31,13 @@ pub struct Plea<'a> {
     pub mark: &'a Mark<'a>,
 }
 
+mod chain;
 mod check;
 mod grant;
 mod seal;
 mod shape;
 
+pub(crate) use chain::*;
 pub(crate) use check::*;
 pub(crate) use grant::*;
 pub(crate) use seal::*;
