@@ -46,7 +46,16 @@ forms never coexist as shadows.
 Bond reads remain flat ties. New and updated ties require live endpoints. A
 resource may end while the ties it declared are still live, because a bond has
 no lifecycle of its own and a row does not answer to the relations it holds; a
-resource still cannot end while a live tie points at it from elsewhere. Live
+resource still cannot end while a live tie points at it from elsewhere.
+
+Containment is the exception, and it is not one: a root relation names the
+container a row belongs to, and its identity is derived from that container, so
+a contained row cannot outlive it. Ending a row ends the rows rooted in it,
+deepest first and in the same transaction, and a lease propagates the same
+instant rather than the fact of expiry. Containment is single-parent and
+acyclic, so the set is a tree and there is no second reading of what ending a
+container means. A caller that wants the contents to survive has declared the
+wrong edge: containment is not the way to spell an ordinary reference. Live
 pair uniqueness is enforced on the serialized write path; physical indexes are
 defense in depth rather than the semantic contract.
 

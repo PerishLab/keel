@@ -139,8 +139,8 @@ async fn count() {
 #[tokio::test]
 async fn blocked() {
     let deck = deck().await;
-    deck.file("a", deck.home, deck.ada).await;
-    let path = format!("/repo/{}", deck.home);
+    deck.file("b", deck.home, deck.bob).await;
+    let path = format!("/actor/{}", deck.bob);
     assert_eq!(
         deck.rig.end(&path, &deck.crown()).await.status,
         StatusCode::CONFLICT
@@ -148,7 +148,14 @@ async fn blocked() {
     let path = format!("/actor/{}", deck.ada);
     assert_eq!(
         deck.rig.end(&path, &deck.crown()).await.status,
-        StatusCode::CONFLICT
+        StatusCode::NO_CONTENT
+    );
+    let q = format!(r#"from Repo where owner = "{}" count"#, deck.ada);
+    assert_eq!(deck.rig.ask(&q, &deck.crown()).await["count"], 0);
+    let path = format!("/actor/{}", deck.bob);
+    assert_eq!(
+        deck.rig.end(&path, &deck.crown()).await.status,
+        StatusCode::NO_CONTENT
     );
 }
 
