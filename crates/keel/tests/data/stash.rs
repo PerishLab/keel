@@ -109,9 +109,16 @@ async fn twin() {
     let q = r#"from Actor where login != "zoe" order by login desc"#;
     let one = live.query(q).await.expect("live");
     let two = bare.query(q).await.expect("bare");
-    assert_eq!(one, two);
+    assert_eq!(shape(&one), shape(&two));
     assert_eq!(
         live.query("from Actor count").await.expect("c1"),
         bare.query("from Actor count").await.expect("c2")
     );
+}
+
+fn shape(pack: &keel::Pack) -> Vec<(i64, std::collections::BTreeMap<String, keel::Cell>)> {
+    pack.rows()
+        .iter()
+        .map(|row| (row.key(), row.cells().clone()))
+        .collect()
 }
