@@ -88,9 +88,11 @@ async fn point() {
         .expect("miss");
     assert_eq!(pack.rows().len(), 0);
 
-    assert!(core.end("Author", ada).await.is_err());
-    core.end("Post", post).await.expect("end post");
-    core.end("Author", ada).await.expect("end ada");
+    core.end("Author", ada)
+        .await
+        .expect("an author takes their posts with them");
+    assert!(core.live("Post").await.expect("posts").is_empty());
+    assert!(core.end("Post", post).await.is_err());
 
     assert!(core.query("from Post link author").await.is_err());
     assert!(

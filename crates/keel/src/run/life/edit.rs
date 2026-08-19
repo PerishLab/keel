@@ -10,6 +10,14 @@ impl<'a, W: Wire> Work<'a, W> {
     }
 
     pub(crate) async fn lease(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+        let held = self.brood(name, key, at).await?;
+        for (unit, key) in held.iter().rev() {
+            self.alone(unit, *key, at).await?;
+        }
+        self.alone(name, key, at).await
+    }
+
+    async fn alone(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
         let unit = self.plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
@@ -18,7 +26,7 @@ impl<'a, W: Wire> Work<'a, W> {
         if at < tick {
             return Err(Error::Adapt("lease is not the past".into()));
         }
-        if self.inbound(unit.name(), key).await? {
+        if self.inbound(unit.name(), key, at).await? {
             return Err(Error::Adapt("live ties remain".into()));
         }
         let text = format!(
@@ -38,6 +46,59 @@ impl<'a, W: Wire> Work<'a, W> {
             return Err(Error::Adapt(format!("missing row {key}")));
         }
         Ok(())
+    }
+
+    async fn brood(&mut self, name: &str, key: i64, at: i64) -> Result<Vec<(String, i64)>, Error> {
+        let mut out = Vec::new();
+        let mut open = vec![(name.to_string(), key)];
+        for _ in 0..crate::cap::DEPTH {
+            let mut next = Vec::new();
+            for (name, key) in &open {
+                next.extend(self.kids(name, *key, at).await?);
+            }
+            if next.is_empty() {
+                break;
+            }
+            out.extend(next.clone());
+            open = next;
+        }
+        Ok(out)
+    }
+
+    async fn kids(&mut self, name: &str, key: i64, at: i64) -> Result<Vec<(String, i64)>, Error> {
+        let mut out = Vec::new();
+        let held = self.plan.find(name)?.name().to_string();
+        let held: Vec<(String, String)> = self
+            .plan
+            .units()
+            .values()
+            .filter_map(|unit| unit.root().map(|edge| (unit, edge)))
+            .filter(|(_, edge)| {
+                self.plan
+                    .find(edge.target())
+                    .is_ok_and(|mate| mate.name() == held)
+            })
+            .map(|(unit, edge)| (unit.name().to_string(), edge.name().to_string()))
+            .collect();
+        for (unit, edge) in held {
+            let seat = self.plan.find(&unit)?;
+            let text = format!(
+                "SELECT {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2)",
+                ddl::KEY,
+                ddl::seat(seat),
+                ddl::col(&ddl::side(&edge)),
+                ddl::EXPIRES,
+                ddl::EXPIRES
+            );
+            for row in self
+                .wire
+                .rows(&text, &[Val::Int(key), Val::Int(at)])
+                .await?
+            {
+                out.push((unit.clone(), row[0].int()));
+            }
+        }
+        Ok(out)
     }
 
     pub(crate) async fn pulse(
@@ -96,13 +157,13 @@ impl<'a, W: Wire> Work<'a, W> {
         Ok(!self.wire.rows(&text, &[Val::Int(key)]).await?.is_empty())
     }
 
-    pub(super) async fn inbound(&mut self, target: &str, key: i64) -> Result<bool, Error> {
+    pub(super) async fn inbound(&mut self, target: &str, key: i64, at: i64) -> Result<bool, Error> {
         for unit in self.plan.units().values() {
             for edge in unit.bonds() {
                 if edge.target() != target {
                     continue;
                 }
-                if self.feeds(unit, edge, key).await? {
+                if self.feeds(unit, edge, key, at).await? {
                     return Ok(true);
                 }
             }
@@ -115,8 +176,8 @@ impl<'a, W: Wire> Work<'a, W> {
         unit: &Unit,
         edge: &Edge,
         key: i64,
+        at: i64,
     ) -> Result<bool, Error> {
-        let tick = now();
         let (place, col) = if edge.kind().point() {
             (ddl::seat(unit), ddl::col(&ddl::side(edge.name())))
         } else {
@@ -134,7 +195,7 @@ impl<'a, W: Wire> Work<'a, W> {
         );
         Ok(!self
             .wire
-            .rows(&text, &[Val::Int(key), Val::Int(tick)])
+            .rows(&text, &[Val::Int(key), Val::Int(at)])
             .await?
             .is_empty())
     }
