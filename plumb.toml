@@ -1,18 +1,47 @@
+[layout]
+
+[[layout.seat]]
+path = "crates/*"
+anchor = ["Cargo.toml"]
+note = "Rust workspace members."
+
+[[layout.seat]]
+path = ".cargo"
+note = "Cargo registry configuration."
+
+[[layout.seat]]
+path = ".forgejo"
+note = "The canonical forge namespace."
+
+[[layout.seat]]
+path = ".runseal"
+note = "Committed inert Runseal resources."
+
+[[layout.seat]]
+path = ".plumb"
+note = "Plumb-owned affirmation records."
+
+[[layout.file]]
+name = ["AGENTS.md"]
+rule = ["rule://seat/affirmed"]
+note = "The repository entrypoint is affirmed against its governed faces."
+
+[[layout.file]]
+name = ["LICENSE", ".gitignore"]
+note = "Repository identity and ignore policy."
+
+[[layout.file]]
+name = ["Cargo.toml", "Cargo.lock"]
+note = "Rust workspace anchors."
+
+[[layout.file]]
+name = ["plumb.toml", "ectropy.toml", "runseal.toml", "sidecar.toml"]
+note = "Governance, isolation, and sidecar declarations."
+
+[[layout.file]]
+name = ["docker-compose.yml"]
+note = "Local PostgreSQL integration fixture."
+
 [release.cargo]
 registry = "perish"
 packages = ["keel-macro", "keel", "keel-relay", "keel-blob", "keel-gate"]
-
-[[document]]
-strategy = "agent"
-source = [{ path = ".", seal = "a22c672b5dd7851a3869d9779d576a007bd8ff3a36b3e4c11c0b909aa0b457f7" }]
-target-seal = "053bed75b733f6f45d9aa569d8106e5559c407d363a60bd8f5a20a3cb217005e"
-
-[[document]]
-strategy = "architecture"
-source = [{ path = ".", seal = "a22c672b5dd7851a3869d9779d576a007bd8ff3a36b3e4c11c0b909aa0b457f7" }]
-target-seal = "501f8b10fd2142129f563298261597c94117167e7e805ad92d7347668b2924c9"
-
-[[document]]
-strategy = "design"
-source = [{ path = ".", seal = "a22c672b5dd7851a3869d9779d576a007bd8ff3a36b3e4c11c0b909aa0b457f7" }]
-target-seal = "bf841d145b03865779cbdd198ffaca15995020a1a4fabe5f649962cfdc5f29ec"
