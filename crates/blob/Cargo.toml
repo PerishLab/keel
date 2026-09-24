@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Keel default object package: capability-gated presigned blobs, bytes never touch keel"
+publish = ["perish"]
 
 [lib]
 path = "src/lib.rs"
