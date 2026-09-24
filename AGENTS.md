@@ -23,7 +23,7 @@ business authoring surfaces.
   unsealed namespace.
 - Source code admits no comments. Refactor unclear behavior into names, types,
   modules, and tests. Repository prose belongs only to the admitted root
-  documents or release CHANGELOG.
+  documents; release notes live on Depot.
 
 ## Repository map
 
@@ -55,8 +55,8 @@ business authoring surfaces.
 ## Operating
 
 - Never commit on `main`; work on a topic branch or Concord Member.
-- `.forgejo/workflows/guard.yml` is the canonical guard lane. Before landing,
-  run:
+- Guard proves every commit through the hooks `plumb configuration install`
+  projects. Before landing, run:
 
 ```sh
 cargo fmt --all --check
@@ -73,12 +73,17 @@ ectropy .
 
 ## Release
 
-Plumb owns publication of `keel-macro`, `keel`, `keel-relay`, `keel-blob`, and
-`keel-gate` to the `perish` registry. Stable release requires bilingual
-`docs/CHANGELOG/v<version>/{en,zh}/{INDEX.md,MIGRATION.md}`. A release with no
-caller migration still says so explicitly.
-
-Publication runs in the forge, not from a workstation: dispatch
-`.forgejo/workflows/release-exact.yml` with an exact channel and version, and
-`publish: false` first to rehearse without mutation. `plumb release` reads
-`PLUMB_RELEASE_URL` and `PLUMB_RELEASE_VERSION` from that lane.
+- Keel is a Cargo-only product. wharf publishes `keel-macro`, `keel`,
+  `keel-relay`, `keel-blob`, and `keel-gate` to the `perish` registry at
+  `cargo.perish.uk`, in dependency order, reading each one back from the index.
+  It declares no binaries and no skill; its release authority carries the
+  distribution record wharf keeps for every marker.
+- A release follows Plumb's lifecycle: `plumb release open` cuts
+  `release/<version>` from a guarded `main`, `plumb release stamp` marks it,
+  and `plumb ship dispatch` hands the marker to wharf. A rerun publishes only
+  what is missing.
+- A stable version owes its bilingual changelog on Depot, consigned with
+  `plumb depot consign --kind changelog`, before the next marker is stamped. A
+  release with no caller migration still says so explicitly.
+- Never publish a crate by hand. A crate published outside wharf leaves no
+  distribution record.

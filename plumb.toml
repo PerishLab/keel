@@ -6,41 +6,35 @@ anchor = ["Cargo.toml"]
 note = "Rust workspace members."
 
 [[layout.seat]]
-path = ".cargo"
-note = "Cargo registry configuration."
+path = "charts/*"
+kind = "retired"
+note = "This product ships no Helm chart; the tombstone keeps the domain seat absent."
 
 [[layout.seat]]
-path = ".forgejo"
-note = "The canonical forge namespace."
+path = "skills/*"
+kind = "retired"
+note = "This product ships no skill; the tombstone keeps the domain seat absent."
+
+[[layout.seat]]
+path = ".cargo"
+note = "Cargo registry configuration."
 
 [[layout.seat]]
 path = ".runseal"
 note = "Committed inert Runseal resources."
 
-[[layout.seat]]
-path = ".plumb"
-note = "Plumb-owned affirmation records."
-
 [[layout.file]]
-name = ["AGENTS.md"]
-rule = ["rule://seat/affirmed"]
-note = "The repository entrypoint is affirmed against its governed faces."
-
-[[layout.file]]
-name = ["LICENSE", ".gitignore"]
-note = "Repository identity and ignore policy."
-
-[[layout.file]]
-name = ["Cargo.toml", "Cargo.lock"]
-note = "Rust workspace anchors."
-
-[[layout.file]]
-name = ["plumb.toml", "ectropy.toml", "runseal.toml", "sidecar.toml"]
-note = "Governance, isolation, and sidecar declarations."
+name = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
+note = "Rust workspace anchors and the toolchain wharf builds with."
 
 [[layout.file]]
 name = ["docker-compose.yml"]
 note = "Local PostgreSQL integration fixture."
+
+[release]
+product = "keel"
+authority = "https://releases.keel.perish.uk"
+skill = false
 
 [release.cargo]
 registry = "perish"
