@@ -2,14 +2,6 @@
 allow = [
     "path",
     "comment",
-]
-note = "ci infra; product depth and comment laws do not apply"
-paths = [".forgejo/**"]
-
-[[boundary]]
-allow = [
-    "path",
-    "comment",
     "word",
 ]
 note = "runseal operator adapters are guarded by deno fmt and deno check instead"
@@ -19,7 +11,10 @@ paths = [".runseal/**"]
 allow = false
 
 [[grant]]
-paths = ["crates/*/tests/**/*.rs"]
+paths = [
+    "crates/*/src/**/*.rs",
+    "crates/*/tests/**/*.rs",
+]
 syntax = "test"
 
 [[grant]]

@@ -1,4 +1,5 @@
 [[record]]
 target = "AGENTS.md"
 rule = "rule://seat/affirmed"
-authority = "050cbffbe7b00796756c2e2fee5913d623d556f62828050f30ec3a18aa5a8ee7"
+authority = "9e2826a9399f0a94033d3cfd37397d84f3aca6944ee45b91fb3e14e9436323c0"
+
