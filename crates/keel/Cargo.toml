@@ -6,7 +6,6 @@ license.workspace = true
 repository.workspace = true
 publish = ["perish"]
 description = "Data model description engine: models and relations only"
-readme = "../../DESIGN.md"
 
 [lib]
 path = "src/lib.rs"
