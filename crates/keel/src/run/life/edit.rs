@@ -78,7 +78,7 @@ impl<'a, W: Wire> Work<'a, W> {
                     .find(edge.target())
                     .is_ok_and(|mate| mate.name() == held)
             })
-            .map(|(unit, edge)| (unit.name().to_string(), edge.name().to_string()))
+            .map(|(unit, edge)| (unit.key(), edge.name().to_string()))
             .collect();
         for (unit, edge) in held {
             let seat = self.plan.find(&unit)?;
