@@ -27,6 +27,34 @@ struct Note {
     seen: Shelf,
 }
 
+mod shelf {
+    use super::Shelf;
+    use keel::atom::string;
+    use keel::resource;
+
+    #[resource]
+    pub(super) struct Addition {
+        #[field(string)]
+        text: string,
+        #[relation(Shelf, many2one, root)]
+        shelf: Shelf,
+    }
+}
+
+mod parcel {
+    use super::Box;
+    use keel::atom::string;
+    use keel::resource;
+
+    #[resource]
+    pub(super) struct Addition {
+        #[field(string)]
+        text: string,
+        #[relation(Box, many2one, root)]
+        parcel: Box,
+    }
+}
+
 #[tokio::test]
 async fn subtree() {
     let mut graph = Graph::new();
@@ -87,4 +115,51 @@ async fn outside() {
         .await
         .expect("containment still cascades");
     assert!(core.live("Note").await.expect("notes").is_empty());
+}
+
+#[tokio::test]
+async fn qualified() {
+    let mut graph = Graph::new();
+    graph
+        .plug::<Shelf>()
+        .plug::<Box>()
+        .plug::<shelf::Addition>()
+        .plug::<parcel::Addition>();
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    let shelf = core.put("Shelf", &[("name", "one")]).await.expect("shelf");
+    let parcel = core
+        .put("Box", &[("name", "inner"), ("shelf", &shelf.to_string())])
+        .await
+        .expect("box");
+    core.put(
+        "shelf:addition",
+        &[("text", "outer"), ("shelf", &shelf.to_string())],
+    )
+    .await
+    .expect("shelf addition");
+    core.put(
+        "box:addition",
+        &[("text", "inner"), ("parcel", &parcel.to_string())],
+    )
+    .await
+    .expect("box addition");
+
+    core.end("Shelf", shelf)
+        .await
+        .expect("qualified contents retire with their container");
+    assert!(core.live("Shelf").await.expect("shelves").is_empty());
+    assert!(
+        core.live("shelf:addition")
+            .await
+            .expect("shelf additions")
+            .is_empty()
+    );
+    assert!(
+        core.live("box:addition")
+            .await
+            .expect("box additions")
+            .is_empty()
+    );
 }
