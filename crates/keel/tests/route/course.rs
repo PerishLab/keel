@@ -189,3 +189,32 @@ async fn blocked() {
     let live = deck.rig.ask("from Course order by code").await;
     assert_eq!(bag(&live, "course").len(), 2);
 }
+
+#[tokio::test]
+async fn regrade() {
+    let deck = deck().await;
+    let ties = deck.ties(deck.bob).await;
+    let held = ties
+        .iter()
+        .find(|tie| right(tie) == deck.algo)
+        .expect("algo tie");
+    let path = format!("/student/{}/courses/{}", deck.bob, key(held));
+    let done = deck.rig.patch(&path, json!({ "grade": "C" })).await;
+    assert_eq!(done.status, StatusCode::NO_CONTENT, "{}", done.body);
+    let ties = deck.ties(deck.bob).await;
+    assert_eq!(ties[0]["grade"], "C");
+}
+
+#[tokio::test]
+async fn stray() {
+    let deck = deck().await;
+    let ties = deck.ties(deck.ada).await;
+    let foreign = format!("/student/{}/courses/{}", deck.bob, key(&ties[0]));
+    let missed = deck.rig.patch(&foreign, json!({ "grade": "C" })).await;
+    assert_eq!(missed.status, StatusCode::NOT_FOUND);
+    assert_eq!(deck.rig.end(&foreign).await.status, StatusCode::NOT_FOUND);
+    let bent = format!("/student/{}/courses/one", deck.ada);
+    let refused = deck.rig.patch(&bent, json!({ "grade": "C" })).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+    assert_eq!(deck.rig.end(&bent).await.status, StatusCode::BAD_REQUEST);
+}

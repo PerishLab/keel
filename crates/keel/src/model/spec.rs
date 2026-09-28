@@ -41,12 +41,12 @@ pub enum Only {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Field {
-    name: String,
-    kind: atom::Kind,
-    only: Only,
-    serial: Option<String>,
-    need: bool,
-    rule: Rule,
+    pub(crate) name: String,
+    pub(crate) kind: atom::Kind,
+    pub(crate) only: Only,
+    pub(crate) serial: Option<String>,
+    pub(crate) need: bool,
+    pub(crate) rule: Rule,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]

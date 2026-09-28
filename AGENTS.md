@@ -33,8 +33,8 @@ business authoring surfaces.
 - `crates/relay` — default webhook consumer in caller space.
 - `crates/blob` — capability-gated object metadata and presigned-byte package;
   bytes never enter Keel.
-- [ARCHITECTURE.md](ARCHITECTURE.md) — current component and dataflow map.
-- [DESIGN.md](DESIGN.md) — stable modeling and runtime laws.
+- `.cargo` — the `perish` registry configuration.
+- `.runseal` — committed inert Runseal resources.
 
 ## Maintenance laws
 
@@ -49,8 +49,8 @@ business authoring surfaces.
   stream cursors.
 - Vocabulary deltas live with the implementation. Register only real compound
   product atoms in `ectropy.toml`; do not maintain a parallel source glossary.
-- A public semantic change updates the relevant root projection and its Plumb
-  document seal in the same change.
+- A public semantic change updates this document and re-affirms it with
+  `plumb affirm --write` in the same change when it moves a claim here.
 
 ## Operating
 
@@ -69,7 +69,8 @@ ectropy .
 
 - The L2 contracts are `cargo test -p keel --test route` and
   `cargo test -p keel-gate --test forge`; they drive the Router in process.
-- Land only through `plumb land` after the complete local guard is green.
+- Issue-led work is delivered through its Concord Member after the complete
+  local guard is green; `plumb land` lands only work no Issue carries.
 
 ## Release
 
