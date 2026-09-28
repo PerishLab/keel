@@ -1,8 +1,7 @@
 use crate::atom;
 use crate::bond;
 use crate::graph::Graph;
-use crate::spec::Only;
-use crate::spec::Rule;
+pub use crate::spec::Field as Slot;
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug)]
@@ -18,16 +17,6 @@ pub struct Unit {
     reign: Reign,
     veil: bool,
     frozen: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct Slot {
-    name: String,
-    kind: atom::Kind,
-    only: Only,
-    serial: Option<String>,
-    need: bool,
-    rule: Rule,
 }
 
 #[derive(Clone, Debug)]
@@ -170,30 +159,6 @@ impl Plan {
 }
 
 impl Slot {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn kind(&self) -> atom::Kind {
-        self.kind
-    }
-
-    pub fn only(&self) -> &Only {
-        &self.only
-    }
-
-    pub fn serial(&self) -> Option<&str> {
-        self.serial.as_deref()
-    }
-
-    pub fn need(&self) -> bool {
-        self.need
-    }
-
-    pub fn rule(&self) -> &Rule {
-        &self.rule
-    }
-
     pub(crate) fn bind(&self, value: &str) -> Result<crate::wire::Val, crate::adapt::Error> {
         self.rule.check(self.kind, value)?;
         use crate::wire::Val;

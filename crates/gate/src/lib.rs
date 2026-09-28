@@ -161,6 +161,7 @@ pub(crate) use door::*;
 pub(crate) use guard::*;
 
 pub use guard::{bearer, crumb};
+pub use rite::Seed;
 
 mod door;
 mod guard;

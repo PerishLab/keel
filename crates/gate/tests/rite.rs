@@ -2,7 +2,7 @@ use axum::http::HeaderMap;
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::{Core, Graph, Wire, bootstrap, resource};
-use keel_gate::{Gate, bake};
+use keel_gate::{Gate, Seed, bake};
 
 #[resource]
 struct Actor {
@@ -152,12 +152,16 @@ async fn seeds() {
     let (_, sid) = gate.session(eve).await.expect("session");
     assert!(gate.logout(&sid).await.is_ok());
 
-    gate.sow(&[("all", "see", "Actor", "all")])
-        .await
-        .expect("sow");
-    gate.sow(&[("all", "see", "Actor", "all")])
-        .await
-        .expect("resow");
+    let everyone = Seed {
+        who: "all",
+        verb: "see",
+        unit: "Actor",
+        scope: "all",
+    };
+    assert!(!gate.sown(&[everyone]).await.expect("unsown"));
+    gate.sow(&[everyone]).await.expect("sow");
+    gate.sow(&[everyone]).await.expect("resow");
+    assert!(gate.sown(&[everyone]).await.expect("sown"));
     let held = core
         .query(r#"from @grant where who = "all" count"#)
         .await

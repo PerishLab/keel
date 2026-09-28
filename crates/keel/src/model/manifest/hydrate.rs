@@ -79,13 +79,7 @@ fn tie(held: Builder, edge: &Edge) -> Builder {
 }
 
 fn law(rule: &Rule) -> Option<crate::spec::Rule> {
-    let shape = (
-        rule.default.is_some(),
-        !rule.values.is_empty(),
-        rule.min.is_some(),
-        rule.max.is_some(),
-    );
-    if shape == (false, false, false, false) {
+    if *rule == Rule::default() {
         return None;
     }
     let mut held = crate::spec::Rule::new();

@@ -32,34 +32,37 @@ pub fn parse(text: &str) -> Result<Tree, Error> {
     }
     scan.ws();
     let tally = scan.opt("count");
-    let links = scan.links()?;
-    let sorts = scan.sorts()?;
-    let limit = scan.limit()?;
-    let after = scan.after()?;
+    let tail = Tail {
+        links: scan.links()?,
+        sorts: scan.sorts()?,
+        limit: scan.limit()?,
+        after: scan.after()?,
+    };
     scan.ws();
     if !scan.done() {
         return Err(Error::Adapt("query has trailing tokens".into()));
     }
-    let projection = (
-        !links.is_empty(),
-        !sorts.is_empty(),
-        limit.is_some(),
-        after.is_some(),
-    );
-    let more = projection != (false, false, false, false);
-    if tally && more {
+    if tally && tail != Tail::default() {
         return Err(Error::Adapt("count stands alone".into()));
     }
     Ok(Tree {
         from: unit,
         slice: Slice::Live,
         preds,
-        links,
-        sorts,
-        limit,
-        after,
+        links: tail.links,
+        sorts: tail.sorts,
+        limit: tail.limit,
+        after: tail.after,
         tally,
     })
+}
+
+#[derive(Default, PartialEq)]
+struct Tail {
+    links: Vec<String>,
+    sorts: Vec<Sort>,
+    limit: Option<usize>,
+    after: Option<i64>,
 }
 
 pub(crate) fn edge<'a>(

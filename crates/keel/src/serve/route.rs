@@ -11,6 +11,14 @@ use serde_json::{Map, Value, json};
 use std::sync::Arc;
 
 #[derive(Deserialize)]
+pub(crate) struct Knot {
+    unit: String,
+    id: i64,
+    bond: String,
+    tie: i64,
+}
+
+#[derive(Deserialize)]
 pub(crate) struct Body {
     q: String,
 }
@@ -151,7 +159,12 @@ pub(crate) async fn attach<W: Wire>(
 
 pub(crate) async fn tune<W: Wire>(
     State(core): State<Arc<Core<W>>>,
-    Path((unit, id, bond, tie)): Path<(String, i64, String, i64)>,
+    Path(Knot {
+        unit,
+        id,
+        bond,
+        tie,
+    }): Path<Knot>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
     Json(body): Json<Map<String, Value>>,
@@ -179,7 +192,12 @@ pub(crate) async fn tune<W: Wire>(
 
 pub(crate) async fn detach<W: Wire>(
     State(core): State<Arc<Core<W>>>,
-    Path((unit, id, bond, tie)): Path<(String, i64, String, i64)>,
+    Path(Knot {
+        unit,
+        id,
+        bond,
+        tie,
+    }): Path<Knot>,
     headers: HeaderMap,
     op: Option<Extension<Operator>>,
 ) -> Result<StatusCode, Fault> {

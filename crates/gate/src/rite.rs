@@ -4,29 +4,39 @@ use keel::adapt::Error;
 use keel::life::tick;
 use keel::{Op, Wire, form};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Seed<'a> {
+    pub who: &'a str,
+    pub verb: &'a str,
+    pub unit: &'a str,
+    pub scope: &'a str,
+}
+
 impl<W: Wire + 'static> Gate<W> {
     pub async fn seed(&self) -> Result<(), Error> {
         let who = self.svc.to_string();
-        let unit = self.core.identity().unwrap_or("");
-        self.sow(&[
-            (&who, "see", "Token", "all"),
-            (&who, "see", "Session", "all"),
-            (&who, "see", unit, "all"),
-            (&who, "put", "Session", "all"),
-        ])
-        .await
+        self.sow(&self.rites(&who)).await
     }
 
     pub async fn ready(&self) -> Result<bool, Error> {
         let who = self.svc.to_string();
+        self.sown(&self.rites(&who)).await
+    }
+
+    fn rites<'a>(&'a self, who: &'a str) -> [Seed<'a>; 4] {
         let unit = self.core.identity().unwrap_or("");
-        self.sown(&[
-            (&who, "see", "Token", "all"),
-            (&who, "see", "Session", "all"),
-            (&who, "see", unit, "all"),
-            (&who, "put", "Session", "all"),
-        ])
-        .await
+        let rite = |verb, unit| Seed {
+            who,
+            verb,
+            unit,
+            scope: "all",
+        };
+        [
+            rite("see", "Token"),
+            rite("see", "Session"),
+            rite("see", unit),
+            rite("put", "Session"),
+        ]
     }
 
     pub async fn whom(&self, headers: &HeaderMap) -> Option<i64> {
@@ -76,18 +86,17 @@ impl<W: Wire + 'static> Gate<W> {
             .await
     }
 
-    pub async fn sow(&self, seeds: &[(&str, &str, &str, &str)]) -> Result<(), Error> {
+    pub async fn sow(&self, seeds: &[Seed<'_>]) -> Result<(), Error> {
         let sudo = self.core.sudo();
         for seed in seeds {
             if !held(&sudo, seed).await? {
-                let (who, verb, unit, scope) = seed;
                 sudo.put(
                     "@grant",
                     &[
-                        ("who", who),
-                        ("verb", verb),
-                        ("unit", unit),
-                        ("scope", scope),
+                        ("who", seed.who),
+                        ("verb", seed.verb),
+                        ("unit", seed.unit),
+                        ("scope", seed.scope),
                     ],
                 )
                 .await?;
@@ -96,7 +105,7 @@ impl<W: Wire + 'static> Gate<W> {
         Ok(())
     }
 
-    pub async fn sown(&self, seeds: &[(&str, &str, &str, &str)]) -> Result<bool, Error> {
+    pub async fn sown(&self, seeds: &[Seed<'_>]) -> Result<bool, Error> {
         let sudo = self.core.sudo();
         for seed in seeds {
             if !held(&sudo, seed).await? {
@@ -133,16 +142,12 @@ impl<W: Wire + 'static> Gate<W> {
     }
 }
 
-async fn held<W: Wire>(
-    face: &keel::Face<'_, W>,
-    seed: &(&str, &str, &str, &str),
-) -> Result<bool, Error> {
-    let (who, verb, unit, scope) = seed;
+async fn held<W: Wire>(face: &keel::Face<'_, W>, seed: &Seed<'_>) -> Result<bool, Error> {
     let ask = form("@grant")
-        .when("who", Op::Eq, who)
-        .when("verb", Op::Eq, verb)
-        .when("unit", Op::Eq, unit)
-        .when("scope", Op::Eq, scope)
+        .when("who", Op::Eq, seed.who)
+        .when("verb", Op::Eq, seed.verb)
+        .when("unit", Op::Eq, seed.unit)
+        .when("scope", Op::Eq, seed.scope)
         .count();
     Ok(face.ask(&ask).await?.count().is_some_and(|count| count > 0))
 }
