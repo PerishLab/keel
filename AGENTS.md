@@ -79,12 +79,9 @@ ectropy .
   `cargo.perish.uk`, in dependency order, reading each one back from the index.
   It declares no binaries and no skill; its release authority carries the
   distribution record wharf keeps for every marker.
-- A release follows Plumb's lifecycle: `plumb release open` cuts
-  `release/<version>` from a guarded `main`, `plumb release stamp` marks it,
-  and `plumb ship dispatch` hands the marker to wharf. A rerun publishes only
-  what is missing.
-- A stable version owes its bilingual changelog on Depot, consigned with
-  `plumb depot consign --kind changelog`, before the next marker is stamped. A
-  release with no caller migration still says so explicitly.
+- A release follows Plumb's lifecycle (`plumb release --help`); wharf
+  publishes it, and a rerun publishes only what is missing.
+- A stable version owes its bilingual changelog on Depot before the next marker
+  is stamped. A release with no caller migration still says so explicitly.
 - Never publish a crate by hand. A crate published outside wharf leaves no
   distribution record.
