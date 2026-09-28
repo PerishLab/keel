@@ -28,20 +28,18 @@ pub(crate) fn read(
 }
 
 fn literals(expr: &Expr) -> syn::Result<Vec<String>> {
-    let Expr::Tuple(tuple) = expr else {
-        return Err(syn::Error::new_spanned(
-            expr,
-            "values needs a nonempty tuple",
-        ));
+    let items = match expr {
+        Expr::Array(array) => &array.elems,
+        Expr::Tuple(legacy) => &legacy.elems,
+        _ => return Err(syn::Error::new_spanned(expr, HINT)),
     };
-    if tuple.elems.is_empty() {
-        return Err(syn::Error::new_spanned(
-            expr,
-            "values needs a nonempty tuple",
-        ));
+    if items.is_empty() {
+        return Err(syn::Error::new_spanned(expr, HINT));
     }
-    tuple.elems.iter().map(literal).collect()
+    items.iter().map(literal).collect()
 }
+
+const HINT: &str = "values needs a nonempty array, as in values = [\"ready\", \"done\"]";
 
 fn literal(expr: &Expr) -> syn::Result<String> {
     match expr {

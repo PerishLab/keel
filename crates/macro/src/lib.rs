@@ -252,3 +252,6 @@ pub(crate) use parse::*;
 
 mod parse;
 mod rule;
+
+#[cfg(test)]
+mod test;

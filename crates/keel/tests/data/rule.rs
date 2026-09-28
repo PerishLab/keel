@@ -4,7 +4,7 @@ use keel::{Cell, Graph, resource};
 
 #[resource]
 struct Job {
-    #[field(string, default = "queued", values = ("done", "queued"))]
+    #[field(string, default = "queued", values = ["done", "queued"])]
     state: string,
     #[field(int, default = 0, min = 0, max = 2)]
     attempts: int,
