@@ -185,7 +185,7 @@ impl Read for Attribute {
 }
 
 pub(crate) fn atom(attrs: &[Attribute]) -> syn::Result<Option<Made>> {
-    let hint = "use #[field(string)] or #[field(string, default = \"ready\", values = (\"ready\", \"done\"))]";
+    let hint = "use #[field(string)] or #[field(string, default = \"ready\", values = [\"ready\", \"done\"])]";
     for attr in attrs {
         if !attr.path().is_ident("field") {
             continue;
