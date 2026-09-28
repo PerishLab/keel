@@ -37,7 +37,7 @@ pub(crate) struct Field {
     pub(crate) rule: Rule,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Rule {
     pub(crate) default: Option<String>,

@@ -103,3 +103,21 @@ fn escapes() {
     let bare = query::parse(r#"from Student where nickname = "plain""#).expect("plain");
     assert_eq!(bare.preds()[0].value(), "plain");
 }
+
+#[test]
+fn alone() {
+    let tree = query::parse(r#"from Student where nickname = "ada" count"#).expect("count");
+    assert!(tree.tally());
+    for tail in [
+        "link classes",
+        "order by nickname",
+        "limit 2",
+        "after \"3\"",
+    ] {
+        let text = format!("from Student count {tail}");
+        let refused = query::parse(&text).expect_err(&text);
+        assert!(refused.to_string().contains("count stands alone"), "{text}");
+    }
+    let refused = query::parse("from Student count nonsense").expect_err("trailing");
+    assert!(refused.to_string().contains("trailing tokens"));
+}

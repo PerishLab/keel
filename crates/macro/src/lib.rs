@@ -182,7 +182,7 @@ pub(crate) enum Made {
     Serial(String),
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 pub(crate) struct Guard {
     pub fallback: Option<String>,
     pub values: Vec<String>,
@@ -222,13 +222,7 @@ pub(crate) fn grow(label: &str, bud: &Bud) -> proc_macro2::TokenStream {
             }
         }
     };
-    let shape = (
-        guard.fallback.is_some(),
-        !guard.values.is_empty(),
-        guard.min.is_some(),
-        guard.max.is_some(),
-    );
-    if shape == (false, false, false, false) {
+    if *guard == Guard::default() {
         return field;
     }
     let fallback = guard
