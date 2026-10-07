@@ -14,8 +14,8 @@ path = ".runseal"
 note = "Committed inert Runseal resources."
 
 [[layout.file]]
-name = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
-note = "Rust workspace anchors and the toolchain wharf builds with."
+name = ["Cargo.toml", "Cargo.lock"]
+note = "Rust workspace anchors."
 
 [[layout.file]]
 name = ["docker-compose.yml"]
