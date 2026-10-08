@@ -165,6 +165,10 @@ pub fn tick() -> i64 {
 }
 
 fn now() -> i64 {
+    #[cfg(test)]
+    if let Some(tick) = check::read() {
+        return tick;
+    }
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
@@ -173,8 +177,12 @@ fn now() -> i64 {
 
 mod closure;
 mod edit;
+mod end;
 mod etch;
 mod glean;
 mod link;
 mod make;
 mod util;
+
+#[cfg(test)]
+mod check;
