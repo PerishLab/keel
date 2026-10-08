@@ -1,5 +1,10 @@
 # Agents
 
+Read the canonical [PerishLab delivery governance](https://github.com/PerishLab/.github/blob/main/GOVERNANCE.md)
+at work start and again before delivery or Issue closure. That document owns
+organization-wide Issue, pull-request and acceptance policy; this file keeps
+repository-specific constraints without copying that policy.
+
 Keel is a data-model description engine. Business callers declare resources,
 fields, relations, and runtime values; the engine owns control fields,
 lifecycle, authority, transactions, storage projection, events, cache, estate
