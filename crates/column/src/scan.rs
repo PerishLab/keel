@@ -1,4 +1,4 @@
-use crate::{Error, Table};
+use crate::{Error, Record, Table};
 use arrow_array::{Array, BinaryArray, BooleanArray, RecordBatch, StringArray, UInt64Array};
 use parquet::arrow::ProjectionMask;
 use parquet::arrow::arrow_reader::{
@@ -15,9 +15,23 @@ pub struct Filter {
     pub keys: Vec<(String, String)>,
 }
 
-type Sink<'a> = dyn FnMut(&[u8]) -> Result<(), Error> + 'a;
+pub(crate) type Sink<'a> = dyn FnMut(&[u8]) -> Result<(), Error> + Send + 'a;
 
 impl Table {
+    pub(crate) fn admits(&self, filter: &Filter, record: &Record) -> Result<bool, Error> {
+        if filter.from.is_some_and(|from| record.time < from)
+            || filter.to.is_some_and(|to| record.time >= to)
+        {
+            return Ok(false);
+        }
+        for (key, value) in &filter.keys {
+            if &record.keys[self.index(key)?] != value {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     pub fn scan(&self, path: &Path, filter: &Filter, sink: &mut Sink<'_>) -> Result<(), Error> {
         let keys = filter
             .keys

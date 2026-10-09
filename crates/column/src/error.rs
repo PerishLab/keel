@@ -34,3 +34,9 @@ impl From<std::io::Error> for Error {
         Self(error.to_string())
     }
 }
+
+impl From<keel::adapt::Error> for Error {
+    fn from(error: keel::adapt::Error) -> Self {
+        Self(error.to_string())
+    }
+}

@@ -77,6 +77,20 @@ impl Table {
         }
     }
 
+    pub(crate) fn check(&self, record: &Record) -> Result<(), Error> {
+        if record.keys.len() != self.keys.len() {
+            return Err(Error::new(format!(
+                "a record carries {} keys, the table declares {}",
+                record.keys.len(),
+                self.keys.len()
+            )));
+        }
+        if u32::try_from(record.raw.len()).is_err() {
+            return Err(Error::new("a record is larger than 4 GiB"));
+        }
+        Ok(())
+    }
+
     pub(crate) fn index(&self, key: &str) -> Result<usize, Error> {
         self.keys
             .iter()
@@ -98,5 +112,22 @@ impl Table {
             .map(|index| left.keys[*index].cmp(&right.keys[*index]))
             .find(|ordering| ordering.is_ne())
             .unwrap_or_else(|| left.time.cmp(&right.time))
+    }
+}
+
+impl Partition {
+    pub fn scope(&self) -> String {
+        let key: String = self
+            .key
+            .as_deref()
+            .unwrap_or_default()
+            .bytes()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        format!(
+            "{}{key}-{}",
+            if self.key.is_some() { "k" } else { "n" },
+            self.slot
+        )
     }
 }
