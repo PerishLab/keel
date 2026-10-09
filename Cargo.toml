@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/keel", "crates/macro", "crates/gate", "crates/relay", "crates/blob"]
+members = ["crates/keel", "crates/macro", "crates/gate", "crates/relay", "crates/blob", "crates/column"]
 
 [workspace.package]
 version = "0.0.0"
@@ -10,6 +10,8 @@ repository = "https://github.com/PerishLab/keel"
 
 [workspace.dependencies]
 clap = { version = "4", features = ["derive"] }
+arrow-array = "60"
+arrow-schema = "60"
 axum = "0.8"
 getrandom = "0.3"
 http-body-util = "0.1"
@@ -17,6 +19,7 @@ keel = { path = "crates/keel", version = "=0.0.0", registry = "perish" }
 keel-gate = { path = "crates/gate", version = "=0.0.0", registry = "perish" }
 keel-macro = { path = "crates/macro", version = "=0.0.0", registry = "perish" }
 keel-relay = { path = "crates/relay", version = "=0.0.0", registry = "perish" }
+parquet = { version = "60", default-features = false, features = ["arrow", "zstd"] }
 proc-macro2 = "1"
 quote = "1"
 serde = { version = "1", features = ["derive"] }
