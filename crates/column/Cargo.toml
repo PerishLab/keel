@@ -13,4 +13,10 @@ path = "src/lib.rs"
 [dependencies]
 arrow-array = { workspace = true }
 arrow-schema = { workspace = true }
+crc32fast = { workspace = true }
+keel = { workspace = true }
 parquet = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

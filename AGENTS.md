@@ -74,12 +74,21 @@ business authoring surfaces.
   published without overwriting; an existing path refuses. Scans select by a
   `[from, to)` window and exact key values, prune by row-group statistics and
   bloom filters, and return raw bytes in sort order within a part.
-- An acknowledged append is durable in an open segment; sealing turns it into a
-  part and drops duplicate record ids within the partition; a part is visible
-  only once published in a manifest held as Keel resources, updated in the
-  same transaction; retention drops a whole partition, its parts and manifest
-  entries atomically; scans cover published parts and the open segment. A
-  caller hosting the manifest therefore hosts a Keel estate.
+- An append carries a caller batch token and is acknowledged only after its
+  partition's open segment is fsynced: CRC-framed records closed by the token
+  frame, so a torn or unclosed tail is truncated on recovery and an
+  unacknowledged batch never becomes visible. A token already applied to a
+  partition, in its open segment or its recent parts, is acknowledged without
+  writing; per-record deduplication belongs to later merging.
+- A segment seals at 16 MiB of raw records or 5 minutes of age into a part
+  whose `Part` row is published in Keel; a part is visible only through a live
+  row. Callers plug `stock` into their Graph and so host a Keel estate.
+- Retention ends a partition's rows in one transaction and drops its open
+  segment; part files are deleted only after a grace, so scans in flight keep
+  their files. Recovery deletes every file no live row references and every
+  segment already published.
+- One process holds a root's lock; scans take a snapshot of live parts and
+  open segments and read files outside the lock.
 - Dependencies are arrow and parquet only, never DataFusion; their roughly
   monthly major releases are a carried upgrade.
 

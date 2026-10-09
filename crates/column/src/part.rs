@@ -47,6 +47,9 @@ impl Table {
     }
 
     fn summarize(&self, records: &[Record]) -> Result<Summary, Error> {
+        for record in records {
+            self.check(record)?;
+        }
         let first = records
             .first()
             .ok_or_else(|| Error::new("a part needs at least one record"))?;
@@ -58,13 +61,6 @@ impl Table {
             rows: 0,
         };
         for record in records {
-            if record.keys.len() != self.keys().len() {
-                return Err(Error::new(format!(
-                    "a record carries {} keys, the table declares {}",
-                    record.keys.len(),
-                    self.keys().len()
-                )));
-            }
             if self.partition(record) != partition {
                 return Err(Error::new("a part holds records of one partition only"));
             }
