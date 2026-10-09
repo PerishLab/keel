@@ -38,6 +38,8 @@ business authoring surfaces.
 - `crates/relay` — default webhook consumer in caller space.
 - `crates/blob` — capability-gated object metadata and presigned-byte package;
   bytes never enter Keel.
+- `crates/column` — append-only record package keeping records verbatim in
+  immutable Parquet parts; records never enter Keel.
 - `.cargo` — the `perish` registry configuration.
 - `.runseal` — committed inert Runseal resources.
 
@@ -56,6 +58,30 @@ business authoring surfaces.
   product atoms in `ectropy.toml`; do not maintain a parallel source glossary.
 - A public semantic change updates this document and re-affirms it with
   `plumb affirm --write` in the same change when it moves a claim here.
+
+## keel-column
+
+- It is a package beside the engine, like `keel-blob`: it composes only
+  Keel's public faces, changes no `Wire`, `Grain`, verb or estate evolution,
+  and knows no caller's record semantics.
+- A table declares a time column, key columns, a sort order over keys and a
+  partition grain (an optional key and a time width). Every record keeps its
+  raw bytes verbatim in the `raw` column beside the time and key values its
+  caller extracted; returning a record returns those bytes exactly.
+- A part is one immutable Parquet file written from a batch of one partition,
+  sorted by the sort keys then time: zstd, the time column delta-encoded, key
+  columns dictionary-encoded with bloom filters, page statistics. A part is
+  published without overwriting; an existing path refuses. Scans select by a
+  `[from, to)` window and exact key values, prune by row-group statistics and
+  bloom filters, and return raw bytes in sort order within a part.
+- An acknowledged append is durable in an open segment; sealing turns it into a
+  part and drops duplicate record ids within the partition; a part is visible
+  only once published in a manifest held as Keel resources, updated in the
+  same transaction; retention drops a whole partition, its parts and manifest
+  entries atomically; scans cover published parts and the open segment. A
+  caller hosting the manifest therefore hosts a Keel estate.
+- Dependencies are arrow and parquet only, never DataFusion; their roughly
+  monthly major releases are a carried upgrade.
 
 ## Operating
 
@@ -80,8 +106,9 @@ ectropy .
 ## Release
 
 - Keel is a Cargo-only product. wharf publishes `keel-macro`, `keel`,
-  `keel-relay`, `keel-blob`, and `keel-gate` to the `perish` registry at
-  `cargo.perish.uk`, in dependency order, reading each one back from the index.
+  `keel-relay`, `keel-blob`, `keel-column`, and `keel-gate` to the `perish`
+  registry at `cargo.perish.uk`, in dependency order, reading each one back
+  from the index.
   It declares no binaries and no skill; its release authority carries the
   distribution record wharf keeps for every marker.
 - A release follows Plumb's lifecycle (`plumb release --help`); wharf

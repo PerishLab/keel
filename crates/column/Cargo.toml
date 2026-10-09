@@ -1,0 +1,16 @@
+[package]
+name = "keel-column"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Keel columnar package: append-only records kept verbatim in immutable Parquet parts"
+publish = ["perish"]
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+arrow-array = { workspace = true }
+arrow-schema = { workspace = true }
+parquet = { workspace = true }
