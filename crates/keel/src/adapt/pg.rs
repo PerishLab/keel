@@ -107,6 +107,11 @@ impl Wire for Postgres {
         self.mark(done).map(|_| ())
     }
 
+    async fn epoch(&mut self) -> Result<Option<String>, Error> {
+        let rows = self.rows("SELECT pg_current_snapshot()::text", &[]).await?;
+        Ok(rows.first().and_then(|row| row.first()).map(Val::text))
+    }
+
     async fn revive(&mut self) -> Result<(), Error> {
         if self.sound {
             return Ok(());

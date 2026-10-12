@@ -190,3 +190,31 @@ async fn spare() {
         Some(&Cell::Text("held".into()))
     );
 }
+
+#[tokio::test]
+async fn foreign() {
+    let _hold = GATE.lock().await;
+    let store = reset().await;
+    let mut graph = Graph::new();
+    graph.plug::<Course>().plug::<Student>();
+    let near = crate::support::boot(graph, store).await.expect("boot");
+    let mut copy = Graph::new();
+    copy.plug::<Course>().plug::<Student>();
+    let far = keel::bind(copy, Postgres::at(url()).await.expect("far"))
+        .await
+        .expect("bind");
+    let algo = near
+        .put("Course", &[("code", "CS101")])
+        .await
+        .expect("course");
+    assert_eq!(near.live("Course").await.expect("warm").len(), 1);
+    assert_eq!(near.live("Course").await.expect("hot").len(), 1);
+
+    far.put("Course", &[("code", "CS102")])
+        .await
+        .expect("far put");
+    far.end("Course", algo).await.expect("far end");
+    let rows = near.live("Course").await.expect("after");
+    assert_eq!(rows.len(), 1);
+    assert_ne!(rows[0].key(), algo);
+}

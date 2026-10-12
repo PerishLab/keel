@@ -19,6 +19,7 @@ impl<W: Wire> Face<'_, W> {
             seat: &mut *seat,
             who: self.who,
         };
+        tx.watch().await?;
         run(&mut tx).await
     }
 
@@ -27,13 +28,16 @@ impl<W: Wire> Face<'_, W> {
         run: impl AsyncFnOnce(&mut Tx<'_, W>) -> Result<T, Error>,
     ) -> Result<T, Error> {
         let mut seat = self.core.seize().await?;
-        seat.open().await?;
         let mut tx = Tx {
             core: self.core,
             seat: &mut *seat,
             who: self.who,
         };
-        let out = run(&mut tx).await;
+        tx.seat.open().await?;
+        let out = match tx.watch().await {
+            Ok(()) => run(&mut tx).await,
+            Err(err) => Err(err),
+        };
         match out {
             Ok(value) => {
                 seat.close(true).await?;

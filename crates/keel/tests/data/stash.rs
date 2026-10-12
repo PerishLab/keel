@@ -122,3 +122,149 @@ fn shape(pack: &keel::Pack) -> Vec<(i64, std::collections::BTreeMap<String, keel
         .map(|row| (row.key(), row.cells().clone()))
         .collect()
 }
+
+fn file() -> std::path::PathBuf {
+    std::env::temp_dir().join(format!(
+        "keel-stash-{}-{}.db",
+        std::process::id(),
+        keel::life::tick()
+    ))
+}
+
+fn graph() -> Graph {
+    let mut graph = Graph::new();
+    graph.plug::<Room>().plug::<Actor>();
+    graph
+}
+
+#[tokio::test]
+async fn foreign() {
+    let path = file();
+    let near = crate::support::boot(graph(), Sqlite::file(&path).await.expect("near"))
+        .await
+        .expect("boot");
+    let far = keel::bind(graph(), Sqlite::file(&path).await.expect("far"))
+        .await
+        .expect("bind");
+    let ada = near.put("Actor", &[("login", "ada")]).await.expect("ada");
+    assert_eq!(near.live("Actor").await.expect("warm").len(), 1);
+    assert_eq!(near.live("Actor").await.expect("hot").len(), 1);
+
+    far.put("Actor", &[("login", "bob")]).await.expect("bob");
+    far.end("Actor", ada).await.expect("end");
+    let rows = near.live("Actor").await.expect("after");
+    assert_eq!(rows.len(), 1);
+    assert_ne!(rows[0].key(), ada);
+
+    assert_eq!(
+        near.anon()
+            .query("from Actor")
+            .await
+            .expect("q")
+            .rows()
+            .len(),
+        0
+    );
+    let grant = far
+        .put(
+            "@grant",
+            &[
+                ("who", "anon"),
+                ("verb", "see"),
+                ("unit", "Actor"),
+                ("scope", "all"),
+            ],
+        )
+        .await
+        .expect("grant");
+    assert_eq!(
+        near.anon()
+            .query("from Actor")
+            .await
+            .expect("q")
+            .rows()
+            .len(),
+        1
+    );
+    far.end("@grant", grant).await.expect("revoke");
+    assert_eq!(
+        near.anon()
+            .query("from Actor")
+            .await
+            .expect("q")
+            .rows()
+            .len(),
+        0
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
+struct Tally {
+    wire: Sqlite,
+    log: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+impl Tally {
+    fn note(&self, text: &str) {
+        self.log.lock().expect("log").push(text.to_string());
+    }
+}
+
+impl keel::Wire for Tally {
+    fn grain(&self) -> keel::ddl::Grain {
+        self.wire.grain()
+    }
+
+    async fn run(
+        &mut self,
+        sql: &str,
+        args: &[keel::wire::Val],
+    ) -> Result<u64, keel::adapt::Error> {
+        self.note(sql);
+        self.wire.run(sql, args).await
+    }
+
+    async fn plant(
+        &mut self,
+        sql: &str,
+        args: &[keel::wire::Val],
+    ) -> Result<i64, keel::adapt::Error> {
+        self.note(sql);
+        self.wire.plant(sql, args).await
+    }
+
+    async fn rows(
+        &mut self,
+        sql: &str,
+        args: &[keel::wire::Val],
+    ) -> Result<Vec<Vec<keel::wire::Val>>, keel::adapt::Error> {
+        self.note(sql);
+        self.wire.rows(sql, args).await
+    }
+
+    async fn script(&mut self, sql: &str) -> Result<(), keel::adapt::Error> {
+        self.note(sql);
+        self.wire.script(sql).await
+    }
+
+    async fn epoch(&mut self) -> Result<Option<String>, keel::adapt::Error> {
+        self.note("epoch");
+        self.wire.epoch().await
+    }
+}
+
+#[tokio::test]
+async fn quiet() {
+    let log = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let wire = Tally {
+        wire: Sqlite::memory().await.expect("db"),
+        log: log.clone(),
+    };
+    let core = crate::support::boot(graph(), wire).await.expect("boot");
+    core.put("Actor", &[("login", "ada")]).await.expect("ada");
+    let warm = core.query("from Actor").await.expect("warm");
+    log.lock().expect("log").clear();
+    let hot = core.query("from Actor").await.expect("hot");
+    assert_eq!(warm, hot);
+    assert_eq!(*log.lock().expect("log"), vec!["epoch".to_string()]);
+}
