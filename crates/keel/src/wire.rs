@@ -47,4 +47,7 @@ pub trait Wire: Send {
     fn revive(&mut self) -> impl Future<Output = Result<(), Error>> + Send {
         async { Ok(()) }
     }
+    fn epoch(&mut self) -> impl Future<Output = Result<Option<String>, Error>> + Send {
+        async { Ok(None) }
+    }
 }

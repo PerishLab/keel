@@ -68,6 +68,11 @@ impl Wire for Sqlite {
             .map(|_| ())
             .map_err(sql)
     }
+
+    async fn epoch(&mut self) -> Result<Option<String>, Error> {
+        let rows = self.rows("PRAGMA data_version", &[]).await?;
+        Ok(rows.first().and_then(|row| row.first()).map(Val::text))
+    }
 }
 
 fn load(

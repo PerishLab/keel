@@ -141,6 +141,17 @@ impl<W: Wire> Tx<'_, W> {
         Ok(())
     }
 
+    pub(super) async fn watch(&mut self) -> Result<(), Error> {
+        if !self.core.stash.on {
+            return Ok(());
+        }
+        let epoch = self.seat.wire.epoch().await?;
+        if self.core.stash.shift(epoch) {
+            self.core.deeds.forget();
+        }
+        Ok(())
+    }
+
     pub(super) async fn sight(&mut self, tree: &Tree) -> Result<Pack, Error> {
         let key = query::digest(tree);
         let units = tree.involved(self.core.plan())?;

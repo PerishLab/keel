@@ -19,9 +19,24 @@ struct Stash {
     on: bool,
     gens: Mutex<HashMap<String, i64>>,
     deals: Mutex<HashMap<String, Deal>>,
+    seen: Mutex<Option<String>>,
 }
 
 impl Stash {
+    fn shift(&self, epoch: Option<String>) -> bool {
+        let Ok(mut seen) = self.seen.lock() else {
+            self.spoil();
+            return true;
+        };
+        if epoch.is_some() && *seen == epoch {
+            return false;
+        }
+        *seen = epoch;
+        drop(seen);
+        self.spoil();
+        true
+    }
+
     fn bump(&self, unit: &str) {
         let owner = unit.split('.').next().unwrap_or(unit).to_string();
         if let Ok(mut gens) = self.gens.lock() {
@@ -102,6 +117,12 @@ struct Deeds {
 }
 
 impl Deeds {
+    fn forget(&self) {
+        if let Ok(mut held) = self.held.lock() {
+            *held = None;
+        }
+    }
+
     fn read(&self, step: i64) -> Option<Arc<Vec<Row>>> {
         if !self.on {
             return None;

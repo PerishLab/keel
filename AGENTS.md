@@ -51,6 +51,10 @@ business authoring surfaces.
   identity must not leak into model or lifecycle semantics.
 - Preserve the six engine verbs. New ceremonies compose verbs; they do not
   create private write paths.
+- A `Core` serves a cached read only while its `Wire` epoch is unchanged since
+  the cached read: SQLite's `data_version`, Postgres's current snapshot. Commits
+  from other connections, including other processes, therefore invalidate it.
+  A `Wire` without an epoch reads uncached.
 - Preserve fail-closed behavior for unknown schema changes, physical drift,
   unparsed query state, ambiguous identity, lost bootstrap custody, and stale
   stream cursors.
