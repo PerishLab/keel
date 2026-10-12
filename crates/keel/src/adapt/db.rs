@@ -1,8 +1,9 @@
 use crate::adapt::Error;
 use crate::ddl::Grain;
 use crate::wire::{Val, Wire};
-use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection, SqliteRow};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection, SqliteRow, SqliteTransactionManager};
 use sqlx::{AssertSqlSafe, ConnectOptions, Row as _, TypeInfo as _, ValueRef as _};
+use sqlx_core::transaction::TransactionManager;
 
 pub struct Sqlite {
     conn: SqliteConnection,
@@ -62,11 +63,22 @@ impl Wire for Sqlite {
     }
 
     async fn script(&mut self, text: &str) -> Result<(), Error> {
-        sqlx::raw_sql(AssertSqlSafe(text.to_string()))
-            .execute(&mut self.conn)
-            .await
-            .map(|_| ())
-            .map_err(sql)
+        match text {
+            "BEGIN" => {
+                SqliteTransactionManager::begin(
+                    &mut self.conn,
+                    Some(sqlx::SqlStr::from_static("BEGIN")),
+                )
+                .await
+            }
+            "COMMIT" => SqliteTransactionManager::commit(&mut self.conn).await,
+            "ROLLBACK" => SqliteTransactionManager::rollback(&mut self.conn).await,
+            _ => sqlx::raw_sql(AssertSqlSafe(text.to_string()))
+                .execute(&mut self.conn)
+                .await
+                .map(|_| ()),
+        }
+        .map_err(sql)
     }
 
     async fn epoch(&mut self) -> Result<Option<String>, Error> {
@@ -113,3 +125,6 @@ fn lift(row: &SqliteRow, at: usize) -> Result<Val, Error> {
 fn sql(err: sqlx::Error) -> Error {
     Error::Adapt(err.to_string())
 }
+
+#[cfg(test)]
+mod tests;

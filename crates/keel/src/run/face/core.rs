@@ -50,6 +50,8 @@ impl<W: Wire> Core<W> {
         let mut seat = self.seat.lock().await;
         seat.wire.revive().await?;
         if seat.dirty {
+            self.stash.spoil();
+            self.deeds.forget();
             seat.wire.script("ROLLBACK").await?;
             seat.dirty = false;
         }
