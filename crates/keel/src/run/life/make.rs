@@ -257,4 +257,27 @@ impl<'a, W: Wire> Work<'a, W> {
         }
         Ok(out)
     }
+
+    pub(crate) async fn equal(
+        &mut self,
+        unit: &Unit,
+        slot: &Slot,
+        value: &str,
+    ) -> Result<Vec<Row>, Error> {
+        let text = format!(
+            "SELECT {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) ORDER BY {}",
+            unit.sheet(),
+            ddl::seat(unit),
+            ddl::col(slot.name()),
+            ddl::EXPIRES,
+            ddl::EXPIRES,
+            ddl::KEY
+        );
+        self.wire
+            .rows(&text, &[Val::Text(value.to_string()), Val::Int(now())])
+            .await?
+            .into_iter()
+            .map(|line| Row::read(unit, &line))
+            .collect()
+    }
 }
