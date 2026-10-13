@@ -14,8 +14,9 @@ pub async fn run<W: Wire>(
 ) -> Result<Pack, Error> {
     scope.verify(tree)?;
     let mut work = Work::new(wire, plan);
-    let mut rows = match tree.slice() {
-        Slice::Live => work.scan(scope.unit()).await?,
+    let mut rows = match (tree.slice(), point(tree)?) {
+        (Slice::Live, Some(key)) => work.one(scope.unit(), key).await?.into_iter().collect(),
+        (Slice::Live, None) => work.scan(scope.unit()).await?,
     };
     if !tree.preds().is_empty() {
         rows.retain(|row| pass(row, tree.preds()));
@@ -48,6 +49,14 @@ pub async fn run<W: Wire>(
         bags,
         count: None,
     })
+}
+
+fn point(tree: &Tree) -> Result<Option<i64>, Error> {
+    tree.preds()
+        .iter()
+        .find(|pred| pred.field() == ddl::KEY && pred.op() == Op::Eq)
+        .map(|pred| key(pred.value()))
+        .transpose()
 }
 
 pub(crate) struct Sweep<'a, 'w, W: Wire> {
