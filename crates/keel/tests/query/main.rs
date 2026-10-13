@@ -5,6 +5,7 @@ mod build;
 mod cast;
 mod chart;
 mod parse;
+mod point;
 mod probe;
 mod run;
 mod world;

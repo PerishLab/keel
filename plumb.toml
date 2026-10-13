@@ -21,8 +21,10 @@ note = "Rust workspace anchors."
 name = ["docker-compose.yml"]
 note = "Local PostgreSQL integration fixture."
 
+[identity]
+ns = "keel"
+
 [release]
-product = "keel"
 authority = "https://releases.keel.perish.uk"
 skill = false
 

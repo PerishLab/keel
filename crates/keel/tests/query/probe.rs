@@ -25,6 +25,7 @@ pub struct Repo {
 pub struct Tally {
     pub reads: AtomicUsize,
     pub grants: AtomicUsize,
+    pub materialized: AtomicUsize,
 }
 
 pub struct Count<I: Wire> {
@@ -47,14 +48,18 @@ impl<I: Wire> Wire for Count<I> {
         if sql.contains("grant") {
             self.tally.grants.fetch_add(1, Ordering::Relaxed);
         }
-        self.inner.rows(sql, args).await
+        let rows = self.inner.rows(sql, args).await?;
+        self.tally
+            .materialized
+            .fetch_add(rows.len(), Ordering::Relaxed);
+        Ok(rows)
     }
     async fn script(&mut self, sql: &str) -> Result<(), keel::adapt::Error> {
         self.inner.script(sql).await
     }
 }
 
-async fn stand(graph: Graph, tally: Arc<Tally>) -> keel::Core<Count<Sqlite>> {
+pub(super) async fn stand(graph: Graph, tally: Arc<Tally>) -> keel::Core<Count<Sqlite>> {
     let wire = Count {
         inner: Sqlite::memory().await.expect("db"),
         tally,
