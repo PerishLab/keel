@@ -2,7 +2,8 @@ use super::*;
 use crate::adapt::Error;
 use crate::ddl;
 use crate::life::{Cell, Row, Tie, Work};
-use crate::plan::{Edge, Plan, Unit};
+use crate::plan::{Edge, Plan, Slot, Unit};
+use crate::spec::Only;
 use crate::wire::Wire;
 use std::collections::BTreeMap;
 
@@ -14,9 +15,10 @@ pub async fn run<W: Wire>(
 ) -> Result<Pack, Error> {
     scope.verify(tree)?;
     let mut work = Work::new(wire, plan);
-    let mut rows = match (tree.slice(), point(tree)?) {
-        (Slice::Live, Some(key)) => work.one(scope.unit(), key).await?.into_iter().collect(),
-        (Slice::Live, None) => work.scan(scope.unit()).await?,
+    let mut rows = match (tree.slice(), point(tree)?, unique(scope.unit(), tree)) {
+        (Slice::Live, Some(key), _) => work.one(scope.unit(), key).await?.into_iter().collect(),
+        (Slice::Live, None, Some((slot, value))) => work.equal(scope.unit(), slot, value).await?,
+        (Slice::Live, None, None) => work.scan(scope.unit()).await?,
     };
     if !tree.preds().is_empty() {
         rows.retain(|row| pass(row, tree.preds()));
@@ -57,6 +59,22 @@ fn point(tree: &Tree) -> Result<Option<i64>, Error> {
         .find(|pred| pred.field() == ddl::KEY && pred.op() == Op::Eq)
         .map(|pred| key(pred.value()))
         .transpose()
+}
+
+fn unique<'a>(unit: &'a Unit, tree: &'a Tree) -> Option<(&'a Slot, &'a str)> {
+    tree.preds().iter().find_map(|pred| {
+        if pred.op() != Op::Eq {
+            return None;
+        }
+        unit.fields()
+            .iter()
+            .find(|slot| {
+                slot.name() == pred.field()
+                    && slot.kind() == crate::atom::Kind::Text
+                    && *slot.only() == Only::All
+            })
+            .map(|slot| (slot, pred.value()))
+    })
 }
 
 pub(crate) struct Sweep<'a, 'w, W: Wire> {

@@ -8,4 +8,5 @@ mod parse;
 mod point;
 mod probe;
 mod run;
+mod unique;
 mod world;
