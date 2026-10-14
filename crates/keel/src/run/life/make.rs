@@ -261,20 +261,27 @@ impl<'a, W: Wire> Work<'a, W> {
     pub(crate) async fn equal(
         &mut self,
         unit: &Unit,
-        slot: &Slot,
-        value: &str,
+        fields: &[(&Slot, &str)],
     ) -> Result<Vec<Row>, Error> {
-        let text = format!(
-            "SELECT {} FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) ORDER BY {}",
-            unit.sheet(),
-            ddl::seat(unit),
-            ddl::col(slot.name()),
+        let mut text = format!("SELECT {} FROM {} WHERE ", unit.sheet(), ddl::seat(unit));
+        let mut args = Vec::with_capacity(fields.len() + 1);
+        for (slot, value) in fields {
+            if !args.is_empty() {
+                text.push_str(" AND ");
+            }
+            text.push_str(&format!("{} = ?{}", ddl::col(slot.name()), args.len() + 1));
+            args.push(Val::Text(value.to_string()));
+        }
+        text.push_str(&format!(
+            " AND ({} IS NULL OR {} > ?{}) ORDER BY {}",
             ddl::EXPIRES,
             ddl::EXPIRES,
+            args.len() + 1,
             ddl::KEY
-        );
+        ));
+        args.push(Val::Int(now()));
         self.wire
-            .rows(&text, &[Val::Text(value.to_string()), Val::Int(now())])
+            .rows(&text, &args)
             .await?
             .into_iter()
             .map(|line| Row::read(unit, &line))

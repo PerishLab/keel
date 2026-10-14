@@ -85,7 +85,7 @@ async fn exact() {
             .expect("mixed")
             .is_none()
     );
-    assert_eq!(tally.materialized.load(Ordering::Relaxed), 1);
+    assert_eq!(tally.materialized.load(Ordering::Relaxed), 0);
     assert_eq!(
         core.ask(&tree.clone().count())
             .await
