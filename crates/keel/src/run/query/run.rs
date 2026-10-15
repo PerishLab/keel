@@ -2,8 +2,8 @@ use super::*;
 use crate::adapt::Error;
 use crate::ddl;
 use crate::life::{Cell, Row, Tie, Work};
-use crate::plan::{Edge, Plan, Slot, Unit};
-use crate::wire::Wire;
+use crate::plan::{Edge, Plan, Unit};
+use crate::wire::{Val, Wire};
 use std::collections::BTreeMap;
 
 pub async fn run<W: Wire>(
@@ -62,17 +62,21 @@ fn point(tree: &Tree) -> Result<Option<i64>, Error> {
         .transpose()
 }
 
-fn equal<'a>(unit: &'a Unit, tree: &'a Tree) -> Vec<(&'a Slot, &'a str)> {
+fn equal(unit: &Unit, tree: &Tree) -> Vec<(String, Val)> {
     tree.preds()
         .iter()
+        .filter(|pred| pred.op() == Op::Eq)
         .filter_map(|pred| {
-            if pred.op() != Op::Eq {
-                return None;
+            let column = unit.column(pred.field()).ok()?;
+            if unit.refs().any(|edge| edge.name() == pred.field()) {
+                return key(pred.value())
+                    .ok()
+                    .map(|value| (column, Val::Int(value)));
             }
             unit.fields()
                 .iter()
                 .find(|slot| slot.name() == pred.field() && slot.kind() == crate::atom::Kind::Text)
-                .map(|slot| (slot, pred.value()))
+                .map(|_| (column, Val::Text(pred.value().to_string())))
         })
         .collect()
 }
