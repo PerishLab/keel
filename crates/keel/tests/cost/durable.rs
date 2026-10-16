@@ -53,7 +53,7 @@ async fn together(core: &Core<Sqlite>, count: usize) -> f64 {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "cost measurement; run explicitly with --ignored"]
 async fn fsync() {
     for count in [100usize, 400] {
         let held = seat(count);
