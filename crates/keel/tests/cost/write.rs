@@ -39,7 +39,7 @@ async fn grants<W: Wire>(core: &Core<W>) -> usize {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "cost measurement; run explicitly with --ignored"]
 async fn floor() {
     let mut told = Vec::new();
     for unit in ["Flat", "Deep", "Deeper"] {
@@ -101,7 +101,7 @@ async fn floor() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "cost measurement; run explicitly with --ignored"]
 async fn growth() {
     let core = estate().await;
     open(&core).await;
@@ -132,7 +132,7 @@ async fn growth() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "cost measurement; run explicitly with --ignored"]
 async fn parts() {
     let core = estate().await;
     open(&core).await;
@@ -188,7 +188,7 @@ async fn parts() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "cost measurement; run explicitly with --ignored"]
 async fn covered() {
     let core = estate().await;
     open(&core).await;

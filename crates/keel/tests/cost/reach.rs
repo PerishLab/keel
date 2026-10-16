@@ -50,7 +50,7 @@ async fn read(core: &Core<Sqlite>, unit: &str, bare: bool) -> f64 {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "cost measurement; run explicitly with --ignored"]
 async fn reach() {
     for (unit, deep) in [("Flat", 0), ("Deep", 1), ("Deeper", 2)] {
         let core = estate().await;
