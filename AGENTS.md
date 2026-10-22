@@ -28,10 +28,12 @@ business authoring surfaces.
   model from the estate, never compiles business types, and takes `--store`
   (`sqlite:PATH`, a `postgres://` URL or keyword conninfo), `--listen`
   (default `0.0.0.0:8080`) and `--prefix`, or `KEEL_STORE`, `KEEL_LISTEN` and
-  `KEEL_PREFIX`. `keel bootstrap` seals a vacant estate from a manifest file
-  and writes the sudo token only to a new custody file, mode 0600, removing it
-  if the seal fails; `keel status` reports vacant, sealed or unknown; `keel
-  model` prints the canonical manifest of a file or of a sealed estate.
+  `KEEL_PREFIX`. On SIGTERM or SIGINT it stops accepting connections, drains
+  in-flight requests and exits 0. `keel bootstrap` seals a vacant estate from
+  a manifest file and writes the sudo token only to a new custody file, mode
+  0600, removing it if the seal fails; `keel status` reports vacant, sealed or
+  unknown; `keel model` prints the canonical manifest of a file or of a sealed
+  estate.
 - Ordinary `bind` never initializes an empty namespace. `bootstrap` exposes
   status, possession mint, and transactional seal hotspots while the caller
   owns custody. `adopt` is the explicit exact-projection exception for an
