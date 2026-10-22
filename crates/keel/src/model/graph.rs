@@ -31,6 +31,11 @@ impl Graph {
         crate::model::manifest::hydrate::read(text)
     }
 
+    pub fn write(&self) -> Result<String, crate::adapt::Error> {
+        let plan = crate::plan::Plan::lift(self)?;
+        Ok(crate::model::manifest::Manifest::lift(&plan).write())
+    }
+
     pub fn nodes(&self) -> &BTreeMap<String, Spec> {
         &self.nodes
     }

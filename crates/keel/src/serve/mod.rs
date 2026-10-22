@@ -1,4 +1,3 @@
-use crate::adapt::Error;
 use crate::face::{Core, Face};
 use crate::wire::Wire;
 use axum::extract::Path;
@@ -8,15 +7,7 @@ use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use serde_json::json;
 use serde_json::{Map, Value};
-use std::net::SocketAddr;
 use std::sync::Arc;
-
-const HOST: &str = "127.0.0.1";
-const PORT: u16 = 3000;
-
-pub async fn serve<W: Wire + 'static>(core: Arc<Core<W>>) -> Result<(), Error> {
-    listen(core, HOST, PORT, "").await
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Operator(pub i64);
@@ -122,31 +113,6 @@ async fn front<'a, W: Wire>(
                 "sudo verification failed".into()
             },
         })
-}
-
-pub async fn listen<W: Wire + 'static>(
-    core: Arc<Core<W>>,
-    host: &str,
-    port: u16,
-    prefix: &str,
-) -> Result<(), Error> {
-    let app = app(core, prefix);
-    let prefix = prefix.trim_end_matches('/');
-    let addr: SocketAddr = format!("{host}:{port}")
-        .parse()
-        .map_err(|e| Error::Adapt(format!("bad addr: {e}")))?;
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|e| Error::Adapt(format!("bind: {e}")))?;
-    let base = if prefix.is_empty() {
-        format!("http://{addr}")
-    } else {
-        format!("http://{addr}{prefix}")
-    };
-    eprintln!("keel: ready on {base}");
-    axum::serve(listener, app)
-        .await
-        .map_err(|e| Error::Adapt(format!("serve: {e}")))
 }
 
 async fn health() -> impl IntoResponse {

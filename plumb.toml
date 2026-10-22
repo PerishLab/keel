@@ -26,7 +26,17 @@ ns = "keel"
 
 [release]
 authority = "https://releases.keel.perish.uk"
+binaries = ["keel", "keel-api"]
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+]
 skill = false
+
+[release.binary.keel-api]
+targets = ["x86_64-unknown-linux-gnu"]
+install = false
 
 [release.cargo]
 registry = "perish"

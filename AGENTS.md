@@ -19,9 +19,19 @@ business authoring surfaces.
 - `Core` is the possession face. `Face` is the operator-scoped face. Resource
   effects must return through one of them; caller packages carry no hidden
   engine privilege.
-- Keel is a library and reads no configuration file, discovers no path, and
+- The `keel` library reads no configuration file, discovers no path, and
   knows no environment variable. Callers construct `Estate`, open a `Wire`,
-  choose listen values, and hand them over.
+  choose listen values, and hand them over. Only the executables read their
+  flags and environment.
+- Keel ships two executables so it can be operated and tested from outside
+  (PerishLab/.github#127). `keel-api` serves one sealed estate: it reads the
+  model from the estate, never compiles business types, and takes `--store`
+  (`sqlite:PATH`, a `postgres://` URL or keyword conninfo), `--listen`
+  (default `0.0.0.0:8080`) and `--prefix`, or `KEEL_STORE`, `KEEL_LISTEN` and
+  `KEEL_PREFIX`. `keel bootstrap` seals a vacant estate from a manifest file
+  and writes the sudo token only to a new custody file, mode 0600, removing it
+  if the seal fails; `keel status` reports vacant, sealed or unknown; `keel
+  model` prints the canonical manifest of a file or of a sealed estate.
 - Ordinary `bind` never initializes an empty namespace. `bootstrap` exposes
   status, possession mint, and transactional seal hotspots while the caller
   owns custody. `adopt` is the explicit exact-projection exception for an
@@ -33,6 +43,9 @@ business authoring surfaces.
 ## Repository map
 
 - `crates/keel` — model compiler, runtime engine, adapters, HTTP projection.
+- `crates/api` — `keel-api`, and the store opening and ceremonies the CLI
+  shares.
+- `crates/cli` — the `keel` operator CLI.
 - `crates/macro` — resource declaration macros.
 - `crates/gate` — default credential package in caller space.
 - `crates/relay` — default webhook consumer in caller space.
@@ -118,12 +131,13 @@ ectropy .
 
 ## Release
 
-- Keel is a Cargo-only product. wharf publishes `keel-macro`, `keel`,
-  `keel-relay`, `keel-blob`, `keel-column`, and `keel-gate` to the `perish`
-  registry at `cargo.perish.uk`, in dependency order, reading each one back
-  from the index.
-  It declares no binaries and no skill; its release authority carries the
-  distribution record wharf keeps for every marker.
+- wharf publishes `keel-macro`, `keel`, `keel-relay`, `keel-blob`,
+  `keel-column`, and `keel-gate` to the `perish` registry at
+  `cargo.perish.uk`, in dependency order, reading each one back from the
+  index. The same marker carries the `keel` CLI for every target and
+  `keel-api` for Linux only, outside the installed manager. Keel declares no
+  skill; its release authority carries the distribution record wharf keeps for
+  every marker.
 - A release follows Plumb's lifecycle (`plumb release --help`); wharf
   publishes it, and a rerun publishes only what is missing.
 - A stable version owes its bilingual changelog on Depot before the next marker

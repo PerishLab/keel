@@ -15,6 +15,9 @@ default = ["http"]
 http = ["dep:axum"]
 pg = ["sqlx/postgres"]
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(keel_pg)"] }
+
 [dependencies]
 axum = { workspace = true, optional = true }
 getrandom = { workspace = true }

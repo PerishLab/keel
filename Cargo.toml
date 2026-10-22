@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/keel", "crates/macro", "crates/gate", "crates/relay", "crates/blob", "crates/column"]
+members = ["crates/keel", "crates/macro", "crates/gate", "crates/relay", "crates/blob", "crates/column", "crates/api", "crates/cli"]
 
 [workspace.package]
 version = "0.0.0"
@@ -9,7 +9,7 @@ license = "MIT"
 repository = "https://github.com/PerishLab/keel"
 
 [workspace.dependencies]
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "env"] }
 crc32fast = "1"
 arrow-array = "60"
 arrow-schema = "60"
@@ -20,6 +20,7 @@ keel = { path = "crates/keel", version = "=0.0.0", registry = "perish" }
 keel-gate = { path = "crates/gate", version = "=0.0.0", registry = "perish" }
 keel-macro = { path = "crates/macro", version = "=0.0.0", registry = "perish" }
 keel-relay = { path = "crates/relay", version = "=0.0.0", registry = "perish" }
+plumb = { version = "0", registry = "perish" }
 parquet = { version = "60", default-features = false, features = ["arrow", "zstd"] }
 proc-macro2 = "1"
 quote = "1"
@@ -28,6 +29,7 @@ rusty-s3 = "0.7"
 serde_json = "1"
 url = "2"
 sha2 = "0.10"
+tempfile = "3"
 syn = { version = "2", features = ["full"] }
 tower = { version = "0.5", features = ["util"] }
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "sync", "time"] }
