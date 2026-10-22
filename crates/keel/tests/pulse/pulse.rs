@@ -171,3 +171,47 @@ async fn window() {
     assert_eq!(tail.len(), 1);
     assert_eq!(core.flow(4100).await.expect("empty").len(), 0);
 }
+
+#[tokio::test]
+async fn vetoed() {
+    use keel::Wire as _;
+    let path = std::env::temp_dir().join(format!(
+        "keel-veto-{}-{}.db",
+        std::process::id(),
+        keel::life::tick()
+    ));
+    let mut graph = Graph::new();
+    graph.plug::<Room>().plug::<Actor>();
+    let core = crate::support::boot(graph, Sqlite::file(&path).await.expect("db"))
+        .await
+        .expect("bind");
+    let mut axe = Sqlite::file(&path).await.expect("axe");
+    let seat = axe
+        .rows(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%pulse%'",
+            &[],
+        )
+        .await
+        .expect("seat")[0][0]
+        .text();
+    axe.script(&format!(
+        "CREATE TRIGGER veto BEFORE INSERT ON \"{seat}\" BEGIN SELECT RAISE(ABORT, 'veto'); END"
+    ))
+    .await
+    .expect("veto");
+
+    let put = core.put("Room", &[("name", "den")]).await;
+    let rooms = core.live("Room").await.expect("rooms");
+    assert!(put.is_err(), "write reported success without its pulse");
+    assert!(rooms.is_empty(), "write committed without its pulse");
+
+    let batch = core
+        .batch(async |tx| {
+            tx.put("Room", &[("name", "den")]).await?;
+            tx.put("Room", &[("name", "hall")]).await
+        })
+        .await;
+    assert!(batch.is_err(), "batch reported success without its pulses");
+    assert!(core.live("Room").await.expect("after").is_empty());
+    let _ = std::fs::remove_file(&path);
+}

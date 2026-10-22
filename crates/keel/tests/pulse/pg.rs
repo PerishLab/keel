@@ -218,3 +218,32 @@ async fn foreign() {
     assert_eq!(rows.len(), 1);
     assert_ne!(rows[0].key(), algo);
 }
+
+#[tokio::test]
+async fn vetoed() {
+    use keel::Wire as _;
+    let _hold = GATE.lock().await;
+    let store = reset().await;
+    let mut graph = Graph::new();
+    graph.plug::<Course>().plug::<Student>();
+    let core = crate::support::boot(graph, store).await.expect("bind");
+    let mut axe = Postgres::at(url()).await.expect("axe");
+    let seat = axe
+        .rows(
+            "SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename LIKE '%pulse%'",
+            &[],
+        )
+        .await
+        .expect("seat")[0][0]
+        .text();
+    axe.script(&format!(
+        "ALTER TABLE \"{seat}\" ADD CONSTRAINT veto CHECK (false) NOT VALID"
+    ))
+    .await
+    .expect("veto");
+
+    let put = core.put("Course", &[("code", "CS101")]).await;
+    let courses = core.live("Course").await.expect("courses");
+    assert!(put.is_err(), "write reported success without its pulse");
+    assert!(courses.is_empty(), "write committed without its pulse");
+}
