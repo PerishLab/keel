@@ -44,5 +44,26 @@ async fn run(cli: Cli) -> Result<(), String> {
         .map_err(|e| format!("bind {}: {e}", cli.listen))?;
     let addr = listener.local_addr().map_err(|e| e.to_string())?;
     eprintln!("keel-api: ready on http://{addr}{}", cli.prefix);
-    axum::serve(listener, app).await.map_err(|e| e.to_string())
+    axum::serve(listener, app)
+        .with_graceful_shutdown(stop())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(unix)]
+async fn stop() {
+    use tokio::signal::unix::{SignalKind, signal};
+    let Ok(mut term) = signal(SignalKind::terminate()) else {
+        let _ = tokio::signal::ctrl_c().await;
+        return;
+    };
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {}
+        _ = term.recv() => {}
+    }
+}
+
+#[cfg(not(unix))]
+async fn stop() {
+    let _ = tokio::signal::ctrl_c().await;
 }
