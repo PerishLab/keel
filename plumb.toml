@@ -19,7 +19,7 @@ note = "Rust workspace anchors."
 
 [[layout.file]]
 name = ["docker-compose.yml"]
-note = "Local PostgreSQL integration fixture."
+note = "Local PostgreSQL for manual debugging; no test depends on it."
 
 [identity]
 ns = "keel"
