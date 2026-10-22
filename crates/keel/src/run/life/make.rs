@@ -151,7 +151,7 @@ impl<'a, W: Wire> Work<'a, W> {
             .parse::<i64>()
             .map_err(|_| Error::Adapt(format!("ref {} needs id", edge.name())))?;
         let mate = self.plan.find(edge.target())?;
-        if !self.alive(mate, key).await? {
+        if !self.kept(mate, key).await? {
             return Err(Error::Adapt("right not live".into()));
         }
         if !self.fresh(edge.target(), key).await? {
