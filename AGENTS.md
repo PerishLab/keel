@@ -78,6 +78,10 @@ business authoring surfaces.
   Postgres, under `READ COMMITTED`, the later of two racing writers waits and
   re-reads the committed row, so no live row or tie refers to an ended one
   across processes. SQLite's single writer already serializes them.
+- A query reads a tie only while its target is live. `link`, `has` and
+  `some` take ties through one reader, so a tie to an ended row is gone from
+  every path, and an error reading ties fails the query instead of matching
+  nothing.
 - Preserve fail-closed behavior for unknown schema changes, physical drift,
   unparsed query state, ambiguous identity, lost bootstrap custody, and stale
   stream cursors.

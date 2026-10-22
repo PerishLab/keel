@@ -88,14 +88,9 @@ pub(crate) struct Sweep<'a, 'w, W: Wire> {
 
 impl<W: Wire> Sweep<'_, '_, W> {
     pub(crate) async fn pull(&mut self, bond: &Edge, keys: &[i64]) -> Result<Vec<Tie>, Error> {
-        let unit = self.scope.unit();
-        let target = self.scope.at(bond.target())?;
         let mut ties = Vec::new();
         for &key in keys {
-            for tie in self.work.ties(unit, bond, key).await? {
-                if !self.work.alive(target, tie.right()).await? {
-                    continue;
-                }
+            for tie in self.bound(bond, key).await? {
                 ties.push(tie);
                 if ties.len() > CAP {
                     return Err(Error::Adapt("tie cap exceeded".into()));
@@ -104,6 +99,18 @@ impl<W: Wire> Sweep<'_, '_, W> {
         }
         ties.sort_by_key(|tie| tie.key());
         Ok(ties)
+    }
+
+    async fn bound(&mut self, bond: &Edge, left: i64) -> Result<Vec<Tie>, Error> {
+        let unit = self.scope.unit();
+        let target = self.scope.at(bond.target())?;
+        let mut out = Vec::new();
+        for tie in self.work.ties(unit, bond, left).await? {
+            if self.work.alive(target, tie.right()).await? {
+                out.push(tie);
+            }
+        }
+        Ok(out)
     }
 
     pub(crate) async fn hold(&mut self, rows: &mut Vec<Row>, preds: &[Pred]) -> Result<(), Error> {
@@ -118,13 +125,12 @@ impl<W: Wire> Sweep<'_, '_, W> {
     }
 
     async fn has(&mut self, rows: &mut Vec<Row>, pred: &Pred) -> Result<(), Error> {
-        let unit = self.scope.unit();
-        let bond = edge(unit, pred.field())?;
+        let bond = edge(self.scope.unit(), pred.field())?;
         let right = key(pred.value())?;
         let mut keep = Vec::new();
         for row in rows.iter() {
-            let ties = self.work.ties(unit, bond, row.key()).await;
-            if ties.is_ok_and(|ties| ties.iter().any(|tie| tie.right() == right)) {
+            let ties = self.bound(bond, row.key()).await?;
+            if ties.iter().any(|tie| tie.right() == right) {
                 keep.push(row.key());
             }
         }
@@ -139,7 +145,7 @@ impl<W: Wire> Sweep<'_, '_, W> {
             .ok_or_else(|| Error::Adapt("some needs inner".into()))?;
         let mut keep = Vec::new();
         for row in rows.iter() {
-            if self.probe(bond, row.key(), nest).await.unwrap_or(false) {
+            if self.probe(bond, row.key(), nest).await? {
                 keep.push(row.key());
             }
         }
@@ -148,9 +154,8 @@ impl<W: Wire> Sweep<'_, '_, W> {
     }
 
     async fn probe(&mut self, bond: &Edge, left: i64, nest: &Pred) -> Result<bool, Error> {
-        let unit = self.scope.unit();
         let target = self.scope.at(bond.target())?;
-        let ties = self.work.ties(unit, bond, left).await?;
+        let ties = self.bound(bond, left).await?;
         let owned = bond.fields().iter().any(|s| s.name() == nest.field());
         for tie in ties {
             if nest.field() == ddl::KEY {
@@ -173,9 +178,6 @@ impl<W: Wire> Sweep<'_, '_, W> {
     }
 
     async fn mate(&mut self, target: &Unit, key: i64, nest: &Pred) -> Result<bool, Error> {
-        if !self.work.alive(target, key).await? {
-            return Ok(false);
-        }
         let rows = self.work.scan(target).await?;
         Ok(rows
             .iter()
