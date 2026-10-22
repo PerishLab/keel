@@ -53,6 +53,8 @@ business authoring surfaces.
   bytes never enter Keel.
 - `crates/column` — append-only record package keeping records verbatim in
   immutable Parquet parts; records never enter Keel.
+- `Containerfile` — the `keel-api` image. Its build context is only this file
+  and a `keel-api` binary beside it; it bakes in no configuration.
 - `.cargo` — the `perish` registry configuration.
 - `.runseal` — committed inert Runseal resources.
 
@@ -135,9 +137,10 @@ ectropy .
   `keel-column`, and `keel-gate` to the `perish` registry at
   `cargo.perish.uk`, in dependency order, reading each one back from the
   index. The same marker carries the `keel` CLI for every target and
-  `keel-api` for Linux only, outside the installed manager. Keel declares no
-  skill; its release authority carries the distribution record wharf keeps for
-  every marker.
+  `keel-api` for Linux only, outside the installed manager, as the image
+  `ghcr.io/perishlab/keel:<version>` built from the root `Containerfile`.
+  Keel declares no skill; its release authority carries the distribution
+  record wharf keeps for every marker.
 - A release follows Plumb's lifecycle (`plumb release --help`); wharf
   publishes it, and a rerun publishes only what is missing.
 - A stable version owes its bilingual changelog on Depot before the next marker

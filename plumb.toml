@@ -21,6 +21,10 @@ note = "Rust workspace anchors."
 name = ["docker-compose.yml"]
 note = "Local PostgreSQL for manual debugging; no test depends on it."
 
+[[layout.file]]
+name = ["Containerfile"]
+note = "The keel-api image wharf builds; it bakes in no configuration."
+
 [identity]
 ns = "keel"
 
@@ -37,6 +41,12 @@ skill = false
 [release.binary.keel-api]
 targets = ["x86_64-unknown-linux-gnu"]
 install = false
+
+[release.oci]
+registry = "ghcr.io"
+image = "perishlab/keel"
+account = "PerishLab"
+binary = "keel-api"
 
 [release.cargo]
 registry = "perish"
