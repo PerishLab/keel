@@ -1,7 +1,8 @@
 mod make;
 mod rite;
 
-use axum::http::StatusCode;
+use axum::extract::State;
+use axum::http::{HeaderMap, StatusCode};
 use axum::middleware::{self};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
@@ -65,10 +66,34 @@ impl<W: Wire + 'static> Gate<W> {
 
     fn doors(&self) -> Router {
         Router::new()
-            .route("/register", post(register::<W>))
-            .route("/login", post(login::<W>))
-            .route("/logout", post(logout::<W>))
-            .route("/revoke", post(revoke::<W>))
+            .route(
+                "/register",
+                post(
+                    |State(gate): State<Self>, Json(body): Json<Map<String, Value>>| async move {
+                        gate.register(body).await
+                    },
+                ),
+            )
+            .route(
+                "/login",
+                post(
+                    |State(gate): State<Self>, Json(body): Json<Map<String, Value>>| async move {
+                        gate.login(body).await
+                    },
+                ),
+            )
+            .route(
+                "/logout",
+                post(|State(gate): State<Self>, headers: HeaderMap| async move {
+                    gate.quit(headers).await
+                }),
+            )
+            .route(
+                "/revoke",
+                post(|State(gate): State<Self>, headers: HeaderMap| async move {
+                    gate.annul(headers).await
+                }),
+            )
             .with_state(self.clone())
     }
 }
@@ -157,7 +182,6 @@ impl IntoResponse for Deny {
     }
 }
 
-pub(crate) use door::*;
 pub(crate) use guard::*;
 
 pub use guard::{bearer, crumb};
