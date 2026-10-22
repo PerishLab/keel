@@ -1,11 +1,13 @@
 use crate::adapt::Error;
 use crate::face::{Core, Face};
 use crate::wire::Wire;
+use axum::extract::Path;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use serde_json::json;
+use serde_json::{Map, Value};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -22,17 +24,52 @@ pub struct Operator(pub i64);
 pub fn app<W: Wire + 'static>(core: Arc<Core<W>>, prefix: &str) -> Router {
     let api = Router::new()
         .route("/health", get(health))
-        .route("/query", post(run::<W>))
-        .route("/batch", post(batch::<W>))
-        .route("/{unit}", get(list::<W>).post(create::<W>))
+        .route(
+            "/query",
+            post(|seat: Seat<W>, Json(body): Json<Body>| Plea::from(seat).run(body)),
+        )
+        .route(
+            "/batch",
+            post(|seat: Seat<W>, Json(body): Json<Batch>| Plea::from(seat).batch(body)),
+        )
+        .route(
+            "/{unit}",
+            get(|seat: Seat<W>, Path(unit): Path<String>| Plea::from(seat).list(unit)).post(
+                |seat: Seat<W>, Path(unit): Path<String>, Json(body): Json<Map<String, Value>>| {
+                    Plea::from(seat).create(unit, body)
+                },
+            ),
+        )
         .route(
             "/{unit}/{id}",
-            get(one::<W>).patch(edit::<W>).delete(remove::<W>),
+            get(|seat: Seat<W>, Path(at): Path<(String, i64)>| Plea::from(seat).one(at))
+                .patch(
+                    |seat: Seat<W>,
+                     Path(at): Path<(String, i64)>,
+                     Json(body): Json<Map<String, Value>>| {
+                        Plea::from(seat).edit(at, body)
+                    },
+                )
+                .delete(|seat: Seat<W>, Path(at): Path<(String, i64)>| Plea::from(seat).remove(at)),
         )
-        .route("/{unit}/{id}/{bond}", get(refuse).post(attach::<W>))
+        .route(
+            "/{unit}/{id}/{bond}",
+            get(refuse).post(
+                |seat: Seat<W>,
+                 Path(at): Path<(String, i64, String)>,
+                 Json(body): Json<Map<String, Value>>| {
+                    Plea::from(seat).attach(at, body)
+                },
+            ),
+        )
         .route(
             "/{unit}/{id}/{bond}/{tie}",
-            patch(tune::<W>).delete(detach::<W>),
+            patch(
+                |seat: Seat<W>, Path(knot): Path<Knot>, Json(body): Json<Map<String, Value>>| {
+                    Plea::from(seat).tune(knot, body)
+                },
+            )
+            .delete(|seat: Seat<W>, Path(knot): Path<Knot>| Plea::from(seat).detach(knot)),
         )
         .with_state(core);
     let prefix = prefix.trim_end_matches('/');
@@ -116,12 +153,18 @@ async fn health() -> impl IntoResponse {
     Json(json!({ "ok": true }))
 }
 
+async fn refuse() -> StatusCode {
+    StatusCode::NOT_FOUND
+}
+
 mod fault;
 mod json;
+mod plea;
 mod route;
 mod write;
 
 pub(crate) use fault::*;
 pub(crate) use json::*;
+pub(crate) use plea::*;
 pub(crate) use route::*;
 pub(crate) use write::*;

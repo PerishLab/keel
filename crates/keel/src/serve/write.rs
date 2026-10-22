@@ -1,16 +1,12 @@
 use super::*;
 use crate::adapt::Error;
-use crate::face::{Core, Tx};
+use crate::face::Tx;
 use crate::life::Ends;
 use crate::wire::Wire;
-use axum::Extension;
 use axum::Json;
-use axum::extract::State;
-use axum::http::HeaderMap;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
 #[derive(Deserialize)]
 pub(crate) struct Batch {
@@ -65,34 +61,31 @@ fn pairs(cells: &BTreeMap<String, String>) -> Vec<(&str, &str)> {
         .collect()
 }
 
-pub(crate) async fn batch<W: Wire + 'static>(
-    State(core): State<Arc<Core<W>>>,
-    headers: HeaderMap,
-    op: Option<Extension<Operator>>,
-    Json(body): Json<Batch>,
-) -> Result<Json<Value>, Fault> {
-    let mut sets: Vec<BTreeMap<String, String>> = Vec::new();
-    for deed in &body.deeds {
-        if let Some(fields) = deed.fields() {
-            sets.push(cells(fields, &[])?);
-        } else {
-            sets.push(BTreeMap::new());
-        }
-    }
-    let face = front(core.as_ref(), &headers, op.as_deref(), "batch").await?;
-    let ids = face
-        .batch(async |tx| {
-            let mut ids = Vec::new();
-            for (deed, cells) in body.deeds.iter().zip(&sets) {
-                if let Some(id) = deed.run(tx, cells).await? {
-                    ids.push(id);
-                }
+impl<W: Wire + 'static> Plea<W> {
+    pub(crate) async fn batch(self, body: Batch) -> Result<Json<Value>, Fault> {
+        let mut sets: Vec<BTreeMap<String, String>> = Vec::new();
+        for deed in &body.deeds {
+            if let Some(fields) = deed.fields() {
+                sets.push(cells(fields, &[])?);
+            } else {
+                sets.push(BTreeMap::new());
             }
-            Ok(ids)
-        })
-        .await
-        .map_err(Fault::from)?;
-    Ok(Json(json!({ "ids": ids })))
+        }
+        let face = self.face("batch").await?;
+        let ids = face
+            .batch(async |tx| {
+                let mut ids = Vec::new();
+                for (deed, cells) in body.deeds.iter().zip(&sets) {
+                    if let Some(id) = deed.run(tx, cells).await? {
+                        ids.push(id);
+                    }
+                }
+                Ok(ids)
+            })
+            .await
+            .map_err(Fault::from)?;
+        Ok(Json(json!({ "ids": ids })))
+    }
 }
 
 impl Deed {
