@@ -2,6 +2,7 @@ use crate::world::*;
 use keel::Graph;
 use keel::adapt::db::Sqlite;
 use keel::life::{Cell, Ends};
+use keel::wire::{Val, Wire};
 
 #[tokio::test]
 async fn run() {
@@ -195,4 +196,57 @@ async fn run() {
     );
     assert!(core.query("from Ghost").await.is_err());
     let _ = bob;
+}
+
+#[tokio::test]
+async fn ended() {
+    let path = std::env::temp_dir().join(format!("keel-query-{}-ended.sqlite", std::process::id()));
+    let _ = std::fs::remove_file(&path);
+    let mut graph = Graph::new();
+    graph.plug::<Class>().plug::<Student>();
+    let core = crate::support::boot(graph, Sqlite::file(&path).await.expect("db"))
+        .await
+        .expect("bind");
+    let ada = core
+        .put(
+            "Student",
+            &[("nickname", "ada"), ("avatar", "https://a.example/a")],
+        )
+        .await
+        .expect("put ada");
+    let math = core
+        .put("Class", &[("title", "math")])
+        .await
+        .expect("put math");
+    core.tie(
+        "Student",
+        "classes",
+        Ends {
+            left: ada,
+            right: math,
+        },
+        &[],
+    )
+    .await
+    .expect("tie");
+    let mut wire = Sqlite::file(&path).await.expect("plant");
+    wire.run(
+        "UPDATE \"class\" SET expires_at = ?1 WHERE id = ?2",
+        &[Val::Int(1), Val::Int(math)],
+    )
+    .await
+    .expect("end the target beneath its tie");
+    drop(wire);
+
+    let pack = core.query("from Student link classes").await.expect("link");
+    assert_eq!(pack.bond("student.classes").expect("bag").len(), 0);
+    for text in [
+        format!(r#"from Student where classes has "{math}" count"#),
+        format!(r#"from Student where classes some(id = "{math}") count"#),
+        r#"from Student where classes some(title = "math") count"#.to_string(),
+    ] {
+        let pack = core.query(&text).await.expect("count");
+        assert_eq!(pack.count(), Some(0), "{text}");
+    }
+    let _ = std::fs::remove_file(&path);
 }
