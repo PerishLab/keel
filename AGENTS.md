@@ -72,6 +72,12 @@ business authoring surfaces.
   the cached read: SQLite's `data_version`, Postgres's current snapshot. Commits
   from other connections, including other processes, therefore invalidate it.
   A `Wire` without an epoch reads uncached.
+- A lifecycle check that reads another row locks it when the store can:
+  `end` takes each row it ends `FOR UPDATE` before it checks ties, refs and
+  root children, and `put`, `set` and `tie` read each target `FOR SHARE`. On
+  Postgres, under `READ COMMITTED`, the later of two racing writers waits and
+  re-reads the committed row, so no live row or tie refers to an ended one
+  across processes. SQLite's single writer already serializes them.
 - Preserve fail-closed behavior for unknown schema changes, physical drift,
   unparsed query state, ambiguous identity, lost bootstrap custody, and stale
   stream cursors.

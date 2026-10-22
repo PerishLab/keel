@@ -56,6 +56,20 @@ pub enum Grain {
     Pg,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum Lock {
+    Share,
+    Update,
+}
+
+pub(crate) fn grip(grain: Grain, hold: Option<Lock>) -> &'static str {
+    match (grain, hold) {
+        (Grain::Pg, Some(Lock::Share)) => " FOR SHARE",
+        (Grain::Pg, Some(Lock::Update)) => " FOR UPDATE",
+        _ => "",
+    }
+}
+
 fn stub(grain: Grain) -> &'static str {
     match grain {
         Grain::Lite => "INTEGER PRIMARY KEY NOT NULL",

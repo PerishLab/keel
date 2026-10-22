@@ -16,6 +16,13 @@ impl<'a, W: Wire> Work<'a, W> {
     }
 
     async fn retire(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+        let root = self.plan.find(name)?;
+        if root.name() == crate::cap::PULSE {
+            return Err(Error::Adapt("pulse is engine owned".into()));
+        }
+        if !self.claim(root, key).await? {
+            return Err(Error::Adapt(format!("missing row {key}")));
+        }
         let held = self.brood(name, key, at).await?;
         for (unit, key) in held.iter().rev() {
             self.alone(unit, *key, at).await?;
@@ -27,6 +34,9 @@ impl<'a, W: Wire> Work<'a, W> {
         let unit = self.plan.find(name)?;
         if unit.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
+        }
+        if !self.claim(unit, key).await? {
+            return Err(Error::Adapt(format!("missing row {key}")));
         }
         let tick = now();
         if self.inbound(unit.name(), key, at).await? {
