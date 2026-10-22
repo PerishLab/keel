@@ -30,23 +30,20 @@ impl<W: Wire> Tx<'_, W> {
         let key = Work::new(&mut self.seat.wire, plan)
             .put(&unit, fields)
             .await?;
-        self.beat("put", &unit, key).await;
+        self.beat("put", &unit, key).await?;
         Ok(key)
     }
 
-    pub(super) async fn beat(&mut self, verb: &str, unit: &str, key: i64) {
+    pub(super) async fn beat(&mut self, verb: &str, unit: &str, key: i64) -> Result<(), Error> {
         self.core.stash.bump(unit);
         if unit == cap::PULSE || unit == cap::SEAL {
-            return;
+            return Ok(());
         }
         let told = label(self.who);
         let plan = self.core.plan();
-        if let Err(err) = Work::new(&mut self.seat.wire, plan)
+        Work::new(&mut self.seat.wire, plan)
             .pulse(verb, unit, key, &told)
             .await
-        {
-            eprintln!("keel: pulse: {err}");
-        }
     }
 
     pub(super) async fn shift(
@@ -60,7 +57,7 @@ impl<W: Wire> Tx<'_, W> {
         Work::new(&mut self.seat.wire, plan)
             .set(&unit, key, fields)
             .await?;
-        self.beat("set", &unit, key).await;
+        self.beat("set", &unit, key).await?;
         Ok(())
     }
 
@@ -75,7 +72,7 @@ impl<W: Wire> Tx<'_, W> {
         Work::new(&mut self.seat.wire, plan)
             .unset(&unit, key, fields)
             .await?;
-        self.beat("set", &unit, key).await;
+        self.beat("set", &unit, key).await?;
         Ok(())
     }
 
@@ -95,7 +92,7 @@ impl<W: Wire> Tx<'_, W> {
             }
             None => Work::new(&mut self.seat.wire, plan).end(&unit, key).await?,
         }
-        self.beat("end", &unit, key).await;
+        self.beat("end", &unit, key).await?;
         Ok(())
     }
 
@@ -111,7 +108,7 @@ impl<W: Wire> Tx<'_, W> {
         let key = Work::new(&mut self.seat.wire, plan)
             .tie(&unit, bond, ends, fields)
             .await?;
-        self.beat("tie", &lane(&unit, bond), key).await;
+        self.beat("tie", &lane(&unit, bond), key).await?;
         Ok(key)
     }
 
@@ -127,7 +124,7 @@ impl<W: Wire> Tx<'_, W> {
         Work::new(&mut self.seat.wire, plan)
             .tune(&unit, bond, key, fields)
             .await?;
-        self.beat("tie", &lane(&unit, bond), key).await;
+        self.beat("tie", &lane(&unit, bond), key).await?;
         Ok(())
     }
 
@@ -137,7 +134,7 @@ impl<W: Wire> Tx<'_, W> {
         Work::new(&mut self.seat.wire, plan)
             .cut(&unit, bond, key)
             .await?;
-        self.beat("cut", &lane(&unit, bond), key).await;
+        self.beat("cut", &lane(&unit, bond), key).await?;
         Ok(())
     }
 
