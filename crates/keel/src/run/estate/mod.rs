@@ -112,6 +112,13 @@ impl Step {
     }
 }
 
+pub async fn read<W: Wire>(wire: &mut W) -> Result<crate::graph::Graph, Error> {
+    if Catalog(&mut *wire).status().await? == crate::Status::Vacant {
+        return Err(Error::Estate(Fault::Vacant));
+    }
+    crate::graph::Graph::read(&verify(wire).await?.manifest.write())
+}
+
 pub(crate) async fn attach<W: Wire>(
     plan: &Plan,
     manifest: &Manifest,

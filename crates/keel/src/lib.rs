@@ -21,4 +21,4 @@ pub use run::query::{Ask, Bag, Op, Pack, Pred, Rank, Slice, Sort, Tree, form};
 pub use wire::{Val, Wire};
 
 #[cfg(feature = "http")]
-pub use serve::{Operator, app, listen, serve};
+pub use serve::{Operator, app};

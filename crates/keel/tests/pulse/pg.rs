@@ -1,4 +1,4 @@
-#![cfg(feature = "pg")]
+#![cfg(all(feature = "pg", keel_pg))]
 
 use keel::adapt::pg::Postgres;
 use keel::atom::{int, string};
