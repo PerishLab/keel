@@ -134,3 +134,13 @@ async fn down() {
     knobs.down.store(false, Ordering::Relaxed);
     assert_eq!(rig.get("/health").await.status, StatusCode::OK);
 }
+
+#[tokio::test]
+async fn unreachable() {
+    let path = std::path::Path::new("/dev/null/keel.db");
+    match Sqlite::file(path).await {
+        Err(Error::Store(Store::Down(_))) => {}
+        Err(other) => panic!("a store that cannot be opened is {other:?}"),
+        Ok(_) => panic!("opened {}", path.display()),
+    }
+}

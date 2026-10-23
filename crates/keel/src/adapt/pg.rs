@@ -37,7 +37,7 @@ pub struct Postgres {
 impl Postgres {
     pub async fn at(url: impl Into<String>) -> Result<Self, Error> {
         let opts = opts(&url.into())?;
-        let conn = opts.clone().connect().await.map_err(sql)?;
+        let conn = opts.clone().connect().await.map_err(gone)?;
         Ok(Self {
             conn,
             opts,
@@ -117,7 +117,7 @@ impl Wire for Postgres {
             return Ok(());
         }
         if self.conn.ping().await.is_err() {
-            self.conn = self.opts.clone().connect().await.map_err(sql)?;
+            self.conn = self.opts.clone().connect().await.map_err(gone)?;
         }
         self.sound = true;
         Ok(())
@@ -169,6 +169,10 @@ fn lift(row: &PgRow, at: usize) -> Result<Val, Error> {
 
 fn dollar(text: &str) -> String {
     text.replace('?', "$")
+}
+
+fn gone(err: sqlx::Error) -> Error {
+    Error::Store(Store::Down(err.to_string()))
 }
 
 fn sql(err: sqlx::Error) -> Error {
