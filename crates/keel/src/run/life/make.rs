@@ -78,7 +78,10 @@ impl<'a, W: Wire> Work<'a, W> {
         vals.push(Val::Int(tick));
         vals.push(Val::Int(tick));
         self.solid(unit, fields, None).await?;
-        self.wire.run(&text, &vals).await?;
+        self.wire
+            .run(&text, &vals)
+            .await
+            .map_err(|err| claim(unit, err))?;
         Ok(key)
     }
 

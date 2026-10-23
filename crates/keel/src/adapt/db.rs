@@ -1,4 +1,4 @@
-use crate::adapt::Error;
+use crate::adapt::{Error, Store};
 use crate::ddl::Grain;
 use crate::wire::{Val, Wire};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection, SqliteRow, SqliteTransactionManager};
@@ -118,13 +118,35 @@ fn lift(row: &SqliteRow, at: usize) -> Result<Val, Error> {
     match cell.type_info().name() {
         "INTEGER" | "BOOLEAN" => row.try_get::<i64, _>(at).map(Val::Int).map_err(sql),
         "TEXT" => row.try_get::<String, _>(at).map(Val::Text).map_err(sql),
-        _ => Err(Error::Adapt("unsupported column type".into())),
+        _ => Err(Error::Store(Store::Fault("unsupported column type".into()))),
     }
 }
 
 fn sql(err: sqlx::Error) -> Error {
-    Error::Adapt(err.to_string())
+    let text = err.to_string();
+    Error::Store(match &err {
+        sqlx::Error::Database(db) if db.is_unique_violation() => {
+            let cols = db.message().rsplit(": ").next().unwrap_or_default();
+            let last = cols.rsplit(", ").next().unwrap_or_default();
+            Store::Taken(last.rsplit('.').next().unwrap_or_default().to_string())
+        }
+        sqlx::Error::Database(db) => match db.code().and_then(|code| code.parse::<i64>().ok()) {
+            Some(code) if matches!(code & 0xff, BUSY | LOCKED | IOERR | CANTOPEN) => {
+                Store::Down(text)
+            }
+            _ => Store::Fault(text),
+        },
+        sqlx::Error::Io(_) | sqlx::Error::WorkerCrashed | sqlx::Error::PoolClosed => {
+            Store::Down(text)
+        }
+        _ => Store::Fault(text),
+    })
 }
+
+const BUSY: i64 = 5;
+const LOCKED: i64 = 6;
+const IOERR: i64 = 10;
+const CANTOPEN: i64 = 14;
 
 #[cfg(test)]
 mod tests;

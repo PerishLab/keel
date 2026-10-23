@@ -2,8 +2,8 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
-use keel::Graph;
 use keel::adapt::db::Sqlite;
+use keel::{Graph, Wire};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
@@ -28,7 +28,10 @@ pub struct Rig {
 
 impl Rig {
     pub async fn open(graph: Graph) -> Rig {
-        let wire = Sqlite::memory().await.expect("wire");
+        Rig::over(graph, Sqlite::memory().await.expect("wire")).await
+    }
+
+    pub async fn over<W: Wire + 'static>(graph: Graph, wire: W) -> Rig {
         let core = crate::support::boot(graph, wire).await.expect("boot");
         let core = core.share();
         core.put("@grant", &grant()).await.expect("grant");

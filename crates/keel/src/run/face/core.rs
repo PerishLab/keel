@@ -174,6 +174,12 @@ impl<W: Wire> Core<W> {
         }
     }
 
+    pub async fn touch(&self) -> Result<(), Error> {
+        let mut seat = self.seize().await?;
+        seat.wire.rows("SELECT 1", &[]).await?;
+        Ok(())
+    }
+
     pub async fn seal(&self, token: &str) -> Result<bool, Error> {
         let mut seat = self.seize().await?;
         cap::sealed(&self.plan, &mut seat.wire, token).await

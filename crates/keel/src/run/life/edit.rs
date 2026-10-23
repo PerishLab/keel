@@ -150,7 +150,11 @@ impl<'a, W: Wire> Work<'a, W> {
         vals.push(Val::Int(tick));
         vals.push(Val::Int(key));
         vals.push(Val::Int(tick));
-        let changed = self.wire.run(&text, &vals).await?;
+        let changed = self
+            .wire
+            .run(&text, &vals)
+            .await
+            .map_err(|err| super::util::claim(unit, err))?;
         if changed == 0 {
             return Err(Error::Adapt(format!("missing row {key}")));
         }
