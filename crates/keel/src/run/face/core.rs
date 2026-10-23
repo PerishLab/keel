@@ -180,6 +180,17 @@ impl<W: Wire> Core<W> {
         Ok(())
     }
 
+    pub async fn trace(&self, name: &str, key: i64) -> Result<Option<Row>, Error> {
+        let unit = self.plan.find(name)?;
+        if unit.name() == cap::SEAL {
+            return Err(Error::Missing(name.into()));
+        }
+        let mut seat = self.seize().await?;
+        crate::life::Work::new(&mut seat.wire, &self.plan)
+            .trace(unit, key)
+            .await
+    }
+
     pub async fn seal(&self, token: &str) -> Result<bool, Error> {
         let mut seat = self.seize().await?;
         cap::sealed(&self.plan, &mut seat.wire, token).await
