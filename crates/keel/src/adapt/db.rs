@@ -24,7 +24,7 @@ impl Sqlite {
     }
 
     async fn join(opts: SqliteConnectOptions) -> Result<Self, Error> {
-        let conn = opts.connect().await.map_err(sql)?;
+        let conn = opts.connect().await.map_err(gone)?;
         Ok(Self { conn })
     }
 }
@@ -120,6 +120,10 @@ fn lift(row: &SqliteRow, at: usize) -> Result<Val, Error> {
         "TEXT" => row.try_get::<String, _>(at).map(Val::Text).map_err(sql),
         _ => Err(Error::Store(Store::Fault("unsupported column type".into()))),
     }
+}
+
+fn gone(err: sqlx::Error) -> Error {
+    Error::Store(Store::Down(err.to_string()))
 }
 
 fn sql(err: sqlx::Error) -> Error {
