@@ -1,5 +1,6 @@
 use crate::web::Rig;
-use axum::http::StatusCode;
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
 use keel::adapt::db::Sqlite;
 use keel::adapt::{Error, Store};
 use keel::atom::string;
@@ -127,6 +128,13 @@ async fn down() {
     let list = rig.get("/Pass").await;
     assert_eq!(list.status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(list.body, json!({ "error": "store unavailable" }));
+    let sworn = Request::get("/Pass")
+        .header("authorization", "sudo forged")
+        .body(Body::empty())
+        .expect("request");
+    let sworn = rig.call(sworn).await;
+    assert_eq!(sworn.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(sworn.body, json!({ "error": "store unavailable" }));
     let health = rig.get("/health").await;
     assert_eq!(health.status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(health.body, json!({ "error": "store unavailable" }));

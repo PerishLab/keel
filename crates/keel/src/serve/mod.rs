@@ -84,24 +84,9 @@ pub async fn admit<'a, W: Wire>(
     op: Option<&Operator>,
     verb: &str,
 ) -> Result<Face<'a, W>, StatusCode> {
-    let told = headers
-        .get("authorization")
-        .and_then(|value| value.to_str().ok());
-    if let Some(token) = told.and_then(|value| value.strip_prefix("sudo ")) {
-        if core
-            .seal(token)
-            .await
-            .map_err(|err| Fault::from(err).status)?
-        {
-            eprintln!("keel: sudo {verb}");
-            return Ok(core.sudo());
-        }
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-    Ok(match op {
-        Some(Operator(id)) => core.of(*id),
-        None => core.anon(),
-    })
+    front(core, headers, op, verb)
+        .await
+        .map_err(|fault| fault.status)
 }
 
 async fn front<'a, W: Wire>(
@@ -110,16 +95,23 @@ async fn front<'a, W: Wire>(
     op: Option<&Operator>,
     verb: &str,
 ) -> Result<Face<'a, W>, Fault> {
-    admit(core, headers, op, verb)
-        .await
-        .map_err(|status| Fault {
-            status,
-            note: if status == StatusCode::UNAUTHORIZED {
-                "bad sudo token".into()
-            } else {
-                "sudo verification failed".into()
-            },
-        })
+    let told = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok());
+    if let Some(token) = told.and_then(|value| value.strip_prefix("sudo ")) {
+        if core.seal(token).await.map_err(Fault::from)? {
+            eprintln!("keel: sudo {verb}");
+            return Ok(core.sudo());
+        }
+        return Err(Fault {
+            status: StatusCode::UNAUTHORIZED,
+            note: "bad sudo token".into(),
+        });
+    }
+    Ok(match op {
+        Some(Operator(id)) => core.of(*id),
+        None => core.anon(),
+    })
 }
 
 async fn health<W: Wire + 'static>(State(core): State<Arc<Core<W>>>) -> Result<Json<Value>, Fault> {
