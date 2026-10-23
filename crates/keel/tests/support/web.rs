@@ -49,7 +49,10 @@ impl Rig {
             }
             None => Body::empty(),
         };
-        let req = head.body(body).expect("request");
+        self.call(head.body(body).expect("request")).await
+    }
+
+    pub async fn call(&self, req: Request<Body>) -> Reply {
         let res = self.app.clone().oneshot(req).await.expect("oneshot");
         let status = res.status();
         let bytes = res.into_body().collect().await.expect("collect").to_bytes();
