@@ -69,5 +69,13 @@ name = "from_str"
 description = "Foreign std TryFrom trait method used by serde to refuse malformed estate retention values during config load."
 name = "try_from"
 
+[[vocabulary.term]]
+description = "Foreign parquet ChunkReader trait method supplying a seeked reader; instrumentation must implement this exact interface."
+name = "get_read"
+
+[[vocabulary.term]]
+description = "Foreign parquet ChunkReader trait method supplying a byte range; instrumentation must implement this exact interface."
+name = "get_bytes"
+
 [word]
 single = true

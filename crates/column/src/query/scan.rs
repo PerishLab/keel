@@ -87,8 +87,8 @@ impl Table {
     }
 }
 
-fn admitted(
-    builder: &mut ParquetRecordBatchReaderBuilder<File>,
+pub(super) fn admitted<T: parquet::file::reader::ChunkReader + 'static>(
+    builder: &mut ParquetRecordBatchReaderBuilder<T>,
     filter: &Filter,
     keys: &[(usize, String)],
 ) -> Result<Vec<usize>, Error> {

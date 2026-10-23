@@ -133,6 +133,30 @@ business authoring surfaces.
   published without overwriting; an existing path refuses. Scans select by a
   `[from, to)` window and exact key values, prune by row-group statistics and
   bloom filters, and return raw bytes in sort order within a part.
+- `Table::query` and `Store::query` validate a `Query` before storage reads,
+  including an empty store: a nonempty half-open time window when both bounds
+  are given, declared exact key predicates, distinct declared projection
+  columns, and batches of 1 through 65536 rows. `Query::select` returns Arrow
+  batches in requested column order; `Query::count` returns the exact matched
+  count in `Stats` without emitting batches. Both reuse the existing physical
+  columns and pruning; count and projections without `raw` never decode it.
+- Query defaults bound candidate rows to ten million, matched rows to one
+  million, file reads and open snapshot payload each to 256 MiB, and batches
+  to 1024 rows. Callers may set `Limit` and batch size. A refusal or callback
+  error fails the query; previously emitted batches are partial until the
+  final success. A limit never silently truncates a successful count.
+- Query `Stats` distinguish opened files, admitted row groups, candidate rows
+  (all rows in admitted groups plus visited open records), matched rows,
+  successfully returned rows and batches, file bytes read through the reader,
+  and copied open snapshot payload bytes (time, all keys, selected raw).
+  Read bytes include metadata and bloom reads, even repeated ranges; they
+  describe neither physical disk I/O nor CPU. Snapshot payload excludes
+  allocation overhead and Arrow buffers; these limits are no RSS guarantee.
+- A store query selects live part paths and copies matching open records
+  under one lock, then reads parts and returns batches outside it. Count
+  copies no open payload; other projections copy raw only when selected.
+  Ordering remains per part and sorted open records, with no global ordering,
+  pagination, persistent snapshot or pin beyond the retention grace.
 - An append carries a caller batch token and is acknowledged only after its
   partition's open segment is fsynced: CRC-framed records closed by the token
   frame, so a torn or unclosed tail is truncated on recovery and an
@@ -148,7 +172,7 @@ business authoring surfaces.
   segment already published.
 - One process holds a root's lock; scans take a snapshot of live parts and
   open segments and read files outside the lock.
-- Dependencies are arrow and parquet only, never DataFusion; their roughly
+- Column execution uses arrow and parquet, never DataFusion; their roughly
   monthly major releases are a carried upgrade.
 
 ## Operating

@@ -1,5 +1,5 @@
 use crate::manifest::{self, Entry};
-use crate::scan::Sink;
+use crate::query::scan::Sink;
 use crate::segment::Segment;
 use crate::{Error, Filter, Record, Table, recover};
 use keel::{Core, Wire};
