@@ -24,7 +24,7 @@ impl<W: Wire> Plea<W> {
         let face = self.face("see").await?;
         let tree = crate::query::parse(&body.q).map_err(Fault::from)?;
         let units = tree.involved(self.core.plan()).map_err(Fault::from)?;
-        if self.core.plan().shrouds(&units) {
+        if self.core.plan().shrouds(&units) || units.iter().any(|unit| crate::cap::closed(unit)) {
             return Err(Fault {
                 status: StatusCode::NOT_FOUND,
                 note: "no such unit".into(),

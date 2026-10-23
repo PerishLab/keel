@@ -90,6 +90,11 @@ business authoring surfaces.
   Keel's own words. It serves operators, debugging and black-box proof.
   Products never depend on it, and a product deadline stays a product field. A
   model cannot name a unit `-`.
+- Resource paths answer only what a model declares: a row is its `id`, fields
+  and refs, and a tie is its `id`, `left`, `right` and fields. Expiry and
+  timestamps stay inside Keel. `@seal` and `@pulse` are refused on every
+  resource path, in `/batch` and in `/query`; `@grant` is managed there by
+  design.
 - A lifecycle check that reads another row locks it when the store can:
   `end` takes each row it ends `FOR UPDATE` before it checks ties, refs and
   root children, and `put`, `set` and `tie` read each target `FOR SHARE`. On

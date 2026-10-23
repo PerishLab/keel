@@ -71,6 +71,15 @@ impl<W: Wire + 'static> Plea<W> {
                 sets.push(BTreeMap::new());
             }
         }
+        for deed in &body.deeds {
+            let name = crate::query::resolve(self.core.plan(), deed.unit()).map_err(Fault::from)?;
+            if crate::cap::closed(&name) {
+                return Err(Fault {
+                    status: axum::http::StatusCode::NOT_FOUND,
+                    note: "no such route".into(),
+                });
+            }
+        }
         let face = self.face("batch").await?;
         let ids = face
             .batch(async |tx| {
@@ -89,6 +98,13 @@ impl<W: Wire + 'static> Plea<W> {
 }
 
 impl Deed {
+    fn unit(&self) -> &str {
+        match self {
+            Deed::Put { unit, .. } | Deed::Set { unit, .. } | Deed::End { unit, .. } => unit,
+            Deed::Tie { owner, .. } | Deed::Tune { owner, .. } | Deed::Cut { owner, .. } => owner,
+        }
+    }
+
     fn fields(&self) -> Option<&Map<String, Value>> {
         match self {
             Deed::Put { fields, .. }
