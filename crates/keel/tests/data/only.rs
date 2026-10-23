@@ -212,3 +212,44 @@ async fn composite() {
         .await
         .expect("re-react after undo");
 }
+
+#[tokio::test]
+async fn whole() {
+    #[resource]
+    struct Mark {
+        #[field(string, opt)]
+        kind: string,
+        #[field(string, unique = kind)]
+        label: string,
+    }
+
+    #[resource]
+    struct Slot {
+        #[field(string, unique = org)]
+        name: string,
+        #[relation(Org, many2one, opt)]
+        org: Org,
+    }
+
+    let mut graph = Graph::new();
+    graph.plug::<Mark>();
+    let err = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .err()
+        .expect("optional field scope");
+    assert!(
+        err.to_string()
+            .contains("unique scope kind of label is optional")
+    );
+
+    let mut graph = Graph::new();
+    graph.plug::<Org>().plug::<Slot>();
+    let err = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .err()
+        .expect("optional ref scope");
+    assert!(
+        err.to_string()
+            .contains("unique scope org of name is optional")
+    );
+}

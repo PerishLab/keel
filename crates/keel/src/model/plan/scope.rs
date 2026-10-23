@@ -22,18 +22,29 @@ fn unique(slot: &Slot, fields: &[Slot], bonds: &[Edge]) -> Result<(), crate::ada
     let Only::Per(scopes) = slot.only() else {
         return Ok(());
     };
-    let invalid = scopes.iter().find(|scope| {
-        !fields
+    for scope in scopes {
+        let field = fields
             .iter()
-            .any(|field| field.name() == *scope && field.name() != slot.name())
-            && !bonds
-                .iter()
-                .any(|edge| edge.kind().point() && edge.name() == *scope)
-    });
-    match invalid {
-        Some(scope) => Err(crate::adapt::Error::Adapt(format!(
-            "unique scope {scope} is not a field or ref"
-        ))),
-        None => Ok(()),
+            .find(|field| field.name() == scope && field.name() != slot.name())
+            .map(Slot::need);
+        let bond = bonds
+            .iter()
+            .find(|edge| edge.kind().point() && edge.name() == scope)
+            .map(Edge::need);
+        match field.or(bond) {
+            None => {
+                return Err(crate::adapt::Error::Adapt(format!(
+                    "unique scope {scope} is not a field or ref"
+                )));
+            }
+            Some(false) => {
+                return Err(crate::adapt::Error::Adapt(format!(
+                    "unique scope {scope} of {} is optional",
+                    slot.name()
+                )));
+            }
+            Some(true) => {}
+        }
     }
+    Ok(())
 }
