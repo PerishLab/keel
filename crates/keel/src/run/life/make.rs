@@ -109,14 +109,13 @@ impl<'a, W: Wire> Work<'a, W> {
         };
         let me = myself.map(|(key, _)| key).unwrap_or(0);
         let mut text = format!(
-            "SELECT 1 FROM {} WHERE {} = ?1 AND {} != ?2 AND ({} IS NULL OR {} > ?3)",
+            "SELECT 1 FROM {} WHERE {} = ?1 AND {} != ?2 AND {} IS NULL",
             ddl::seat(unit),
             ddl::col(slot.name()),
             ddl::KEY,
-            ddl::EXPIRES,
             ddl::EXPIRES
         );
-        let mut vals = vec![value, Val::Int(me), Val::Int(now())];
+        let mut vals = vec![value, Val::Int(me)];
         if let Only::Per(rels) = slot.only() {
             for rel in rels {
                 let col = unit.column(rel)?;
@@ -183,16 +182,14 @@ impl<'a, W: Wire> Work<'a, W> {
         key: i64,
         myself: Option<i64>,
     ) -> Result<(), Error> {
-        let tick = now();
         let text = format!(
-            "SELECT 1 FROM {} WHERE {} = ?1 AND {} != ?2 AND ({} IS NULL OR {} > ?3) LIMIT 1",
+            "SELECT 1 FROM {} WHERE {} = ?1 AND {} != ?2 AND {} IS NULL LIMIT 1",
             ddl::seat(unit),
             ddl::col(&ddl::side(edge.name())),
             ddl::KEY,
-            ddl::EXPIRES,
             ddl::EXPIRES
         );
-        let args = [Val::Int(key), Val::Int(myself.unwrap_or(0)), Val::Int(tick)];
+        let args = [Val::Int(key), Val::Int(myself.unwrap_or(0))];
         if !self.wire.rows(&text, &args).await?.is_empty() {
             return Err(Error::Adapt("live ref exists".into()));
         }

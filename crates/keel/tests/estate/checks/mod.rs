@@ -42,3 +42,27 @@ async fn unique() {
     drop(core);
     clean(&path);
 }
+
+#[tokio::test]
+async fn leased() {
+    let path = spot("leased");
+    let core = crate::support::boot(graph::<Loose>(), Sqlite::file(&path).await.expect("first"))
+        .await
+        .expect("bind");
+    core.put("Label", &[("code", "same")]).await.expect("one");
+    let two = core.put("Label", &[("code", "same")]).await.expect("two");
+    let at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+        + 3600;
+    core.lease("Label", two, at).await.expect("lease");
+    drop(core);
+
+    let core = bind(graph::<Sole>(), Sqlite::file(&path).await.expect("evolve"))
+        .await
+        .expect("a leased repeat holds no key");
+    assert!(core.put("Label", &[("code", "same")]).await.is_err());
+    drop(core);
+    clean(&path);
+}

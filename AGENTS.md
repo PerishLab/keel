@@ -72,6 +72,11 @@ business authoring surfaces.
   the cached read: SQLite's `data_version`, Postgres's current snapshot. Commits
   from other connections, including other processes, therefore invalidate it.
   A `Wire` without an epoch reads uncached.
+- A unique field is a key over the rows that have no expiry, so a leased row
+  holds no key. The partial unique index, the write checks for fields and for
+  one2one refs, and the estate guard read a key with that one liveness, so one
+  process and many give the same answer. Occupancy that outlives a lease is a
+  product's own model.
 - A lifecycle check that reads another row locks it when the store can:
   `end` takes each row it ends `FOR UPDATE` before it checks ties, refs and
   root children, and `put`, `set` and `tie` read each target `FOR SHARE`. On
