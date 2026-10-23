@@ -5,3 +5,4 @@ mod web;
 
 mod course;
 mod smoke;
+mod store;

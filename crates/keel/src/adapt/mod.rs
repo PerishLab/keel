@@ -14,6 +14,32 @@ pub enum Error {
     Missing(String),
     Adapt(String),
     Estate(crate::estate::Fault),
+    Store(Store),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Store {
+    Down(String),
+    Taken(String),
+    Fault(String),
+}
+
+impl Store {
+    pub fn detail(&self) -> &str {
+        match self {
+            Self::Down(text) | Self::Taken(text) | Self::Fault(text) => text,
+        }
+    }
+}
+
+impl std::fmt::Display for Store {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Down(_) => write!(f, "store unavailable"),
+            Self::Taken(_) => write!(f, "key taken"),
+            Self::Fault(_) => write!(f, "store fault"),
+        }
+    }
 }
 
 impl std::fmt::Display for Error {
@@ -22,6 +48,7 @@ impl std::fmt::Display for Error {
             Self::Missing(name) => write!(f, "missing resource: {name}"),
             Self::Adapt(note) => write!(f, "adapt: {note}"),
             Self::Estate(fault) => write!(f, "{fault}"),
+            Self::Store(store) => write!(f, "{store}"),
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::adapt::Error;
+use crate::adapt::{Error, Store};
 use crate::ddl;
 use crate::ddl::Grain;
 use crate::wire::{Val, Wire};
@@ -161,7 +161,9 @@ fn lift(row: &PgRow, at: usize) -> Result<Val, Error> {
         "TEXT" | "VARCHAR" | "BPCHAR" | "NAME" => {
             row.try_get::<String, _>(at).map(Val::Text).map_err(sql)
         }
-        other => Err(Error::Adapt(format!("unsupported pg type {other}"))),
+        other => Err(Error::Store(Store::Fault(format!(
+            "unsupported pg type {other}"
+        )))),
     }
 }
 
@@ -170,7 +172,23 @@ fn dollar(text: &str) -> String {
 }
 
 fn sql(err: sqlx::Error) -> Error {
-    Error::Adapt(err.to_string())
+    let text = err.to_string();
+    Error::Store(match &err {
+        sqlx::Error::Database(db) if db.is_unique_violation() => {
+            Store::Taken(db.constraint().unwrap_or_default().to_string())
+        }
+        sqlx::Error::Database(db) => match db.code().as_deref() {
+            Some(code) if code.starts_with("08") || code.starts_with("57P") => Store::Down(text),
+            Some(code) if code.starts_with("53") => Store::Down(text),
+            _ => Store::Fault(text),
+        },
+        sqlx::Error::Io(_)
+        | sqlx::Error::Tls(_)
+        | sqlx::Error::PoolTimedOut
+        | sqlx::Error::PoolClosed
+        | sqlx::Error::WorkerCrashed => Store::Down(text),
+        _ => Store::Fault(text),
+    })
 }
 
 impl Postgres {

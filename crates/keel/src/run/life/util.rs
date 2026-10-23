@@ -1,7 +1,8 @@
 use super::*;
-use crate::adapt::Error;
+use crate::adapt::{Error, Store};
 use crate::atom;
 use crate::plan::{Edge, Slot, Unit};
+use crate::spec::Only;
 use crate::wire::Val;
 use std::collections::BTreeMap;
 
@@ -146,4 +147,20 @@ pub(super) fn fit(slots: &[Slot], col: &str, value: &str) -> Result<Val, Error> 
         .find(|slot| slot.name() == col)
         .ok_or_else(|| Error::Adapt(format!("unknown field {col}")))?;
     slot.bind(value)
+}
+
+pub(super) fn claim(unit: &Unit, err: Error) -> Error {
+    let Error::Store(Store::Taken(arbiter)) = &err else {
+        return err;
+    };
+    let held = unit
+        .fields()
+        .iter()
+        .filter(|slot| *slot.only() != Only::Free || slot.serial().is_some())
+        .filter(|slot| arbiter == slot.name() || arbiter.ends_with(&format!("_{}", slot.name())))
+        .max_by_key(|slot| slot.name().len());
+    match held {
+        Some(slot) => Error::Adapt(format!("field {} taken", slot.name())),
+        None => err,
+    }
 }

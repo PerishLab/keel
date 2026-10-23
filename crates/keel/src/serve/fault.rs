@@ -1,4 +1,4 @@
-use crate::adapt::Error;
+use crate::adapt::{Error, Store};
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -69,6 +69,20 @@ impl From<Error> for Fault {
                 status: StatusCode::BAD_REQUEST,
                 note: fault.to_string(),
             },
+            Error::Store(store) => {
+                let status = match store {
+                    Store::Down(_) => StatusCode::SERVICE_UNAVAILABLE,
+                    Store::Taken(_) => StatusCode::CONFLICT,
+                    Store::Fault(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                };
+                if status.is_server_error() {
+                    eprintln!("keel: {store}: {}", store.detail());
+                }
+                Self {
+                    status,
+                    note: store.to_string(),
+                }
+            }
         }
     }
 }

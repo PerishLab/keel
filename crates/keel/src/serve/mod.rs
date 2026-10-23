@@ -1,8 +1,7 @@
 use crate::face::{Core, Face};
 use crate::wire::Wire;
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::IntoResponse;
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use serde_json::json;
@@ -14,7 +13,7 @@ pub struct Operator(pub i64);
 
 pub fn app<W: Wire + 'static>(core: Arc<Core<W>>, prefix: &str) -> Router {
     let api = Router::new()
-        .route("/health", get(health))
+        .route("/health", get(health::<W>))
         .route(
             "/query",
             post(|seat: Seat<W>, Json(body): Json<Body>| Plea::from(seat).run(body)),
@@ -84,7 +83,7 @@ pub async fn admit<'a, W: Wire>(
         if core
             .seal(token)
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .map_err(|err| Fault::from(err).status)?
         {
             eprintln!("keel: sudo {verb}");
             return Ok(core.sudo());
@@ -115,8 +114,9 @@ async fn front<'a, W: Wire>(
         })
 }
 
-async fn health() -> impl IntoResponse {
-    Json(json!({ "ok": true }))
+async fn health<W: Wire + 'static>(State(core): State<Arc<Core<W>>>) -> Result<Json<Value>, Fault> {
+    core.touch().await.map_err(Fault::from)?;
+    Ok(Json(json!({ "ok": true })))
 }
 
 async fn refuse() -> StatusCode {

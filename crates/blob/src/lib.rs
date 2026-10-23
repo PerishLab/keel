@@ -187,7 +187,13 @@ impl Fault {
 impl From<keel::adapt::Error> for Fault {
     fn from(err: keel::adapt::Error) -> Self {
         let note = err.to_string();
-        let status = if note.contains("refused") {
+        let status = if let keel::adapt::Error::Store(store) = &err {
+            match store {
+                keel::adapt::Store::Down(_) => StatusCode::SERVICE_UNAVAILABLE,
+                keel::adapt::Store::Taken(_) => StatusCode::CONFLICT,
+                keel::adapt::Store::Fault(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            }
+        } else if note.contains("refused") {
             StatusCode::FORBIDDEN
         } else if note.ends_with(" taken") {
             StatusCode::CONFLICT

@@ -79,6 +79,12 @@ business authoring surfaces.
   product's own model.
 - A key has no null part: a unique scope is a required field or ref, so a
   model check refuses an optional one before any store reads the key.
+- An adapter reports a store fault by kind: `Store::Down` for a store that
+  cannot answer, `Store::Taken` for a unique key the store refused, and
+  `Store::Fault` for the rest. HTTP answers them 503, 409 and 500, and
+  `/health` fails when one round trip to the store does. A refused key answers
+  `field <name> taken`, as Keel's own check does. No caller sees driver text
+  or a physical name; the driver's text goes only to the server log.
 - A lifecycle check that reads another row locks it when the store can:
   `end` takes each row it ends `FOR UPDATE` before it checks ties, refs and
   root children, and `put`, `set` and `tie` read each target `FOR SHARE`. On
