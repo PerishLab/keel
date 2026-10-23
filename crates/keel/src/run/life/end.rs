@@ -35,11 +35,18 @@ impl<'a, W: Wire> Work<'a, W> {
         if !self.claim(root, key).await? {
             return Err(Error::Adapt(format!("missing row {key}")));
         }
-        let held = self.brood(name, key, at).await?;
+        let mut held = vec![(name.to_string(), key)];
+        held.extend(self.brood(name, key, at).await?);
         for (unit, key) in held.iter().rev() {
             self.alone(unit, *key, at).await?;
         }
-        self.alone(name, key, at).await
+        for (unit, key) in &held {
+            let unit = self.plan.find(unit)?.name().to_string();
+            if self.inbound(&unit, *key, at).await? {
+                return Err(Error::Adapt("live ties remain".into()));
+            }
+        }
+        Ok(())
     }
 
     async fn alone(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
@@ -51,9 +58,6 @@ impl<'a, W: Wire> Work<'a, W> {
             return Err(Error::Adapt(format!("missing row {key}")));
         }
         let tick = now();
-        if self.inbound(unit.name(), key, at).await? {
-            return Err(Error::Adapt("live ties remain".into()));
-        }
         let text = format!(
             "UPDATE {} SET {} = ?1, {} = ?2 WHERE {} = ?3 AND ({} IS NULL OR {} > ?2)",
             ddl::seat(unit),
