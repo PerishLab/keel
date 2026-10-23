@@ -273,15 +273,11 @@ async fn grouped<W: Wire>(wire: &mut W, table: &str, cols: &[String]) -> Result<
         .last()
         .ok_or_else(|| Error::Estate(Fault::Unknown("unique columns".into())))?;
     let text = format!(
-        "SELECT 1 FROM {} WHERE ({} IS NULL OR {} > ?1) AND {value} IS NOT NULL GROUP BY {list} HAVING COUNT(*) > 1 LIMIT 1",
+        "SELECT 1 FROM {} WHERE {} IS NULL AND {value} IS NOT NULL GROUP BY {list} HAVING COUNT(*) > 1 LIMIT 1",
         crate::ddl::col(table),
-        crate::ddl::EXPIRES,
         crate::ddl::EXPIRES
     );
-    Ok(wire
-        .rows(&text, &[Val::Int(crate::life::tick())])
-        .await?
-        .is_empty())
+    Ok(wire.rows(&text, &[]).await?.is_empty())
 }
 
 async fn absent<W: Wire>(wire: &mut W, table: &str, extra: Option<&str>) -> Result<bool, Error> {

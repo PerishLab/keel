@@ -19,6 +19,14 @@ struct Guest {
     home: Room,
 }
 
+#[resource]
+struct Desk {
+    #[field(string)]
+    spot: string,
+    #[relation(Guest, one2one)]
+    owner: Guest,
+}
+
 fn late() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -108,4 +116,56 @@ async fn strict() {
 
     let dup = core.put("Guest", &[("name", "ada"), ("home", "")]).await;
     assert!(dup.is_err());
+}
+
+#[tokio::test]
+async fn yields() {
+    let mut graph = Graph::new();
+    graph.plug::<Room>().plug::<Guest>().plug::<Desk>();
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    let at = late();
+
+    let bea = core
+        .put("Guest", &[("name", "bea"), ("home", "")])
+        .await
+        .expect("bea");
+    core.lease("Guest", bea, at).await.expect("lease bea");
+    let heir = core
+        .put("Guest", &[("name", "bea"), ("home", "")])
+        .await
+        .expect("a leased guest holds no key");
+    let cid = core
+        .put("Guest", &[("name", "cid"), ("home", "")])
+        .await
+        .expect("cid");
+    assert!(
+        core.set("Guest", cid, &[("name", "bea")]).await.is_err(),
+        "a guest with no expiry still holds its key"
+    );
+
+    let dee = core
+        .put("Guest", &[("name", "dee"), ("home", "")])
+        .await
+        .expect("dee");
+    core.lease("Guest", dee, at).await.expect("lease dee");
+    core.set("Guest", cid, &[("name", "dee")])
+        .await
+        .expect("an edit to a leased guest's name");
+
+    let desk = core
+        .put("Desk", &[("spot", "a1"), ("owner", &heir.to_string())])
+        .await
+        .expect("desk");
+    core.lease("Desk", desk, at).await.expect("lease desk");
+    core.put("Desk", &[("spot", "a2"), ("owner", &heir.to_string())])
+        .await
+        .expect("a leased desk holds no one2one key");
+    assert!(
+        core.put("Desk", &[("spot", "a3"), ("owner", &heir.to_string())])
+            .await
+            .is_err(),
+        "a desk with no expiry still holds its one2one key"
+    );
 }
