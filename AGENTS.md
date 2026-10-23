@@ -85,6 +85,11 @@ business authoring surfaces.
   `/health` fails when one round trip to the store does. A refused key answers
   `field <name> taken`, as Keel's own check does. No caller sees driver text
   or a physical name; the driver's text goes only to the server log.
+- `/-/keel` is Keel's operator interface, open to sudo only: a row's
+  `created_at`, `updated_at` and `expires_at`, and the pulse after a cursor, in
+  Keel's own words. It serves operators, debugging and black-box proof.
+  Products never depend on it, and a product deadline stays a product field. A
+  model cannot name a unit `-`.
 - A lifecycle check that reads another row locks it when the store can:
   `end` takes each row it ends `FOR UPDATE` before it checks ties, refs and
   root children, and `put`, `set` and `tie` read each target `FOR SHARE`. On

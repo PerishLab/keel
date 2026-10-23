@@ -1,6 +1,6 @@
 use crate::face::{Core, Face};
 use crate::wire::Wire;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
@@ -14,6 +14,14 @@ pub struct Operator(pub i64);
 pub fn app<W: Wire + 'static>(core: Arc<Core<W>>, prefix: &str) -> Router {
     let api = Router::new()
         .route("/health", get(health::<W>))
+        .route(
+            "/-/keel/row/{unit}/{id}",
+            get(|seat: Seat<W>, Path(at): Path<(String, i64)>| Plea::from(seat).trace(at)),
+        )
+        .route(
+            "/-/keel/pulse",
+            get(|seat: Seat<W>, Query(after): Query<After>| Plea::from(seat).pulse(after)),
+        )
         .route(
             "/query",
             post(|seat: Seat<W>, Json(body): Json<Body>| Plea::from(seat).run(body)),
@@ -123,12 +131,14 @@ async fn refuse() -> StatusCode {
     StatusCode::NOT_FOUND
 }
 
+mod desk;
 mod fault;
 mod json;
 mod plea;
 mod route;
 mod write;
 
+pub(crate) use desk::*;
 pub(crate) use fault::*;
 pub(crate) use json::*;
 pub(crate) use plea::*;

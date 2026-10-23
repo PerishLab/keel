@@ -4,5 +4,6 @@ mod support;
 mod web;
 
 mod course;
+mod desk;
 mod smoke;
 mod store;

@@ -54,6 +54,7 @@ impl Plan {
         }
         let mut units = BTreeMap::new();
         for spec in graph.nodes().values() {
+            crate::name::kept(spec.name())?;
             let unit = Unit::lift(spec)?;
             units.insert(unit.key(), unit);
         }

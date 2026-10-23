@@ -1,9 +1,21 @@
 use super::*;
 use crate::adapt::Error;
 use crate::ddl;
+use crate::plan::Unit;
 use crate::wire::{Val, Wire};
 
 impl<'a, W: Wire> Work<'a, W> {
+    pub(crate) async fn trace(&mut self, unit: &Unit, key: i64) -> Result<Option<Row>, Error> {
+        let text = format!(
+            "SELECT {} FROM {} WHERE {} = ?1",
+            unit.sheet(),
+            ddl::seat(unit),
+            ddl::KEY
+        );
+        let rows = self.wire.rows(&text, &[Val::Int(key)]).await?;
+        rows.first().map(|line| Row::read(unit, line)).transpose()
+    }
+
     pub(crate) async fn end(&mut self, name: &str, key: i64) -> Result<(), Error> {
         self.retire(name, key, now()).await
     }
