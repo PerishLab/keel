@@ -105,6 +105,11 @@ business authoring surfaces.
   `some` take ties through one reader, so a tie to an ended row is gone from
   every path, and an error reading ties fails the query instead of matching
   nothing.
+- A row retires from the ties it holds, and a tie holds its target only while
+  its holder is live. `end` and `lease` retire a row and its root children
+  first, then refuse while a live row or a tie with a live holder outside them
+  still refers to any of them, so references within one cascade never hold it
+  open.
 - Preserve fail-closed behavior for unknown schema changes, physical drift,
   unparsed query state, ambiguous identity, lost bootstrap custody, and stale
   stream cursors.

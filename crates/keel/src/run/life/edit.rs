@@ -82,20 +82,33 @@ impl<'a, W: Wire> Work<'a, W> {
         key: i64,
         at: i64,
     ) -> Result<bool, Error> {
-        let (place, col) = if edge.kind().point() {
-            (ddl::seat(unit), ddl::col(&ddl::side(edge.name())))
+        let (place, col, holder) = if edge.kind().point() {
+            (
+                ddl::seat(unit),
+                ddl::col(&ddl::side(edge.name())),
+                String::new(),
+            )
         } else {
             (
                 ddl::joint(unit, edge.name()),
                 ddl::col(&ddl::mate(unit.name(), edge.name(), edge.target())),
+                format!(
+                    " AND EXISTS (SELECT 1 FROM {} AS h WHERE h.{} = t.{} AND (h.{} IS NULL OR h.{} > ?2))",
+                    ddl::seat(unit),
+                    ddl::KEY,
+                    ddl::col(&ddl::side(unit.name())),
+                    ddl::EXPIRES,
+                    ddl::EXPIRES
+                ),
             )
         };
         let text = format!(
-            "SELECT 1 FROM {} WHERE {} = ?1 AND ({} IS NULL OR {} > ?2) LIMIT 1",
+            "SELECT 1 FROM {} AS t WHERE t.{} = ?1 AND (t.{} IS NULL OR t.{} > ?2){} LIMIT 1",
             place,
             col,
             ddl::EXPIRES,
-            ddl::EXPIRES
+            ddl::EXPIRES,
+            holder
         );
         Ok(!self
             .wire
