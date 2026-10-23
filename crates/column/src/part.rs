@@ -35,7 +35,7 @@ impl Table {
         published.map(|()| summary)
     }
 
-    fn schema(&self) -> Schema {
+    pub(crate) fn schema(&self) -> Schema {
         let mut fields = vec![Field::new(self.time(), DataType::UInt64, false)];
         fields.extend(
             self.keys()

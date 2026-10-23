@@ -14,9 +14,11 @@ path = "src/lib.rs"
 arrow-array = { workspace = true }
 arrow-schema = { workspace = true }
 crc32fast = { workspace = true }
+bytes = { workspace = true }
 keel = { workspace = true }
 parquet = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }
 tokio = { workspace = true }

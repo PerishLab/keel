@@ -1172,9 +1172,11 @@ version = "0.0.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
+ "bytes",
  "crc32fast",
  "keel",
  "parquet",
+ "tempfile",
  "tokio",
 ]
 

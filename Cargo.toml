@@ -11,6 +11,7 @@ repository = "https://github.com/PerishLab/keel"
 [workspace.dependencies]
 clap = { version = "4", features = ["derive", "env"] }
 crc32fast = "1"
+bytes = "1"
 arrow-array = "60"
 arrow-schema = "60"
 axum = "0.8"
