@@ -17,7 +17,7 @@ pub(crate) trait Reach {
 impl<W: Wire> Reach for Core<W> {
     fn unit(&self, route: &str) -> Result<String, Fault> {
         let name = crate::query::resolve(self.plan(), route).map_err(Fault::from)?;
-        if self.plan().veiled(&name) {
+        if self.plan().veiled(&name) || crate::cap::closed(&name) {
             return Err(Fault {
                 status: StatusCode::NOT_FOUND,
                 note: "no such route".into(),
@@ -88,7 +88,6 @@ impl Emit for crate::life::Row {
         for (k, v) in self.cells() {
             map.insert(k.clone(), v.emit());
         }
-        reign(&mut map, self.expires(), self.created(), self.updated());
         Value::Object(map)
     }
 }
@@ -102,7 +101,6 @@ impl Emit for crate::life::Tie {
         for (k, v) in self.cells() {
             map.insert(k.clone(), v.emit());
         }
-        reign(&mut map, self.expires(), self.created(), self.updated());
         Value::Object(map)
     }
 }
@@ -115,10 +113,4 @@ impl Emit for crate::life::Cell {
             crate::life::Cell::Bool(value) => Value::Bool(*value),
         }
     }
-}
-
-fn reign(map: &mut Map<String, Value>, expires: Option<i64>, created: i64, updated: i64) {
-    map.insert("expires_at".into(), json!(expires));
-    map.insert("created_at".into(), json!(created));
-    map.insert("updated_at".into(), json!(updated));
 }
