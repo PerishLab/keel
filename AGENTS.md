@@ -112,6 +112,29 @@ business authoring surfaces.
   open. The cascade is collected, locked, marked and checked as sets, one
   layer and one unit or bond at a time, so the statements an `end` runs are
   bounded by the model, never by the rows it ends.
+- Each Core collects expired business rows, grants and ties in background batches.
+  `Estate.collection` defaults to a 30-day retention, 256 rows per transaction
+  and a 60-second sweep period; callers may configure `retain` (including
+  `forever`), `batch` (1 through 4096) and `period` (positive seconds) before
+  bind or bootstrap. A lease is eligible only after its expiry plus retention.
+  A live or retained point referrer protects its target, and a remaining tie
+  protects both endpoints; ties whose own expiry or either endpoint's expiry
+  has passed retention are collected first. Old expired referrers outside
+  retention do not preserve a target forever, including reference cycles.
+  Each batch locks its candidates, rechecks references after the lock, verifies
+  the active model and commits separately. A Core with an obsolete model
+  refuses collection; dropping the Core cancels its tasks. Generation cleanup,
+  identity clocks and pulse history keep their existing contracts.
+  `keel-api` exposes `--collection-retain`, `--collection-batch` and
+  `--collection-period`, or `KEEL_COLLECTION_RETAIN`,
+  `KEEL_COLLECTION_BATCH` and `KEEL_COLLECTION_PERIOD`, with the same defaults.
+- `Hook::collect` observes committed removal identities through a bounded,
+  best-effort channel, outside the database transaction. Hook absence, failure,
+  timeout or panic, and a full notification channel never gate or undo
+  collection or block later batches. Notifications may be dropped; there
+  is no durable delivery or retry promise. Generation `Hook::purge` keeps its
+  existing contract. Row collection frees database space for reuse; shrinking
+  database files or vacuuming is not promised.
 - Indexes are part of the storage projection: every ref column and both sides
   of every join table carry an index on the column and its expiry. An estate
   whose model is unchanged gains the indexes the projection adds in place,

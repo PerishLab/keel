@@ -1,3 +1,5 @@
+mod collect;
+
 use super::world::*;
 use keel::adapt::Error;
 use keel::adapt::db::Sqlite;

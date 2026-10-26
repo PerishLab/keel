@@ -67,6 +67,7 @@ pub struct Bootstrap<W> {
     plan: crate::plan::Plan,
     manifest: crate::model::manifest::Manifest,
     wire: W,
+    estate: crate::config::Estate,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -91,10 +92,16 @@ pub fn bootstrap<W: Wire>(graph: crate::graph::Graph, wire: W) -> Result<Bootstr
         plan,
         manifest,
         wire,
+        estate: crate::config::Estate::default(),
     })
 }
 
 impl<W: Wire> Bootstrap<W> {
+    pub fn estate(mut self, estate: &crate::config::Estate) -> Self {
+        self.estate = estate.clone();
+        self
+    }
+
     pub async fn status(&mut self) -> Result<Status, Error> {
         crate::estate::Catalog(&mut self.wire).status().await
     }
@@ -106,12 +113,19 @@ impl<W: Wire> Bootstrap<W> {
         crate::cap::wild()
     }
 
-    pub async fn seal(mut self, token: &str) -> Result<crate::face::Core<W>, Error> {
+    pub async fn seal(mut self, token: &str) -> Result<crate::face::Core<W>, Error>
+    where
+        W: 'static,
+    {
+        self.estate.collection.check()?;
         if !crate::cap::token(token) {
             return Err(Error::Estate(crate::estate::Fault::Token));
         }
         crate::estate::bootstrap(&self.plan, &self.manifest, token, &mut self.wire).await?;
-        Ok(crate::face::Core::new(self.plan, self.wire))
+        Ok(
+            crate::face::Core::new(self.plan, self.wire)
+                .collect(self.estate.collection, None::<()>),
+        )
     }
 }
 
@@ -153,7 +167,7 @@ impl<W: Wire + 'static, H: crate::estate::Hook + 'static> Await for Bind<W, H> {
     }
 }
 
-async fn ready<W: Wire, H: crate::estate::Hook>(
+async fn ready<W: Wire + 'static, H: crate::estate::Hook + 'static>(
     bind: Bind<W, H>,
 ) -> Result<crate::face::Core<W>, Error> {
     let Bind {
@@ -163,6 +177,7 @@ async fn ready<W: Wire, H: crate::estate::Hook>(
         adopt,
         mut hook,
     } = bind;
+    estate.collection.check()?;
     let (plan, manifest) = prepare(&graph)?;
     crate::estate::attach(
         &plan,
@@ -175,7 +190,7 @@ async fn ready<W: Wire, H: crate::estate::Hook>(
     )
     .await?;
     crate::estate::cleanup::deliver(hook.as_mut(), &mut wire).await?;
-    Ok(crate::face::Core::new(plan, wire))
+    Ok(crate::face::Core::new(plan, wire).collect(estate.collection, hook))
 }
 
 fn prepare(

@@ -107,7 +107,7 @@ async fn boot() -> Lab<Sqlite> {
     lab(Sqlite::memory().await.expect("db")).await
 }
 
-async fn lab<W: Wire>(wire: W) -> Lab<W> {
+async fn lab<W: Wire + 'static>(wire: W) -> Lab<W> {
     let core = crate::support::boot(graph(), wire).await.expect("bind");
     Lab { core }
 }

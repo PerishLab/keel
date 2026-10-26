@@ -14,7 +14,7 @@ struct Actor {
 
 keel_gate::gate!(Actor);
 
-async fn boot<W: Wire>(graph: Graph, wire: W) -> Core<W> {
+async fn boot<W: Wire + 'static>(graph: Graph, wire: W) -> Core<W> {
     let mut boot = bootstrap(graph, wire).expect("bootstrap");
     let token = boot.mint().await.expect("mint");
     boot.seal(&token).await.expect("seal")

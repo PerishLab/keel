@@ -20,13 +20,21 @@ pub async fn open(at: &str) -> Result<Store, Error> {
     }
 }
 
-pub async fn mount<W: Wire + 'static>(mut wire: W, prefix: &str) -> Result<Router, Error> {
+pub async fn mount<W: Wire + 'static>(wire: W, prefix: &str) -> Result<Router, Error> {
+    configured(wire, prefix, &keel::config::Estate::default()).await
+}
+
+pub async fn configured<W: Wire + 'static>(
+    mut wire: W,
+    prefix: &str,
+    estate: &keel::config::Estate,
+) -> Result<Router, Error> {
     let graph = keel::estate::read(&mut wire).await?;
-    let core = keel::bind(graph, wire).await?;
+    let core = keel::bind(graph, wire).estate(estate).await?;
     Ok(keel::app(Arc::new(core), prefix))
 }
 
-pub async fn seal<W: Wire>(wire: W, graph: Graph, custody: &Path) -> Result<(), Error> {
+pub async fn seal<W: Wire + 'static>(wire: W, graph: Graph, custody: &Path) -> Result<(), Error> {
     let mut boot = keel::bootstrap(graph, wire)?;
     let token = boot.mint().await?;
     keep(custody, &token)?;
