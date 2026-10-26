@@ -1,3 +1,4 @@
+pub mod join;
 mod meter;
 mod plan;
 mod reader;
