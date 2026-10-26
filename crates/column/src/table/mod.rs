@@ -1,3 +1,8 @@
+mod batch;
+mod evolve;
+mod field;
+mod layout;
+pub use field::{Column, Kind, Row, Value};
 mod model;
 pub(crate) use model::occupied;
 mod verify;
@@ -13,6 +18,7 @@ pub struct Table {
     keys: Vec<String>,
     sort: Vec<usize>,
     grain: Grain,
+    fields: Vec<Column>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -48,6 +54,7 @@ impl Table {
             time: time.to_string(),
             keys: keys.iter().map(|key| (*key).to_string()).collect(),
             sort: Vec::new(),
+            fields: Vec::new(),
             grain: Grain {
                 key: None,
                 width: u64::MAX,

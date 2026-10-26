@@ -31,7 +31,7 @@ impl<W: Wire> Store<W> {
                     .ok_or_else(|| Error::new("part has no directory"))?,
             )?;
             discard(&path)?;
-            let summary = self.table.write(&path, segment.records.clone())?;
+            let summary = self.table.rows(&path, segment.records.clone())?;
             let entry = Entry {
                 key: 0,
                 scope: scope.clone(),

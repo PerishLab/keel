@@ -1,6 +1,5 @@
 use crate::table::RAW;
-use crate::{Error, Partition, Record, Table};
-use arrow_array::{ArrayRef, BinaryArray, RecordBatch, StringArray, UInt64Array};
+use crate::{Error, Partition, Record, Row, Table};
 use arrow_schema::{DataType, Field, Schema};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, Encoding, ZstdLevel};
@@ -21,7 +20,11 @@ pub struct Summary {
 }
 
 impl Table {
-    pub fn write(&self, path: &Path, mut records: Vec<Record>) -> Result<Summary, Error> {
+    pub fn write(&self, path: &Path, records: Vec<Record>) -> Result<Summary, Error> {
+        self.rows(path, records.into_iter().map(Row::from).collect())
+    }
+
+    pub fn rows(&self, path: &Path, mut records: Vec<Row>) -> Result<Summary, Error> {
         let summary = self.summarize(&records)?;
         records.sort_by(|left, right| self.order(left, right));
         let staging = staged(path);
@@ -43,12 +46,17 @@ impl Table {
                 .map(|key| Field::new(key, DataType::Utf8, false)),
         );
         fields.push(Field::new(RAW, DataType::Binary, false));
+        fields.extend(
+            self.fields()
+                .iter()
+                .map(|field| Field::new(&field.name, field.kind.arrow(), true)),
+        );
         Schema::new(fields)
     }
 
-    fn summarize(&self, records: &[Record]) -> Result<Summary, Error> {
+    fn summarize(&self, records: &[Row]) -> Result<Summary, Error> {
         for record in records {
-            self.check(record)?;
+            self.accept(record)?;
         }
         let first = records
             .first()
@@ -72,20 +80,10 @@ impl Table {
         Ok(summary)
     }
 
-    fn encode(&self, path: &Path, records: &[Record]) -> Result<(), Error> {
+    fn encode(&self, path: &Path, records: &[Row]) -> Result<(), Error> {
         let schema = Arc::new(self.schema());
-        let mut columns: Vec<ArrayRef> = vec![Arc::new(UInt64Array::from_iter_values(
-            records.iter().map(|record| record.time),
-        ))];
-        for index in 0..self.keys().len() {
-            columns.push(Arc::new(StringArray::from_iter_values(
-                records.iter().map(|record| record.keys[index].as_str()),
-            )));
-        }
-        columns.push(Arc::new(BinaryArray::from_iter_values(
-            records.iter().map(|record| record.raw.as_slice()),
-        )));
-        let batch = RecordBatch::try_new(schema.clone(), columns)?;
+        let columns: Vec<_> = (0..schema.fields().len()).collect();
+        let batch = self.batch(records, &columns)?;
         let file = File::create_new(path)?;
         let mut writer = ArrowWriter::try_new(file, schema, Some(self.properties()?))?;
         writer.write(&batch)?;

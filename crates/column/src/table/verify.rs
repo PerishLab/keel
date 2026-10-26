@@ -43,9 +43,7 @@ impl Table {
 
     fn part(&self, path: &Path, scope: &str) -> Result<(), Error> {
         let builder = ParquetRecordBatchReaderBuilder::try_new(File::open(path)?)?;
-        if builder.schema().as_ref() != &self.schema() {
-            return Err(Error::new("legacy part schema differs from column model"));
-        }
+        self.layout(builder.schema())?;
         let projection = ProjectionMask::leaves(builder.parquet_schema(), 0..=self.keys.len());
         let reader = builder.with_projection(projection).build()?;
         let mut previous = None;

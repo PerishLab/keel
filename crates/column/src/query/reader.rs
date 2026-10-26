@@ -36,9 +36,14 @@ impl Table {
         let source = Source::new(File::open(path)?, meter.clone())?;
         stats.files += 1;
         let mut builder = ParquetRecordBatchReaderBuilder::try_new(source)?;
-        if builder.schema().as_ref() != &self.schema() {
-            return Err(Error::new("query part schema differs from table"));
-        }
+        self.layout(builder.schema())?;
+        let width = builder.schema().fields().len();
+        let physical: Vec<_> = plan
+            .columns
+            .iter()
+            .copied()
+            .filter(|index| *index < width)
+            .collect();
         let groups = scan::admitted(&mut builder, &query.filter, &plan.keys)?;
         for group in &groups {
             stats.admit(
@@ -51,7 +56,7 @@ impl Table {
         let reader = builder
             .with_batch_size(query.batch)
             .with_row_groups(groups)
-            .with_projection(ProjectionMask::leaves(&columns, plan.columns.clone()))
+            .with_projection(ProjectionMask::leaves(&columns, physical.clone()))
             .with_row_filter(predicates(&columns, plan, query))
             .build()?;
         for batch in reader {
@@ -63,7 +68,11 @@ impl Table {
                 "matched rows",
             )?;
             if !plan.columns.is_empty() {
-                stats.emit(batch.project(&plan.order)?, output)?;
+                stats.emit(
+                    self.align(&batch, &plan.columns, &physical)?
+                        .project(&plan.order)?,
+                    output,
+                )?;
             }
         }
         Ok(())

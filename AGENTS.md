@@ -127,17 +127,37 @@ business authoring surfaces.
   partition grain (an optional key and a time width). Every record keeps its
   raw bytes verbatim in the `raw` column beside the time and key values its
   caller extracted; returning a record returns those bytes exactly.
-- `Table::schema` exposes the current non-null Arrow columns: UInt64 time,
-  Utf8 keys in declaration order, then Binary raw. `describe` and `parse`
-  round-trip a canonical format-1 table description, at most 1 MiB, including
-  time/key names, sort and partition grain. Unknown versions, fields and
-  invalid declarations refuse; this format adds no new scalar columns.
-- A column root binds that physical declaration in `model.json`, under its
-  writer lock, by a synced atomic publication before record recovery or
-  writes. Ordinary `Store::open` requires the exact model, including ordered
-  keys, sort and grain; changes and invalid model files refuse before recovery
-  can truncate segments or remove orphan parts. A binding is never overwritten;
-  supported evolution is presently exact reopen only.
+- `Table::schema` exposes non-null UInt64 time, ordered Utf8 keys and Binary
+  raw, followed by declared nullable fields. `Table::field` adds Bool, Int,
+  Uint, Text or Bytes, mapped to Boolean, Int64, UInt64, Utf8 or Binary. Names
+  are distinct across all columns; additional fields cannot become sort or
+  partition keys. `fields` exposes their identity, order, type and nullability.
+- `describe` and `parse` round-trip a canonical description at most 1 MiB:
+  format 1 for field-free tables, format 2 for nullable fields. Unknown
+  versions, types, fields and invalid declarations refuse. Existing format-1
+  descriptions remain unchanged. Every additional field is nullable; omitted
+  suffix values mean null, with no inferred value or backfill.
+- A column root binds its physical declaration in `model.json`, under its
+  writer lock, by synced atomic publication before record recovery or writes.
+  Ordinary `Store::open` requires the exact model, including ordered keys,
+  fields, sort and grain; it never upgrades. Invalid or changed bindings
+  refuse before recovery can truncate segments or remove orphan parts.
+- `Store::evolve` opens an existing bound root explicitly with an appended
+  nullable field suffix. Existing field names, types, order, nullability and
+  the base layout must match. While holding the exclusive writer lock it
+  validates history against the saved model, then atomically replaces and
+  syncs the binding before recovery; it rewrites no part or segment. An equal
+  model is an idempotent reopen. The old writer must close first; this is not
+  live evolution. A publication failure may leave the old or new complete
+  binding; reread it rather than assuming a rollback. Torn historical tails
+  must first recover under the saved model. Missing bindings, incompatible
+  changes and contradictory history refuse before publication.
+- `Record` and legacy append/write keep their shape and supply null for all
+  additional fields. `Record::values` constructs a `Row` with a positional
+  nullable-value prefix; `Store::write` and `Table::rows` accept typed rows.
+  Type or width mismatches refuse before writes. Raw remains byte-for-byte
+  caller data, independent of extracted values. Typed WAL entries are
+  CRC-framed beside unchanged legacy entries and share token/fsync recovery.
 - A historical nonempty root without a binding requires explicit
   `Store::adopt` with its original table declaration. Adoption first reads
   referenced part schemas, key/time ordering and partition membership, and
@@ -165,6 +185,10 @@ business authoring surfaces.
   batches in requested column order; `Query::count` returns the exact matched
   count in `Stats` without emitting batches. Both reuse the existing physical
   columns and pruning; count and projections without `raw` never decode it.
+  A historical part may have an exact physical prefix of the current schema;
+  missing nullable suffix columns return typed null arrays. Wrong column
+  names, types, nullability or order refuse. New scalar fields are selectable;
+  predicates remain time and declared exact key predicates only.
 - Query defaults bound candidate rows to ten million, matched rows to one
   million, file reads and open snapshot payload each to 256 MiB, and batches
   to 1024 rows. Callers may set `Limit` and batch size. A refusal or callback
@@ -173,13 +197,15 @@ business authoring surfaces.
 - Query `Stats` distinguish opened files, admitted row groups, candidate rows
   (all rows in admitted groups plus visited open records), matched rows,
   successfully returned rows and batches, file bytes read through the reader,
-  and copied open snapshot payload bytes (time, all keys, selected raw).
+  and copied open snapshot payload bytes (time, all keys, selected raw and
+  selected scalar payload).
   Read bytes include metadata and bloom reads, even repeated ranges; they
   describe neither physical disk I/O nor CPU. Snapshot payload excludes
   allocation overhead and Arrow buffers; these limits are no RSS guarantee.
 - A store query selects live part paths and copies matching open records
   under one lock, then reads parts and returns batches outside it. Count
-  copies no open payload; other projections copy raw only when selected.
+  copies no open payload; other projections copy raw and scalar payload only
+  when selected.
   Ordering remains per part and sorted open records, with no global ordering,
   pagination, persistent snapshot or pin beyond the retention grace.
 - An append carries a caller batch token and is acknowledged only after its
@@ -188,7 +214,8 @@ business authoring surfaces.
   unacknowledged batch never becomes visible. A token already applied to a
   partition, in its open segment or its recent parts, is acknowledged without
   writing; per-record deduplication belongs to later merging.
-- A segment seals at 16 MiB of raw records or 5 minutes of age into a part
+- A segment seals at 16 MiB of raw plus encoded scalar values or 5 minutes
+  of age into a part
   whose `Part` row is published in Keel; a part is visible only through a live
   row. Callers plug `stock` into their Graph and so host a Keel estate.
 - Retention ends a partition's rows in one transaction and drops its open

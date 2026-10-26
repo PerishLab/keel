@@ -1,15 +1,16 @@
-use crate::Record;
+use crate::{Error, Record, Row};
 
 const TOKEN: u8 = 0;
 const ENTRY: u8 = 1;
+const TYPED: u8 = 2;
 const HEAD: usize = 8;
 
 pub(crate) enum Frame {
     Token(String),
-    Entry(Record),
+    Entry(Row),
 }
 
-pub(crate) fn encode(frame: &Frame) -> Vec<u8> {
+pub(crate) fn encode(frame: &Frame) -> Result<Vec<u8>, Error> {
     let mut payload = Vec::new();
     match frame {
         Frame::Token(token) => {
@@ -17,22 +18,29 @@ pub(crate) fn encode(frame: &Frame) -> Vec<u8> {
             payload.extend_from_slice(token.as_bytes());
         }
         Frame::Entry(record) => {
-            payload.push(ENTRY);
+            payload.push(if record.values.is_empty() {
+                ENTRY
+            } else {
+                TYPED
+            });
             payload.extend_from_slice(&record.time.to_le_bytes());
-            push(&mut payload, narrow(record.keys.len()));
+            push(&mut payload, narrow(record.keys.len())?);
             for key in &record.keys {
-                push(&mut payload, narrow(key.len()));
+                push(&mut payload, narrow(key.len())?);
                 payload.extend_from_slice(key.as_bytes());
             }
-            push(&mut payload, narrow(record.raw.len()));
+            push(&mut payload, narrow(record.raw.len())?);
             payload.extend_from_slice(&record.raw);
+            if !record.values.is_empty() {
+                super::scalar::encode(&record.values, &mut payload)?;
+            }
         }
     }
     let mut framed = Vec::with_capacity(HEAD + payload.len());
-    push(&mut framed, narrow(payload.len()));
+    push(&mut framed, narrow(payload.len())?);
     push(&mut framed, crc32fast::hash(&payload));
     framed.extend_from_slice(&payload);
-    framed
+    Ok(framed)
 }
 
 pub(crate) fn decode(bytes: &[u8]) -> Vec<(Frame, usize)> {
@@ -44,7 +52,7 @@ pub(crate) fn decode(bytes: &[u8]) -> Vec<(Frame, usize)> {
     frames
 }
 
-struct Cursor<'a> {
+pub(super) struct Cursor<'a> {
     bytes: &'a [u8],
     at: usize,
 }
@@ -71,11 +79,12 @@ impl Cursor<'_> {
     }
 
     fn payload(mut self) -> Option<Frame> {
-        match *self.take(1)?.first()? {
+        let tag = *self.take(1)?.first()?;
+        match tag {
             TOKEN => String::from_utf8(self.bytes[self.at..].to_vec())
                 .ok()
                 .map(Frame::Token),
-            ENTRY => {
+            ENTRY | TYPED => {
                 let time = u64::from_le_bytes(self.take(8)?.try_into().ok()?);
                 let count = self.word()?;
                 let keys = (0..count)
@@ -86,20 +95,28 @@ impl Cursor<'_> {
                     .collect::<Option<Vec<_>>>()?;
                 let length = self.word()? as usize;
                 let raw = self.take(length)?.to_vec();
+                let values = if tag == TYPED {
+                    self.values()?
+                } else {
+                    Vec::new()
+                };
                 if self.at != self.bytes.len() {
                     return None;
                 }
-                Some(Frame::Entry(Record { raw, time, keys }))
+                Some(Frame::Entry(Row {
+                    record: Record { raw, time, keys },
+                    values,
+                }))
             }
             _ => None,
         }
     }
 
-    fn word(&mut self) -> Option<u32> {
+    pub(super) fn word(&mut self) -> Option<u32> {
         Some(u32::from_le_bytes(self.take(4)?.try_into().ok()?))
     }
 
-    fn take(&mut self, length: usize) -> Option<&[u8]> {
+    pub(super) fn take(&mut self, length: usize) -> Option<&[u8]> {
         let end = self.at.checked_add(length)?;
         let slice = self.bytes.get(self.at..end)?;
         self.at = end;
@@ -107,10 +124,10 @@ impl Cursor<'_> {
     }
 }
 
-fn push(buffer: &mut Vec<u8>, value: u32) {
+pub(super) fn push(buffer: &mut Vec<u8>, value: u32) {
     buffer.extend_from_slice(&value.to_le_bytes());
 }
 
-fn narrow(length: usize) -> u32 {
-    u32::try_from(length).unwrap_or(u32::MAX)
+pub(super) fn narrow(length: usize) -> Result<u32, Error> {
+    u32::try_from(length).map_err(|_| Error::new("encoded frame exceeds 4 GiB"))
 }
