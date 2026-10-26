@@ -96,8 +96,8 @@ business authoring surfaces.
   resource path, in `/batch` and in `/query`; `@grant` is managed there by
   design.
 - A lifecycle check that reads another row locks it when the store can:
-  `end` takes each row it ends `FOR UPDATE` before it checks ties, refs and
-  root children, and `put`, `set` and `tie` read each target `FOR SHARE`. On
+  `end` takes each layer of its cascade `FOR UPDATE` before it collects the
+  next one, and `put`, `set` and `tie` read each target `FOR SHARE`. On
   Postgres, under `READ COMMITTED`, the later of two racing writers waits and
   re-reads the committed row, so no live row or tie refers to an ended one
   across processes. SQLite's single writer already serializes them.
@@ -109,7 +109,9 @@ business authoring surfaces.
   its holder is live. `end` and `lease` retire a row and its root children
   first, then refuse while a live row or a tie with a live holder outside them
   still refers to any of them, so references within one cascade never hold it
-  open.
+  open. The cascade is collected, locked, marked and checked as sets, one
+  layer and one unit or bond at a time, so the statements an `end` runs are
+  bounded by the model, never by the rows it ends.
 - Indexes are part of the storage projection: every ref column and both sides
   of every join table carry an index on the column and its expiry. An estate
   whose model is unchanged gains the indexes the projection adds in place,
