@@ -86,6 +86,9 @@ impl Cursor<'_> {
                     .collect::<Option<Vec<_>>>()?;
                 let length = self.word()? as usize;
                 let raw = self.take(length)?.to_vec();
+                if self.at != self.bytes.len() {
+                    return None;
+                }
                 Some(Frame::Entry(Record { raw, time, keys }))
             }
             _ => None,

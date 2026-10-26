@@ -29,11 +29,38 @@ pub(crate) struct State {
 
 impl<W: Wire> Store<W> {
     pub async fn open(core: Arc<Core<W>>, table: Table, root: &Path) -> Result<Self, Error> {
+        Self::start(core, table, root, false).await
+    }
+
+    pub async fn adopt(core: Arc<Core<W>>, table: Table, root: &Path) -> Result<Self, Error> {
+        Self::start(core, table, root, true).await
+    }
+
+    async fn start(
+        core: Arc<Core<W>>,
+        table: Table,
+        root: &Path,
+        adopt: bool,
+    ) -> Result<Self, Error> {
+        table.describe()?;
         fs::create_dir_all(root)?;
         let lock = File::create(root.join("lock"))?;
         lock.try_lock()
             .map_err(|_| Error::new(format!("{} is held by another writer", root.display())))?;
+        let bound = table.bound(root)?;
         let parts = manifest::load(&core).await?;
+        if !bound {
+            let occupied = !parts.is_empty() || crate::table::occupied(root)?;
+            if occupied && !adopt {
+                return Err(Error::new(
+                    "column root lacks a model binding; explicitly adopt the legacy root with its original table declaration",
+                ));
+            }
+            if occupied {
+                table.inspect(root, &parts)?;
+            }
+            table.bind(root)?;
+        }
         let state = recover::recover(root, parts, now())?;
         Ok(Self {
             core,

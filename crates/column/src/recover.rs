@@ -59,7 +59,7 @@ pub(crate) fn recover(root: &Path, parts: Vec<Entry>, born: u64) -> Result<State
     })
 }
 
-fn listed(area: &Path) -> Result<Vec<(String, Option<u64>, PathBuf)>, Error> {
+pub(crate) fn listed(area: &Path) -> Result<Vec<(String, Option<u64>, PathBuf)>, Error> {
     let mut found = Vec::new();
     for scope in entries(area)? {
         let name = scope

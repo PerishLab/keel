@@ -1,3 +1,7 @@
+mod model;
+pub(crate) use model::occupied;
+mod verify;
+
 use crate::Error;
 use std::collections::BTreeSet;
 

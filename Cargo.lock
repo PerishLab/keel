@@ -1176,6 +1176,8 @@ dependencies = [
  "crc32fast",
  "keel",
  "parquet",
+ "serde",
+ "serde_json",
  "tempfile",
  "tokio",
 ]
