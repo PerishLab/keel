@@ -20,7 +20,11 @@ impl Wire for Step {
     }
 
     async fn run(&mut self, sql: &str, args: &[Val]) -> Result<u64, Error> {
-        self.wire.run(sql, args).await
+        let done = self.wire.run(sql, args).await?;
+        if sql.contains(self.needle) {
+            advance();
+        }
+        Ok(done)
     }
 
     async fn plant(&mut self, sql: &str, args: &[Val]) -> Result<i64, Error> {
@@ -55,7 +59,7 @@ fn graph() -> Graph {
 async fn core() -> Core<Step> {
     let wire = Step {
         wire: Sqlite::memory().await.expect("memory"),
-        needle: "WHERE \"shelf_id\" = ?1",
+        needle: "c.\"shelf_id\" IN (",
     };
     let mut boot = crate::bootstrap(graph(), wire).expect("bootstrap");
     let token = boot.mint().await.expect("mint");
@@ -122,7 +126,7 @@ async fn estate() {
     let _time = hold(100);
     let mut wire = Step {
         wire: Sqlite::memory().await.expect("memory"),
-        needle: "WHERE \"unit_id\" = ?1",
+        needle: "c.\"unit_id\" IN (",
     };
     let graph = graph();
     let plan = Plan::lift(&graph).expect("plan");
