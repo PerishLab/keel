@@ -67,6 +67,10 @@ impl<W: Wire> Catalog<'_, W> {
     }
 
     pub(super) async fn shape(&mut self) -> Result<String, Error> {
+        Ok(frame(&self.rows().await?))
+    }
+
+    pub(super) async fn rows(&mut self) -> Result<Vec<Vec<Val>>, Error> {
         let wire = &mut *self.0;
         let rows = match wire.grain() {
         Grain::Lite => {
@@ -78,7 +82,7 @@ impl<W: Wire> Catalog<'_, W> {
         }
         Grain::Pg => wire.rows(POSTGRES, &[]).await?,
     };
-        Ok(frame(&rows))
+        Ok(rows)
     }
 }
 
@@ -162,7 +166,7 @@ async fn seed<W: Wire>(
     Ok(())
 }
 
-fn frame(rows: &[Vec<Val>]) -> String {
+pub(super) fn frame(rows: &[Vec<Val>]) -> String {
     let mut out = String::new();
     for row in rows {
         out.push('r');

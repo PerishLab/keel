@@ -112,6 +112,13 @@ impl Plan {
         &self.units
     }
 
+    pub(crate) fn staged(&self) -> Vec<&Unit> {
+        self.units
+            .values()
+            .filter(|unit| !unit.name().starts_with('@'))
+            .collect()
+    }
+
     pub fn veiled(&self, name: &str) -> bool {
         self.find(name).is_ok_and(Unit::veil)
     }
