@@ -18,18 +18,23 @@ impl<'a, W: Wire> Work<'a, W> {
         rows.first().map(|line| Row::read(unit, line)).transpose()
     }
 
-    pub(crate) async fn end(&mut self, name: &str, key: i64) -> Result<(), Error> {
+    pub(crate) async fn end(&mut self, name: &str, key: i64) -> Result<Vec<String>, Error> {
         self.retire(name, key, now()).await
     }
 
-    pub(crate) async fn lease(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+    pub(crate) async fn lease(
+        &mut self,
+        name: &str,
+        key: i64,
+        at: i64,
+    ) -> Result<Vec<String>, Error> {
         if at < now() {
             return Err(Error::Adapt("lease is not the past".into()));
         }
         self.retire(name, key, at).await
     }
 
-    async fn retire(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+    async fn retire(&mut self, name: &str, key: i64, at: i64) -> Result<Vec<String>, Error> {
         let root = self.plan.find(name)?;
         if root.name() == crate::cap::PULSE {
             return Err(Error::Adapt("pulse is engine owned".into()));
@@ -48,7 +53,7 @@ impl<'a, W: Wire> Work<'a, W> {
                 return Err(Error::Adapt("live ties remain".into()));
             }
         }
-        Ok(())
+        Ok(fallen.into_iter().map(|(unit, _)| unit).collect())
     }
 
     async fn sow(&mut self, root: &Unit, key: i64) -> Result<(), Error> {

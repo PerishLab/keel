@@ -84,13 +84,16 @@ impl<W: Wire> Tx<'_, W> {
     ) -> Result<(), Error> {
         let plan = self.core.plan();
         let unit = query::resolve(plan, name)?;
-        match at {
+        let fallen = match at {
             Some(at) => {
                 Work::new(&mut self.seat.wire, plan)
                     .lease(&unit, key, at)
                     .await?
             }
             None => Work::new(&mut self.seat.wire, plan).end(&unit, key).await?,
+        };
+        for fell in &fallen {
+            self.core.stash.bump(fell);
         }
         self.beat("end", &unit, key).await?;
         Ok(())
