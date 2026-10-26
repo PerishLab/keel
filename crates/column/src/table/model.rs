@@ -1,4 +1,4 @@
-use super::Table;
+use super::{Column, Table};
 use crate::Error;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
@@ -16,6 +16,12 @@ struct Model {
     keys: Vec<String>,
     sort: Vec<String>,
     grain: Grain,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "columns"
+    )]
+    columns: Option<Vec<Column>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -30,7 +36,8 @@ impl Table {
     pub fn describe(&self) -> Result<String, Error> {
         self.measure()?;
         let model = Model {
-            format: 1,
+            format: if self.fields.is_empty() { 1 } else { 2 },
+            columns: (!self.fields.is_empty()).then(|| self.fields.clone()),
             time: self.time.clone(),
             keys: self.keys.clone(),
             sort: self
@@ -53,6 +60,7 @@ impl Table {
             .chain(self.keys.iter().map(String::as_str))
             .chain(self.sort.iter().map(|index| self.keys[*index].as_str()))
             .chain(self.grain.key.map(|index| self.keys[index].as_str()));
+        let names = names.chain(self.fields.iter().map(|field| field.name.as_str()));
         let mut length = 0usize;
         for name in names {
             length = length
@@ -66,35 +74,44 @@ impl Table {
     pub fn parse(text: &str) -> Result<Self, Error> {
         size(text.len())?;
         let model: Model = serde_json::from_str(text).map_err(fault)?;
-        if model.format != 1 {
-            return Err(Error::new(format!(
-                "unsupported column model format {}",
-                model.format
-            )));
-        }
+        let columns = match (model.format, model.columns) {
+            (1, None) => Vec::new(),
+            (2, Some(columns)) if !columns.is_empty() => columns,
+            _ => return Err(Error::new("unsupported or incomplete column model format")),
+        };
         let keys: Vec<_> = model.keys.iter().map(String::as_str).collect();
         let sort: Vec<_> = model.sort.iter().map(String::as_str).collect();
-        Self::new(&model.time, &keys)?
+        let mut table = Self::new(&model.time, &keys)?
             .sort(&sort)?
-            .grain(model.grain.key.as_deref(), model.grain.width)
+            .grain(model.grain.key.as_deref(), model.grain.width)?;
+        let mut names: std::collections::BTreeSet<String> = table
+            .schema()
+            .fields()
+            .iter()
+            .map(|field| field.name().clone())
+            .collect();
+        for column in &columns {
+            if column.name.is_empty() || !column.nullable || !names.insert(column.name.clone()) {
+                return Err(Error::new(
+                    "nullable field declarations need distinct non-empty names and nullable=true",
+                ));
+            }
+        }
+        table.fields = columns;
+        Ok(table)
     }
 
-    pub(crate) fn bound(&self, root: &Path) -> Result<bool, Error> {
+    pub(crate) fn saved(root: &Path) -> Result<Option<Self>, Error> {
         let mut text = String::new();
         let file = match File::open(root.join(NAME)) {
             Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error.into()),
         };
         file.take((LIMIT + 1) as u64).read_to_string(&mut text)?;
         let saved = Self::parse(&text)?;
-        if saved != *self {
-            return Err(Error::new(
-                "column model differs: time, ordered keys, sort and grain must match; model evolution is unsupported",
-            ));
-        }
         File::open(root)?.sync_all()?;
-        Ok(true)
+        Ok(Some(saved))
     }
 
     pub(crate) fn bind(&self, root: &Path) -> Result<(), Error> {
@@ -136,4 +153,8 @@ fn fault(error: serde_json::Error) -> Error {
 
 fn nullable<'de, D: serde::Deserializer<'de>>(reader: D) -> Result<Option<String>, D::Error> {
     Option::<String>::deserialize(reader)
+}
+
+fn columns<'de, D: serde::Deserializer<'de>>(reader: D) -> Result<Option<Vec<Column>>, D::Error> {
+    Vec::<Column>::deserialize(reader).map(Some)
 }

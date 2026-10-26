@@ -1,7 +1,7 @@
 use crate::manifest::{self, Entry};
 use crate::query::scan::Sink;
 use crate::segment::Segment;
-use crate::{Error, Filter, Record, Table, recover};
+use crate::{Error, Filter, Record, Row, Table, recover};
 use keel::{Core, Wire};
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -11,6 +11,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
 
 const WINDOW: usize = 16;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Opening {
+    Open,
+    Adopt,
+    Evolve,
+}
 
 pub struct Store<W: Wire> {
     pub(crate) core: Arc<Core<W>>,
@@ -29,29 +36,54 @@ pub(crate) struct State {
 
 impl<W: Wire> Store<W> {
     pub async fn open(core: Arc<Core<W>>, table: Table, root: &Path) -> Result<Self, Error> {
-        Self::start(core, table, root, false).await
+        Self::start(core, table, root, Opening::Open).await
     }
 
     pub async fn adopt(core: Arc<Core<W>>, table: Table, root: &Path) -> Result<Self, Error> {
-        Self::start(core, table, root, true).await
+        Self::start(core, table, root, Opening::Adopt).await
+    }
+
+    pub async fn evolve(core: Arc<Core<W>>, table: Table, root: &Path) -> Result<Self, Error> {
+        Self::start(core, table, root, Opening::Evolve).await
     }
 
     async fn start(
         core: Arc<Core<W>>,
         table: Table,
         root: &Path,
-        adopt: bool,
+        mode: Opening,
     ) -> Result<Self, Error> {
         table.describe()?;
         fs::create_dir_all(root)?;
         let lock = File::create(root.join("lock"))?;
         lock.try_lock()
             .map_err(|_| Error::new(format!("{} is held by another writer", root.display())))?;
-        let bound = table.bound(root)?;
+        let saved = Table::saved(root)?;
+        let changed = saved.as_ref().is_some_and(|saved| saved != &table);
+        if mode == Opening::Evolve && saved.is_none() {
+            return Err(Error::new(
+                "column evolution requires an existing model binding",
+            ));
+        }
+        if let Some(saved) = &saved
+            && changed
+        {
+            if mode != Opening::Evolve {
+                return Err(Error::new(
+                    "column model differs; use explicit compatible evolution",
+                ));
+            }
+            table.extends(saved)?;
+        }
         let parts = manifest::load(&core).await?;
-        if !bound {
+        if changed {
+            let saved = saved.as_ref().unwrap();
+            saved.inspect(root, &parts)?;
+            table.evolve(root, saved)?;
+        }
+        if saved.is_none() {
             let occupied = !parts.is_empty() || crate::table::occupied(root)?;
-            if occupied && !adopt {
+            if occupied && mode != Opening::Adopt {
                 return Err(Error::new(
                     "column root lacks a model binding; explicitly adopt the legacy root with its original table declaration",
                 ));
@@ -61,7 +93,7 @@ impl<W: Wire> Store<W> {
             }
             table.bind(root)?;
         }
-        let state = recover::recover(root, parts, now())?;
+        let state = recover::recover(root, parts, now(), &table)?;
         Ok(Self {
             core,
             table,
@@ -72,12 +104,17 @@ impl<W: Wire> Store<W> {
     }
 
     pub async fn append(&self, token: &str, records: Vec<Record>) -> Result<(), Error> {
+        self.write(token, records.into_iter().map(Row::from).collect())
+            .await
+    }
+
+    pub async fn write(&self, token: &str, records: Vec<Row>) -> Result<(), Error> {
         if token.is_empty() || token.contains('\n') {
             return Err(Error::new("a batch token is one non-empty line"));
         }
-        let mut grouped: BTreeMap<String, Vec<Record>> = BTreeMap::new();
+        let mut grouped: BTreeMap<String, Vec<Row>> = BTreeMap::new();
         for record in records {
-            self.table.check(&record)?;
+            self.table.accept(&record)?;
             let scope = self.table.partition(&record).scope();
             grouped.entry(scope).or_default().push(record);
         }

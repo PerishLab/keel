@@ -10,7 +10,12 @@ use std::path::{Path, PathBuf};
 pub(crate) const OPEN: &str = "open";
 pub(crate) const PARTS: &str = "parts";
 
-pub(crate) fn recover(root: &Path, parts: Vec<Entry>, born: u64) -> Result<State, Error> {
+pub(crate) fn recover(
+    root: &Path,
+    parts: Vec<Entry>,
+    born: u64,
+    table: &crate::Table,
+) -> Result<State, Error> {
     let published: BTreeSet<(String, u64)> = parts
         .iter()
         .map(|entry| (entry.scope.clone(), entry.source))
@@ -28,7 +33,7 @@ pub(crate) fn recover(root: &Path, parts: Vec<Entry>, born: u64) -> Result<State
             fs::remove_file(&path)?;
             continue;
         }
-        let segment = Segment::load(path, seq, born)?;
+        let segment = Segment::load(path, seq, born, table)?;
         if segment.records.is_empty() {
             segment.remove()?;
         } else if let Some(other) = open.insert(scope, segment) {

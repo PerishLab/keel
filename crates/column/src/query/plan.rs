@@ -7,6 +7,7 @@ pub(super) struct Plan {
     pub order: Vec<usize>,
     pub keys: Vec<(usize, String)>,
     pub raw: bool,
+    pub fields: Vec<usize>,
 }
 
 impl Table {
@@ -41,7 +42,12 @@ impl Table {
             .iter()
             .map(|index| columns.binary_search(index).unwrap())
             .collect();
+        let fields = columns
+            .iter()
+            .filter_map(|index| index.checked_sub(self.keys().len() + 2))
+            .collect();
         Ok(Plan {
+            fields,
             raw: columns.contains(&(self.keys().len() + 1)),
             columns,
             order,
@@ -56,15 +62,5 @@ impl Table {
             ));
         }
         names.iter().map(|name| self.column(name)).collect()
-    }
-
-    fn column(&self, name: &str) -> Result<usize, Error> {
-        if name == self.time() {
-            Ok(0)
-        } else if name == "raw" {
-            Ok(self.keys().len() + 1)
-        } else {
-            self.index(name).map(|index| index + 1)
-        }
     }
 }
