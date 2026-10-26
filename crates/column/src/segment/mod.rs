@@ -68,6 +68,32 @@ impl Segment {
         Ok(segment)
     }
 
+    pub(crate) fn inspect(path: &Path, table: &crate::Table, scope: &str) -> Result<bool, Error> {
+        let bytes = fs::read(path)?;
+        let frames = frame::decode(&bytes);
+        if !bytes.is_empty()
+            && !matches!(frames.last(), Some((Frame::Token(_), end)) if *end == bytes.len())
+        {
+            return Err(Error::new(
+                "legacy adoption requires complete acknowledged segments; recover torn data with the original model first",
+            ));
+        }
+        let mut present = false;
+        for (frame, _) in frames {
+            match frame {
+                Frame::Entry(record) => {
+                    table.scope(&record, scope)?;
+                    present = true;
+                }
+                Frame::Token(token) if token.is_empty() || token.contains('\n') => {
+                    return Err(Error::new("legacy segment carries an invalid batch token"));
+                }
+                _ => {}
+            }
+        }
+        Ok(present)
+    }
+
     pub(crate) fn commit(&mut self, token: &str, records: Vec<Record>) -> Result<(), Error> {
         let mut buffer = Vec::new();
         for record in &records {

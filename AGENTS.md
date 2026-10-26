@@ -127,6 +127,31 @@ business authoring surfaces.
   partition grain (an optional key and a time width). Every record keeps its
   raw bytes verbatim in the `raw` column beside the time and key values its
   caller extracted; returning a record returns those bytes exactly.
+- `Table::schema` exposes the current non-null Arrow columns: UInt64 time,
+  Utf8 keys in declaration order, then Binary raw. `describe` and `parse`
+  round-trip a canonical format-1 table description, at most 1 MiB, including
+  time/key names, sort and partition grain. Unknown versions, fields and
+  invalid declarations refuse; this format adds no new scalar columns.
+- A column root binds that physical declaration in `model.json`, under its
+  writer lock, by a synced atomic publication before record recovery or
+  writes. Ordinary `Store::open` requires the exact model, including ordered
+  keys, sort and grain; changes and invalid model files refuse before recovery
+  can truncate segments or remove orphan parts. A binding is never overwritten;
+  supported evolution is presently exact reopen only.
+- A historical nonempty root without a binding requires explicit
+  `Store::adopt` with its original table declaration. Adoption first reads
+  referenced part schemas, key/time ordering and partition membership, and
+  verifies complete acknowledged open segments, record widths and partitions,
+  refusing unknown segment names or multiple unpublished nonempty segments;
+  it then publishes the binding and runs ordinary recovery. Its validation
+  refusals leave record files unchanged. Torn legacy segments must first be
+  recovered by their original writer; adoption never guesses their model.
+- Adoption attests the caller's original declaration: observations cannot
+  recover column labels from positional open values or prove a unique grain
+  from finite records. The binding describes physical storage, not estate
+  identity or business schema; Keel remains the authority for live Part rows.
+  Model-aware writers enforce it; older writers cannot, so writer rollback
+  across this boundary requires an explicit operator compatibility review.
 - A part is one immutable Parquet file written from a batch of one partition,
   sorted by the sort keys then time: zstd, the time column delta-encoded, key
   columns dictionary-encoded with bloom filters, page statistics. A part is
