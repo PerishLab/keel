@@ -61,3 +61,7 @@ path = "tests/pulse/main.rs"
 [[test]]
 name = "estate"
 path = "tests/estate/main.rs"
+
+[[test]]
+name = "index"
+path = "tests/index/main.rs"

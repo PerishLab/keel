@@ -3,6 +3,11 @@ use crate::bond;
 use crate::plan::{Plan, Reign, Slot, Unit};
 use crate::spec::Only;
 
+mod refs;
+mod settle;
+
+pub(crate) use settle::settled;
+
 pub const KEY: &str = "id";
 pub const EXPIRES: &str = "expires_at";
 pub const CREATED: &str = "created_at";
@@ -85,28 +90,24 @@ fn whole(grain: Grain) -> &'static str {
 }
 
 pub fn script(plan: &Plan, grain: Grain) -> Vec<String> {
-    project(plan, grain, None)
+    let units: Vec<&Unit> = plan.units().values().collect();
+    project(&units, grain, None)
 }
 
 pub(crate) fn candidate(plan: &Plan, grain: Grain, generation: i64) -> Vec<String> {
-    project(plan, grain, Some(generation))
+    project(&plan.staged(), grain, Some(generation))
 }
 
-fn project(plan: &Plan, grain: Grain, generation: Option<i64>) -> Vec<String> {
+fn project(units: &[&Unit], grain: Grain, generation: Option<i64>) -> Vec<String> {
     let mut out = Vec::new();
     if grain == Grain::Lite {
         out.push("PRAGMA foreign_keys = ON;".into());
     }
-    let units: Vec<&Unit> = plan
-        .units()
-        .values()
-        .filter(|unit| generation.is_none() || !unit.name().starts_with('@'))
-        .collect();
-    for node in &units {
+    for node in units {
         let place = place(&node.table(), generation);
         out.push(form(node, &place, grain));
     }
-    for node in &units {
+    for node in units {
         for bond in node.bonds() {
             if bond.kind() == bond::Kind::Many2many {
                 let joint = place(&join(node, bond.name()), generation);
@@ -122,6 +123,7 @@ fn project(plan: &Plan, grain: Grain, generation: Option<i64>) -> Vec<String> {
             }
         }
     }
+    out.extend(refs::all(units, generation));
     out
 }
 

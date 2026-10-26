@@ -151,6 +151,7 @@ pub(crate) async fn attach<W: Wire>(
             )
             .await?;
         }
+        projection::gain(plan, wire).await?;
     }
     cleanup::run(policy.cleanup, manifest, wire).await?;
     Ok(())

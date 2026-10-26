@@ -110,6 +110,15 @@ business authoring surfaces.
   first, then refuse while a live row or a tie with a live holder outside them
   still refers to any of them, so references within one cascade never hold it
   open.
+- Indexes are part of the storage projection: every ref column and both sides
+  of every join table carry an index on the column and its expiry. An estate
+  whose model is unchanged gains the indexes the projection adds in place,
+  before it serves, in one transaction that records the new held shape; an
+  index that fails to build leaves the estate as it was and refuses the bind.
+  A missing table or an index the projection lacks is drift. Columns follow the
+  field order of the model that built the estate, which the digest does not
+  fix, so they are held by the digest and the held shape, not compared with
+  the projection.
 - Preserve fail-closed behavior for unknown schema changes, physical drift,
   unparsed query state, ambiguous identity, lost bootstrap custody, and stale
   stream cursors.
