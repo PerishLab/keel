@@ -5,6 +5,36 @@ use std::str::FromStr;
 #[serde(default)]
 pub struct Estate {
     pub generation: Generation,
+    pub collection: Collection,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct Collection {
+    pub retain: Retain,
+    pub batch: usize,
+    pub period: u64,
+}
+
+impl Default for Collection {
+    fn default() -> Self {
+        Self {
+            retain: Retain::Span(30 * 24 * 60 * 60),
+            batch: 256,
+            period: 60,
+        }
+    }
+}
+
+impl Collection {
+    pub(crate) fn check(&self) -> Result<(), crate::adapt::Error> {
+        if self.batch == 0 || self.batch > 4096 || self.period == 0 {
+            return Err(crate::adapt::Error::Adapt(
+                "collection needs batch 1..4096 and positive period".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]

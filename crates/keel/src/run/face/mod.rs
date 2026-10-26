@@ -186,6 +186,7 @@ fn horizon(pack: &Pack) -> Option<i64> {
 pub(crate) struct Seat<W: Wire> {
     wire: W,
     dirty: bool,
+    stale: bool,
 }
 
 impl<W: Wire> Seat<W> {
@@ -205,7 +206,8 @@ impl<W: Wire> Seat<W> {
 
 pub struct Core<W: Wire> {
     plan: Plan,
-    seat: tokio::sync::Mutex<Seat<W>>,
+    seat: Arc<tokio::sync::Mutex<Seat<W>>>,
+    sweep: sweep::Sweep,
     identity: Option<String>,
     stash: Stash,
     chart: Chart,
@@ -245,5 +247,6 @@ mod core;
 mod deed;
 mod grant;
 mod link;
+mod sweep;
 mod tx;
 mod verb;

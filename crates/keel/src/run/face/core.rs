@@ -12,7 +12,12 @@ impl<W: Wire> Core<W> {
     pub(crate) fn new(plan: Plan, wire: W) -> Self {
         Self {
             plan,
-            seat: tokio::sync::Mutex::new(Seat { wire, dirty: false }),
+            seat: Arc::new(tokio::sync::Mutex::new(Seat {
+                wire,
+                dirty: false,
+                stale: false,
+            })),
+            sweep: sweep::Sweep::default(),
             identity: None,
             stash: Stash {
                 on: true,
@@ -49,11 +54,14 @@ impl<W: Wire> Core<W> {
     pub(super) async fn seize(&self) -> Result<tokio::sync::MutexGuard<'_, Seat<W>>, Error> {
         let mut seat = self.seat.lock().await;
         seat.wire.revive().await?;
-        if seat.dirty {
+        if seat.dirty || seat.stale {
             self.stash.spoil();
             self.deeds.forget();
-            seat.wire.script("ROLLBACK").await?;
+            if seat.dirty {
+                seat.wire.script("ROLLBACK").await?;
+            }
             seat.dirty = false;
+            seat.stale = false;
         }
         Ok(seat)
     }

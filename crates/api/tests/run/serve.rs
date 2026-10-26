@@ -72,3 +72,47 @@ async fn reopened() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body[0]["title"], "kept");
 }
+
+#[tokio::test]
+async fn collection() {
+    use keel::wire::{Val, Wire};
+    use std::time::Duration;
+    let site = Site::new();
+    let token = site.sealed().await;
+    let core = keel::bind(crate::rig::graph(), site.wire().await)
+        .await
+        .expect("bind");
+    let id = core
+        .put("Course", &[("code", "C1"), ("title", "old")])
+        .await
+        .expect("put");
+    core.end("Course", id).await.expect("end");
+    drop(core);
+    let mut estate = keel::config::Estate::default();
+    estate.collection.retain = keel::config::Retain::Span(0);
+    estate.collection.period = 1;
+    let app = api::configured(site.wire().await, "", &estate)
+        .await
+        .expect("configured");
+    let mut wire = site.wire().await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let rows = wire
+                .rows("SELECT COUNT(*) FROM course", &[])
+                .await
+                .expect("inspect");
+            if rows[0][0] == Val::Int(0) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("collected");
+    let request = Request::get(format!("/course/{id}"))
+        .header("authorization", format!("sudo {token}"))
+        .body(Body::empty())
+        .expect("request");
+    let (status, _) = send(&app, request).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}

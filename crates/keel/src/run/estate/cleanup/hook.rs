@@ -14,6 +14,13 @@ pub struct Purge {
 
 pub trait Hook: Send {
     fn purge(&mut self, event: Purge) -> impl Future<Output = Result<(), String>> + Send;
+
+    fn collect(&mut self, gone: Vec<Gone>) -> impl Future<Output = Result<(), String>> + Send {
+        async {
+            drop(gone);
+            Ok(())
+        }
+    }
 }
 
 impl Gone {

@@ -14,6 +14,24 @@ struct Cli {
     listen: String,
     #[arg(long, env = "KEEL_PREFIX", default_value = "")]
     prefix: String,
+    #[arg(
+        long = "collection-retain",
+        env = "KEEL_COLLECTION_RETAIN",
+        help = "Row retention: <digits><s|m|h|d> or forever; default 30d"
+    )]
+    retain: Option<keel::config::Retain>,
+    #[arg(
+        long = "collection-batch",
+        env = "KEEL_COLLECTION_BATCH",
+        help = "Rows per collection transaction, 1..4096; default 256"
+    )]
+    batch: Option<usize>,
+    #[arg(
+        long = "collection-period",
+        env = "KEEL_COLLECTION_PERIOD",
+        help = "Positive seconds between collection sweeps; default 60"
+    )]
+    period: Option<u64>,
 }
 
 #[tokio::main]
@@ -34,9 +52,19 @@ async fn main() {
 }
 
 async fn run(cli: Cli) -> Result<(), String> {
+    let mut estate = keel::config::Estate::default();
+    if let Some(retain) = cli.retain {
+        estate.collection.retain = retain;
+    }
+    if let Some(batch) = cli.batch {
+        estate.collection.batch = batch;
+    }
+    if let Some(period) = cli.period {
+        estate.collection.period = period;
+    }
     let app = match api::open(&cli.store).await.map_err(|e| e.to_string())? {
-        api::Store::Lite(wire) => api::mount(wire, &cli.prefix).await,
-        api::Store::Pg(wire) => api::mount(*wire, &cli.prefix).await,
+        api::Store::Lite(wire) => api::configured(wire, &cli.prefix, &estate).await,
+        api::Store::Pg(wire) => api::configured(*wire, &cli.prefix, &estate).await,
     }
     .map_err(|e| e.to_string())?;
     let listener = tokio::net::TcpListener::bind(&cli.listen)

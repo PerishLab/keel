@@ -27,6 +27,7 @@ sqlx = { workspace = true }
 sqlx-core = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }
 http-body-util = { workspace = true }
 tower = { workspace = true }
 
