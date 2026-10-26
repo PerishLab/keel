@@ -5,18 +5,40 @@ use crate::{Error, Record, Row, Store, Value};
 use keel::Wire;
 use std::path::PathBuf;
 
+pub(super) struct View {
+    paths: Vec<PathBuf>,
+    records: Vec<Row>,
+}
+
 impl<W: Wire> Store<W> {
     pub async fn query(&self, query: &Query, output: &mut Output<'_>) -> Result<Stats, Error> {
         let plan = self.table.plan(query)?;
         let mut stats = Stats::default();
-        let (paths, mut records) = self.view(&plan, query, &mut stats).await?;
+        let view = {
+            let state = self.state.lock().await;
+            self.capture(&state, (&plan, query), &mut stats)?
+        };
         let meter = Meter::new(query.limit.bytes);
-        for path in paths {
+        self.execute(view, (&plan, query), (&meter, &mut stats, output))?;
+        stats.bytes = meter.bytes();
+        Ok(stats)
+    }
+
+    pub(super) fn execute(
+        &self,
+        mut view: View,
+        request: (&Plan, &Query),
+        state: (&Meter, &mut Stats, &mut Output<'_>),
+    ) -> Result<(), Error> {
+        let (plan, query) = request;
+        let (meter, stats, output) = state;
+        for path in view.paths {
             self.table
-                .read(&path, &plan, query, (&meter, &mut stats, output))?;
+                .read(&path, plan, query, (meter, stats, output))?;
         }
-        records.sort_by(|left, right| self.table.order(left, right));
-        for chunk in records.chunks(query.batch) {
+        view.records
+            .sort_by(|left, right| self.table.order(left, right));
+        for chunk in view.records.chunks(query.batch) {
             stats.emit(
                 self.table
                     .batch(chunk, &plan.columns)?
@@ -24,17 +46,16 @@ impl<W: Wire> Store<W> {
                 output,
             )?;
         }
-        stats.bytes = meter.bytes();
-        Ok(stats)
+        Ok(())
     }
 
-    async fn view(
+    pub(super) fn capture(
         &self,
-        plan: &Plan,
-        query: &Query,
+        state: &crate::store::State,
+        request: (&Plan, &Query),
         stats: &mut Stats,
-    ) -> Result<(Vec<PathBuf>, Vec<Row>), Error> {
-        let state = self.state.lock().await;
+    ) -> Result<View, Error> {
+        let (plan, query) = request;
         let filter = &query.filter;
         let paths = state
             .parts
@@ -61,7 +82,7 @@ impl<W: Wire> Store<W> {
                 }
             }
         }
-        Ok((paths, records))
+        Ok(View { paths, records })
     }
 }
 

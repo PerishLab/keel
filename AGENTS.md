@@ -189,6 +189,46 @@ business authoring surfaces.
   missing nullable suffix columns return typed null arrays. Wrong column
   names, types, nullability or order refuse. New scalar fields are selectable;
   predicates remain time and declared exact key predicates only.
+- `Store::join` accepts `join::Query`: two projected logical inputs of the
+  same store, existing time/key filters, typed Equal or explicit Missing
+  conditions, and one scalar key on each side. Both inputs compile and validate
+  before storage reads, even on an empty root. Key types must match exactly;
+  equality with null refuses in favor of Missing. Null keys never match;
+  false, zero and empty text/bytes remain ordinary keys.
+- Joins default to Left mode; Inner is explicit. Every duplicate combination
+  is returned, with no deduplication or guessed single counterpart. A
+  `join::Batch` contains aligned left/right Arrow batches and a non-null
+  `present` bitmap; it distinguishes an unmatched right row from a matched
+  all-null projection. Left mode makes all right output fields nullable.
+  Output follows input scan and bucket insertion order, with no global order.
+- Both join inputs capture selected open records and part membership under
+  one state lock, then read immutable files outside it with one shared scan
+  budget. Right builds the index, then left probes it. Only projection, key
+  and condition columns are read; raw is avoided unless one needs it. This
+  view has the existing file-retention grace, no persistent pin, cross-store
+  snapshot or RDS transaction. Missing files or read faults fail the join.
+- Join defaults allow 100000 indexed right rows, 64 MiB of charged index
+  storage, ten million work steps, one million result rows, 64 MiB of charged
+  results, and 8 MiB per output batch. Batch row count is 1 through 65536;
+  batch charge cannot exceed 64 MiB. Zero budgets are valid; positive charges
+  against them refuse. Scan limits apply jointly to both inputs;
+  all limits refuse explicitly, never truncate a successful result.
+- Join index charge includes fixed Value/vector cells, visible payload and
+  key payload per indexed row, including duplicates. Result charge includes
+  fixed cells/vectors, payload and presence per pair. A pair must fit one
+  batch. These charges exclude hash bucket/capacity, allocator and Arrow
+  buffer overhead, and are no RSS guarantee. Borrowed key lookup avoids
+  copying probe keys. Work counts input visits, condition checks and bucket
+  comparisons; it is no CPU-time measurement.
+- `join::Stats` separates combined scan counters from eligible left/right
+  rows and their null keys, indexed rows, matched pairs, missing left rows,
+  returned rows/batches, charged index/result bytes and work. Scan rows and
+  batches describe input delivery to the operator, not joined output, and
+  repeated input visits are counted separately. Missing left rows are counted
+  in both modes, including null keys; right null keys are counted but never
+  indexed. Callback, storage and budget errors leave output partial until
+  final success. The operator gives no business identity or lifecycle meaning
+  to a match and defines no cross-store join or optimizer.
 - Query defaults bound candidate rows to ten million, matched rows to one
   million, file reads and open snapshot payload each to 256 MiB, and batches
   to 1024 rows. Callers may set `Limit` and batch size. A refusal or callback
