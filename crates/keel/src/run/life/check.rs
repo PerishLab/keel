@@ -154,6 +154,7 @@ async fn estate() {
         crate::estate::adopt::Policy {
             cleanup: &cleanup,
             adopt: false,
+            renames: &[],
         },
         &mut wire,
     )

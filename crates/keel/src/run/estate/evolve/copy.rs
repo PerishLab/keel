@@ -1,6 +1,6 @@
 use crate::adapt::Error;
 use crate::ddl::Grain;
-use crate::model::manifest::{Atom, Bond, Edge, Field, Manifest, Unit};
+use crate::model::manifest::{Atom, Bond, Edge, Field, Unit};
 use crate::wire::{Val, Wire};
 
 struct Pair<'a> {
@@ -8,7 +8,14 @@ struct Pair<'a> {
     requested: &'a Edge,
 }
 
+#[derive(Clone, Copy)]
+struct Stage {
+    generation: i64,
+    retain: bool,
+}
+
 struct Sheet {
+    retain: bool,
     target: String,
     source: String,
     cols: Vec<String>,
@@ -16,16 +23,23 @@ struct Sheet {
 }
 
 pub(super) async fn run<W: Wire>(
-    active: &Manifest,
-    requested: &Manifest,
+    work: &super::Work<'_>,
     generation: i64,
     wire: &mut W,
 ) -> Result<(), Error> {
-    for target in requested.units() {
-        let Some(prior) = active.units().iter().find(|old| old.key == target.key) else {
+    let stage = Stage {
+        generation,
+        retain: work.rename.is_some(),
+    };
+    for target in work.requested.units() {
+        let source = work
+            .rename
+            .filter(|rename| rename.to == target.key)
+            .map_or(target.key.as_str(), |rename| rename.from.as_str());
+        let Some(prior) = work.active.units().iter().find(|old| old.key == source) else {
             continue;
         };
-        unit(prior, target, generation, wire).await?;
+        unit(prior, target, stage, wire).await?;
         for edge in target
             .bonds
             .iter()
@@ -40,12 +54,12 @@ pub(super) async fn run<W: Wire>(
                     active: old,
                     requested: edge,
                 },
-                generation,
+                stage,
                 wire,
             )
             .await?;
             if old.closure && edge.closure {
-                closure(prior, edge, generation, wire).await?;
+                closure(prior, edge, stage, wire).await?;
             }
         }
     }
@@ -55,7 +69,7 @@ pub(super) async fn run<W: Wire>(
 async fn closure<W: Wire>(
     owner: &Unit,
     edge: &Edge,
-    generation: i64,
+    stage: Stage,
     wire: &mut W,
 ) -> Result<(), Error> {
     let name = format!("{}_closure", edge.name);
@@ -70,7 +84,8 @@ async fn closure<W: Wire>(
     reign(&mut cols, &mut vals);
     let table = crate::ddl::joiner(&owner.table(), &name);
     let sheet = Sheet {
-        target: crate::ddl::stage(generation, &table),
+        retain: stage.retain,
+        target: crate::ddl::stage(stage.generation, &table),
         source: table,
         cols,
         vals,
@@ -81,14 +96,18 @@ async fn closure<W: Wire>(
 async fn unit<W: Wire>(
     active: &Unit,
     requested: &Unit,
-    generation: i64,
+    stage: Stage,
     wire: &mut W,
 ) -> Result<(), Error> {
     let mut cols = vec![crate::ddl::KEY.into()];
     let mut vals = vec![crate::ddl::KEY.into()];
     for field in &requested.fields {
         cols.push(crate::ddl::col(&field.name));
-        vals.push(scalar(active, field, wire.grain()));
+        vals.push(if stage.retain {
+            crate::ddl::col(&field.name)
+        } else {
+            scalar(active, field, wire.grain())
+        });
     }
     for edge in requested.bonds.iter().filter(|edge| point(edge.kind)) {
         cols.push(crate::ddl::col(&crate::ddl::side(&edge.name)));
@@ -101,7 +120,8 @@ async fn unit<W: Wire>(
     }
     reign(&mut cols, &mut vals);
     let sheet = Sheet {
-        target: crate::ddl::stage(generation, &requested.table()),
+        retain: stage.retain,
+        target: crate::ddl::stage(stage.generation, &requested.table()),
         source: active.table(),
         cols,
         vals,
@@ -112,7 +132,7 @@ async fn unit<W: Wire>(
 async fn bond<W: Wire>(
     owner: &Unit,
     pair: Pair<'_>,
-    generation: i64,
+    stage: Stage,
     wire: &mut W,
 ) -> Result<(), Error> {
     let active = pair.active;
@@ -132,7 +152,8 @@ async fn bond<W: Wire>(
     reign(&mut cols, &mut vals);
     let table = crate::ddl::joiner(&owner.table(), &requested.name);
     let sheet = Sheet {
-        target: crate::ddl::stage(generation, &table),
+        retain: stage.retain,
+        target: crate::ddl::stage(stage.generation, &table),
         source: table,
         cols,
         vals,
@@ -212,16 +233,28 @@ fn reign(cols: &mut Vec<String>, vals: &mut Vec<String>) {
 }
 
 async fn transfer<W: Wire>(wire: &mut W, sheet: &Sheet) -> Result<(), Error> {
+    let predicate = if sheet.retain {
+        String::new()
+    } else {
+        format!(
+            " WHERE {} IS NULL OR {} > ?1",
+            crate::ddl::EXPIRES,
+            crate::ddl::EXPIRES
+        )
+    };
     let text = format!(
-        "INSERT INTO {} ({}) SELECT {} FROM {} WHERE {} IS NULL OR {} > ?1",
+        "INSERT INTO {} ({}) SELECT {} FROM {}{predicate}",
         crate::ddl::col(&sheet.target),
         sheet.cols.join(", "),
         sheet.vals.join(", "),
-        crate::ddl::col(&sheet.source),
-        crate::ddl::EXPIRES,
-        crate::ddl::EXPIRES
+        crate::ddl::col(&sheet.source)
     );
-    wire.run(&text, &[Val::Int(crate::life::tick())]).await?;
+    let args = if sheet.retain {
+        Vec::new()
+    } else {
+        vec![Val::Int(crate::life::tick())]
+    };
+    wire.run(&text, &args).await?;
     Ok(())
 }
 

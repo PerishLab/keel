@@ -60,6 +60,7 @@ pub struct Bind<W, H = ()> {
     wire: W,
     estate: crate::config::Estate,
     adopt: bool,
+    renames: Vec<(String, String)>,
     hook: Option<H>,
 }
 
@@ -82,6 +83,7 @@ pub fn bind<W: Wire>(graph: crate::graph::Graph, wire: W) -> Bind<W> {
         wire,
         estate: crate::config::Estate::default(),
         adopt: false,
+        renames: Vec::new(),
         hook: None,
     }
 }
@@ -140,12 +142,18 @@ impl<W, H> Bind<W, H> {
         self
     }
 
+    pub fn rename(mut self, from: impl Into<String>, to: impl Into<String>) -> Self {
+        self.renames.push((from.into(), to.into()));
+        self
+    }
+
     pub fn hook<N: crate::estate::Hook>(self, hook: N) -> Bind<W, N> {
         let Bind {
             graph,
             wire,
             estate,
             adopt,
+            renames,
             ..
         } = self;
         Bind {
@@ -153,6 +161,7 @@ impl<W, H> Bind<W, H> {
             wire,
             estate,
             adopt,
+            renames,
             hook: Some(hook),
         }
     }
@@ -175,15 +184,22 @@ async fn ready<W: Wire + 'static, H: crate::estate::Hook + 'static>(
         mut wire,
         estate,
         adopt,
+        renames,
         mut hook,
     } = bind;
     estate.collection.check()?;
+    if adopt && !renames.is_empty() {
+        return Err(Error::Adapt(
+            "rename requires a sealed estate, not adoption".into(),
+        ));
+    }
     let (plan, manifest) = prepare(&graph)?;
     crate::estate::attach(
         &plan,
         &manifest,
         crate::estate::adopt::Policy {
             cleanup: &estate.generation.cleanup,
+            renames: &renames,
             adopt,
         },
         &mut wire,

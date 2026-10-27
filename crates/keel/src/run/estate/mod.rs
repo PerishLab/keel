@@ -7,7 +7,6 @@ pub(crate) mod adopt;
 mod catalog;
 pub(crate) mod cleanup;
 pub(crate) mod clock;
-mod copy;
 mod evolve;
 mod guard;
 mod projection;
@@ -48,6 +47,7 @@ pub enum Act {
     Drop,
     Cast,
     Alter,
+    Rename,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -136,9 +136,9 @@ pub(crate) async fn attach<W: Wire>(
         }
     } else {
         let bound = verify(wire).await?;
+        let rename = evolve::Rename::resolve(policy.renames, &bound.manifest, manifest)?;
         if bound.digest != manifest.digest() {
-            let change =
-                crate::model::delta::plan(&bound.manifest, manifest).map_err(Error::Estate)?;
+            let change = evolve::change(&bound.manifest, manifest, rename.as_ref())?;
             evolve::run(
                 evolve::Work {
                     plan,
@@ -146,6 +146,7 @@ pub(crate) async fn attach<W: Wire>(
                     requested: manifest,
                     generation: bound.generation,
                     change: &change,
+                    rename: rename.as_ref(),
                 },
                 wire,
             )
