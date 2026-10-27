@@ -1,3 +1,8 @@
+mod copy;
+mod rename;
+
+pub(super) use rename::Rename;
+
 use super::Change;
 use crate::adapt::Error;
 use crate::model::manifest::Manifest;
@@ -9,6 +14,7 @@ pub(super) struct Work<'a> {
     pub(super) active: &'a Manifest,
     pub(super) requested: &'a Manifest,
     pub(super) generation: i64,
+    pub(super) rename: Option<&'a Rename>,
     pub(super) change: &'a Change,
 }
 
@@ -41,6 +47,7 @@ async fn migrate<W: Wire>(work: &Work<'_>, wire: &mut W) -> Result<(), Error> {
         requested,
         generation,
         change,
+        rename,
     } = work;
     super::guard::run(
         super::guard::Scope {
@@ -66,7 +73,10 @@ async fn migrate<W: Wire>(work: &Work<'_>, wire: &mut W) -> Result<(), Error> {
     for stmt in crate::ddl::candidate(plan, wire.grain(), next) {
         wire.script(&stmt).await?;
     }
-    super::copy::run(active, requested, next, wire).await?;
+    if let Some(rename) = rename {
+        rename.clock(wire).await?;
+    }
+    copy::run(work, next, wire).await?;
     activate(
         Swap {
             active,
@@ -153,4 +163,19 @@ fn paths(manifest: &Manifest) -> Vec<String> {
         );
     }
     out
+}
+
+pub(super) fn change(
+    active: &Manifest,
+    requested: &Manifest,
+    rename: Option<&Rename>,
+) -> Result<Change, Error> {
+    match rename {
+        Some(rename) => Ok(Change::new(vec![super::Step::new(
+            rename.from.clone(),
+            super::Act::Rename,
+            None,
+        )])),
+        None => crate::model::delta::plan(active, requested).map_err(Error::Estate),
+    }
 }

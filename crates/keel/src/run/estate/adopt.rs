@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 pub(crate) struct Policy<'a> {
     pub(crate) cleanup: &'a crate::config::Cleanup,
     pub(crate) adopt: bool,
+    pub(crate) renames: &'a [(String, String)],
 }
 
 pub(super) async fn run<W: Wire>(

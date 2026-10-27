@@ -38,6 +38,17 @@ business authoring surfaces.
   status, possession mint, and transactional seal hotspots while the caller
   owns custody. `adopt` is the explicit exact-projection exception for an
   unsealed namespace.
+- `bind.rename(from, to)` explicitly migrates one pure leaf resource rename
+  between exact qualified keys. Fields, mode, outgoing point relations, root,
+  and all other resources must remain equal. Serial fields, many-to-many and
+  incoming relations (including self references), occupied destinations,
+  multiple declarations and historical destination identity clocks refuse.
+  The native generation transaction preserves stored rows, control fields,
+  outgoing references and the identity high-water mark; grant validation may
+  refuse and never rewrites authority. Failure rolls back the generation and
+  clock together. Default bind evolution remains unchanged. An already exact
+  target model accepts the declaration as a no-op, including a new estate
+  bootstrapped with that target; the source is no active resource or route alias.
 - Source code admits no comments. Refactor unclear behavior into names, types,
   modules, and tests. Repository prose belongs only to the admitted root
   documents; release notes live on Depot.

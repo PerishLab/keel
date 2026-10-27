@@ -1,3 +1,8 @@
+mod bounds;
+mod refusal;
+mod rename;
+mod rollback;
+
 use super::world::*;
 use keel::adapt::Error;
 use keel::adapt::db::Sqlite;
