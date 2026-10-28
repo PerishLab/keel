@@ -51,3 +51,12 @@ binary = "keel-api"
 [release.cargo]
 registry = "perish"
 packages = ["keel-macro", "keel", "keel-relay", "keel-blob", "keel-column", "keel-gate"]
+
+[guard.seatrial]
+cases = ["health-lite", "again-lite"]
+image = "ghcr.io/perishlab/keel"
+
+[guard.seatrial.scenes]
+authority = "https://depot.seatrial.perish.uk"
+product = "seatrial"
+channel = "beta"
