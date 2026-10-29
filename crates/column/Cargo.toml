@@ -16,6 +16,7 @@ arrow-schema = { workspace = true }
 crc32fast = { workspace = true }
 bytes = { workspace = true }
 keel = { workspace = true }
+radicula-lock = { workspace = true }
 parquet = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
