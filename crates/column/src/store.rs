@@ -56,7 +56,7 @@ impl<W: Wire> Store<W> {
         table.describe()?;
         fs::create_dir_all(root)?;
         let lock = File::create(root.join("lock"))?;
-        lock.try_lock()
+        radicula_lock::attempt(&lock, radicula_lock::Mode::Exclusive)
             .map_err(|_| Error::new(format!("{} is held by another writer", root.display())))?;
         let saved = Table::saved(root)?;
         let changed = saved.as_ref().is_some_and(|saved| saved != &table);
