@@ -1456,9 +1456,9 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "plumb"
-version = "0.111.0"
+version = "0.113.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "584a556dfd00d1dca0adbbbfe86becbbd5540326f620f359b0ec30c9031c1660"
+checksum = "ac33c519dfa85a068e3dc9145ca78b1f4cd8f9718dbe14fbfa4eb7faa6fbb326"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -1466,6 +1466,7 @@ dependencies = [
  "object",
  "pin-project-lite",
  "plumb-macro",
+ "radicula-lock",
  "semver",
  "serde",
  "serde_json",
@@ -1480,9 +1481,9 @@ dependencies = [
 
 [[package]]
 name = "plumb-macro"
-version = "0.111.0"
+version = "0.113.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "8860b9beb1c40d8c8856d565eb310025a99bb41345b9bcf1b728c89408694aa2"
+checksum = "a42df65f8af4dbe52162dd7cb9c7c80facdeaf8810880a7432013805994f381f"
 dependencies = [
  "proc-macro2",
  "quote",
