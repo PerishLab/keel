@@ -1456,9 +1456,9 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "plumb"
-version = "0.129.0"
+version = "0.130.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "95f1ccfb96fe807771b0bea7d3de22f9fe358c21e68da45fdab65afd43781349"
+checksum = "2bbb439676de6f2e7623620085f87fa2e5e0e042a305aa067687111a02e43acc"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -1466,6 +1466,7 @@ dependencies = [
  "object",
  "pin-project-lite",
  "plumb-macro",
+ "radicula-config",
  "radicula-git",
  "radicula-lock",
  "radicula-process",
@@ -1476,15 +1477,15 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "toml",
- "toml_edit",
+ "toml_edit 0.23.10+spec-1.0.0",
  "winapi-util",
 ]
 
 [[package]]
 name = "plumb-macro"
-version = "0.129.0"
+version = "0.130.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "99b28727c0f65a77275d47f9c8fff2dce3f057545b311532eda0f52edd6b8a97"
+checksum = "ee759826e0441f6ad61a115bc5d8b1a90f874321dd6455240a0db209459175af"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1506,6 +1507,15 @@ name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
+
+[[package]]
+name = "proc-macro-crate"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e67ba7e9b2b56446f1d419b1d807906278ffa1a658a8a5d8a39dcb1f5a78614f"
+dependencies = [
+ "toml_edit 0.25.17+spec-1.1.0",
+]
 
 [[package]]
 name = "proc-macro2"
@@ -1546,6 +1556,29 @@ name = "r-efi"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
+
+[[package]]
+name = "radicula-config"
+version = "0.11.0"
+source = "sparse+https://cargo.perish.uk/"
+checksum = "a9739ac8ed223919c75f886e7ccc1dfdc5b4c31a3e3bc9e4c4eafba2caf85c65"
+dependencies = [
+ "radicula-config-macros",
+ "serde",
+ "toml",
+]
+
+[[package]]
+name = "radicula-config-macros"
+version = "0.11.0"
+source = "sparse+https://cargo.perish.uk/"
+checksum = "a6eb30f31522c9d2a98a8ae3b91904a5c67edfbe86e90e1df97fcb2bb6463830"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.118",
+]
 
 [[package]]
 name = "radicula-git"
@@ -2182,7 +2215,7 @@ dependencies = [
  "indexmap",
  "serde_core",
  "serde_spanned",
- "toml_datetime",
+ "toml_datetime 0.7.5+spec-1.1.0",
  "toml_parser",
  "toml_writer",
  "winnow 0.7.15",
@@ -2198,16 +2231,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml_datetime"
+version = "1.1.2+spec-1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b86d767906c6c42421dcba507eb9d203e779497710a47782a224bb871653053"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
 name = "toml_edit"
 version = "0.23.10+spec-1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84c8b9f757e028cee9fa244aea147aab2a9ec09d5325a9b01e0a49730c2b5269"
 dependencies = [
  "indexmap",
- "toml_datetime",
+ "toml_datetime 0.7.5+spec-1.1.0",
  "toml_parser",
  "toml_writer",
  "winnow 0.7.15",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.25.17+spec-1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3641d5bbb5349a79e1020a242d251efbc546ad8048d133958323ce9c40a9c9c"
+dependencies = [
+ "indexmap",
+ "toml_datetime 1.1.2+spec-1.1.0",
+ "toml_parser",
+ "winnow 1.0.4",
 ]
 
 [[package]]
@@ -2532,6 +2586,9 @@ name = "winnow"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "wit-bindgen"
