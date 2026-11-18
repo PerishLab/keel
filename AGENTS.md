@@ -66,6 +66,8 @@ business authoring surfaces.
   bytes never enter Keel.
 - `crates/column` — append-only record package keeping records verbatim in
   immutable Parquet parts; records never enter Keel.
+- `crates/document` — structural document models, conditional execution and
+  native redb payloads; Keel holds resource control metadata only.
 - `Containerfile` — the `keel-api` image. Its build context is only this file
   and a `keel-api` binary beside it; it bakes in no configuration.
 - `.cargo` — the `perish` registry configuration.
@@ -312,6 +314,43 @@ business authoring surfaces.
 - Column execution uses arrow and parquet, never DataFusion; their roughly
   monthly major releases are a carried upgrade.
 
+## keel-document
+
+- Callers plug `stock` into their Graph and declare ordered collections with
+  structural shapes. Radicula owns JSON values, exact paths, presence and atomic
+  set/remove batches. Required fields and nullable values are independent;
+  objects reject unknown fields, while maps admit arbitrary keys of one shape.
+- `Store::create` binds a vacant payload directory to one live native root id,
+  random nonce and model. `open` requires that exact binding; `evolve` explicitly
+  permits compatible collection suffixes and optional object field suffixes,
+  recursively, preserving existing names, order, types and required flags.
+- The store owns one exclusive root lock. Its sudo, operator and anonymous views
+  compose only the same Core's public Face/Tx; native grants, root inheritance
+  and lifecycle remain authoritative. Embedders retain possession authority and
+  expose these views through their own authenticated business API.
+- Each document publishes one head. A conditional edit or end checks the exact
+  token inside its native transaction. A frozen unique predecessor fence prevents
+  a second publication from the same head. Resource checks and tentative metadata
+  precede an immutable redb payload commit; the native commit publishes visibility.
+  These are two storage commits, not a distributed transaction. A native failure
+  may leave an unreferenced payload and preserves its typed store error; it does
+  not imply a domain conflict or authorize automatic replay.
+- Reads resolve a current head and immutable payload per document. Query snapshots
+  payload candidate identities, filters through the caller's Face, then evaluates
+  typed Equal/Missing conditions and exact path projections. Projection aliases
+  omit missing values and retain explicit null; traversal kind errors refuse.
+  There is no cross-document snapshot, query DSL or historical body read API.
+- Running stores retain old payloads for in-flight readers. Reopening verifies
+  the native root and complete current documents under both declarations before
+  publishing evolution or removing unreferenced payloads. Unknown bindings,
+  missing current payloads and native enumeration failures stop cleanup. Native
+  query capacity remains a refusal boundary for recovery; no truncated list is
+  treated as complete. Revision fences remain after old bodies are reclaimed.
+- Public error positions named `parts` are decoded path segments, not pointer
+  strings. Domain patch faults retain their operation index and Radicula code.
+  The first carrier qualifies one root writer on local redb plus native SQLite
+  control metadata; it promises no multiwriter root or other backend equivalence.
+
 ## Operating
 
 - Never commit on `main`; work on a topic branch or Concord Member.
@@ -335,7 +374,7 @@ ectropy .
 ## Release
 
 - wharf publishes `keel-macro`, `keel`, `keel-relay`, `keel-blob`,
-  `keel-column`, and `keel-gate` to the `perish` registry at
+  `keel-column`, `keel-gate`, and `keel-document` to the `perish` registry at
   `cargo.perish.uk`, in dependency order, reading each one back from the
   index. The same marker carries the `keel` CLI for every target and
   `keel-api` for Linux only, outside the installed manager, as the image

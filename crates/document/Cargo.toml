@@ -1,0 +1,21 @@
+[package]
+name = "keel-document"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Model-driven document declarations and execution beside Keel"
+publish = ["perish"]
+
+[dependencies]
+getrandom = { workspace = true }
+keel = { workspace = true }
+radicula-document = { workspace = true }
+radicula-lock = { workspace = true }
+redb = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
