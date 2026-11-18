@@ -50,7 +50,7 @@ binary = "keel-api"
 
 [release.cargo]
 registry = "perish"
-packages = ["keel-macro", "keel", "keel-relay", "keel-blob", "keel-column", "keel-gate"]
+packages = ["keel-macro", "keel", "keel-relay", "keel-blob", "keel-column", "keel-document", "keel-gate"]
 
 [windtun]
 cases = ["health-lite", "again-lite"]
