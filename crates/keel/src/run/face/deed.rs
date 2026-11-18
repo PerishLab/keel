@@ -46,6 +46,7 @@ impl<W: Wire> Face<'_, W> {
             Err(err) => {
                 let _ = seat.close(false).await;
                 self.core.stash.spoil();
+                self.core.deeds.forget();
                 Err(err)
             }
         }
