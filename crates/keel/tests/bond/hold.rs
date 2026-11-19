@@ -163,3 +163,64 @@ async fn qualified() {
             .is_empty()
     );
 }
+
+#[tokio::test]
+async fn retain() {
+    use keel::bond::Kind;
+    use keel::spec::Spec;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let mut graph = Graph::new();
+    graph
+        .plug::<Shelf>()
+        .plug::<Box>()
+        .plug::<shelf::Addition>()
+        .plug::<parcel::Addition>();
+    graph.add(
+        Spec::build("Mark")
+            .bond("target", Kind::Many2one, "shelf:addition", &[])
+            .seal(),
+    );
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+    let shelf = core.put("Shelf", &[("name", "one")]).await.expect("shelf");
+    let parcel = core
+        .put("Box", &[("name", "inner"), ("shelf", &shelf.to_string())])
+        .await
+        .expect("box");
+    let kept = core
+        .put(
+            "shelf:addition",
+            &[("text", "outer"), ("shelf", &shelf.to_string())],
+        )
+        .await
+        .expect("kept");
+    let spare = core
+        .put(
+            "box:addition",
+            &[("text", "inner"), ("parcel", &parcel.to_string())],
+        )
+        .await
+        .expect("spare");
+    let mark = core
+        .put("Mark", &[("target", &kept.to_string())])
+        .await
+        .expect("mark");
+    let at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock")
+        .as_secs() as i64
+        + 60;
+
+    assert_eq!(kept, spare);
+    assert!(core.end("shelf:addition", kept).await.is_err());
+    assert!(core.lease("shelf:addition", kept, at).await.is_err());
+    assert_eq!(
+        core.live("shelf:addition").await.unwrap()[0].expires(),
+        None
+    );
+    core.end("box:addition", spare).await.expect("end spare");
+    core.end("Mark", mark).await.expect("end mark");
+    core.end("shelf:addition", kept).await.expect("end kept");
+}

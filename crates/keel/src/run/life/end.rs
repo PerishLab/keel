@@ -164,9 +164,12 @@ impl<'a, W: Wire> Work<'a, W> {
 
     async fn bound(&mut self, unit: &str, at: i64) -> Result<bool, Error> {
         let plan = self.plan;
-        let target = plan.find(unit)?.name().to_string();
+        let target = plan.find(unit)?;
         for holder in plan.units().values() {
-            for edge in holder.bonds().iter().filter(|edge| edge.target() == target) {
+            for edge in holder.bonds() {
+                if !std::ptr::eq(plan.find(edge.target())?, target) {
+                    continue;
+                }
                 let text = held(holder, edge);
                 let args = [Val::Text(unit.into()), Val::Int(at)];
                 if !self.wire.rows(&text, &args).await?.is_empty() {
