@@ -167,6 +167,25 @@ business authoring surfaces.
 
 ## keel-column
 
+- Embedders can add the frozen `keel_column::Channel` resource to their graph
+  and provision one row per source and mode (`append` or `scan`). Provisioning
+  and grant administration are trusted operations. Grant a machine or reader
+  native `see` on the appropriate Channel row. Each `Store::of(operator, source)`
+  operation resolves that live row through the store estate's Face. The scoped
+  view exposes append and raw scan only. Access refusals can be identified by
+  `Error::refused()`. Keep the possession Store private.
+- The source is the value of the table's declared grain key. The view checks
+  the whole batch against that key before writing and intersects every scan
+  with it. An unkeyed table refuses scoped access. Authorization admits the
+  current operation; a later call, including retry, checks again. The caller
+  validates product-specific fields embedded in opaque bytes.
+- A scoped append returns after the normal durable segment commits. Retries
+  use the same operator, token, order and records. The store derives a token
+  over that input, using the existing per-partition replay window. Different
+  content under the same caller label is a different batch. After a storage
+  failure, some partitions may have committed; retry the original batch.
+  Legacy possession callers retain their existing token and storage semantics.
+
 - It is a package beside the engine, like `keel-blob`: it composes only
   Keel's public faces, changes no `Wire`, `Grain`, verb or estate evolution,
   and knows no caller's record semantics.

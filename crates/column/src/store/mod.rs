@@ -1,3 +1,6 @@
+mod access;
+pub use access::{Channel, View};
+
 use crate::manifest::{self, Entry};
 use crate::query::scan::Sink;
 use crate::segment::Segment;
