@@ -1,4 +1,5 @@
-#[path = "support/mod.rs"]
+mod access;
+#[path = "../support/mod.rs"]
 mod support;
 
 use std::fs;

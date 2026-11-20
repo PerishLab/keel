@@ -13,6 +13,7 @@ path = "src/lib.rs"
 [dependencies]
 arrow-array = { workspace = true }
 arrow-schema = { workspace = true }
+sha2 = { workspace = true }
 crc32fast = { workspace = true }
 bytes = { workspace = true }
 keel = { workspace = true }

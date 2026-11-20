@@ -81,6 +81,12 @@ impl Table {
         Ok(self)
     }
 
+    pub(crate) fn axis(&self) -> Result<usize, Error> {
+        self.grain
+            .key
+            .ok_or_else(|| Error::new("source access requires a keyed grain"))
+    }
+
     pub fn partition(&self, record: &Record) -> Partition {
         Partition {
             key: self.grain.key.map(|index| record.keys[index].clone()),
