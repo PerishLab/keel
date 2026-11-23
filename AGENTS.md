@@ -79,6 +79,13 @@ business authoring surfaces.
   public faces and never receive a privileged backchannel.
 - Keep stores behind `Wire`. Driver row types, SQL dialects, and backend
   identity must not leak into model or lifecycle semantics.
+- A package that declares a query surface owes a canonical description of it:
+  bounded text, round-trip `describe` and `parse`, and explicit refusal of
+  unknown versions, fields and constructs. Every such query keeps the engine's
+  envelope: candidates authorized through the caller's Face before payload is
+  read, bounded costs refused rather than truncated, stable error kinds, and a
+  stated ordering and snapshot scope. A description is data, never a grammar:
+  no package adds a text query language, and the engine parses no query text.
 - Preserve the six engine verbs. New ceremonies compose verbs; they do not
   create private write paths.
 - A `Core` serves a cached read only while its `Wire` epoch is unchanged since
@@ -358,7 +365,13 @@ business authoring surfaces.
   payload candidate identities, filters through the caller's Face, then evaluates
   typed Equal/Missing conditions and exact path projections. Projection aliases
   omit missing values and retain explicit null; traversal kind errors refuse.
-  There is no cross-document snapshot, query DSL or historical body read API.
+  There is no cross-document snapshot, no historical body read API, and no
+  textual query grammar. The query description is canonical: format 1, at most
+  1 MiB, 256 conditions and 256 projections; `describe` and `parse` round-trip;
+  unknown versions, fields, condition kinds, invalid paths, invalid values,
+  duplicate projection names, duplicate conditions and excess declarations
+  refuse. Execution bounds candidates, matched rows and copied payload bytes,
+  refuses explicitly instead of truncating, and reports them in `Stats`.
 - Running stores retain old payloads for in-flight readers. Reopening verifies
   the native root and complete current documents under both declarations before
   publishing evolution or removing unreferenced payloads. Unknown bindings,

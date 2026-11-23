@@ -19,6 +19,7 @@ pub enum Error {
         index: usize,
         error: radicula_document::Error,
     },
+    Query(String),
     Missing,
     Conflict {
         expected: String,
@@ -41,6 +42,7 @@ impl Error {
             Self::Value { .. } => "value",
             Self::Document(_) => "document",
             Self::Patch { .. } => "patch",
+            Self::Query(_) => "query",
             Self::Missing => "missing",
             Self::Conflict { .. } => "conflict",
             Self::Store(_) => "store",
@@ -75,6 +77,7 @@ impl std::fmt::Display for Error {
             Self::Patch { index, error } => {
                 write!(out, "operation {index} refused: {}", error.code())
             }
+            Self::Query(reason) => write!(out, "query refused: {reason}"),
             Self::Missing => out.write_str("document or payload is absent"),
             Self::Conflict { .. } => out.write_str("expected revision is not the visible head"),
             Self::Store(held) => write!(out, "store refused: {held}"),
