@@ -24,7 +24,15 @@ pub fn app<W: Wire + 'static>(core: Arc<Core<W>>, prefix: &str) -> Router {
         )
         .route(
             "/query",
-            post(|seat: Seat<W>, Json(body): Json<Body>| Plea::from(seat).run(body)),
+            post(|seat: Seat<W>, Json(body): Json<Value>| Plea::from(seat).alias(body)),
+        )
+        .route(
+            "/query/{kind}",
+            post(
+                |seat: Seat<W>, Path(kind): Path<String>, Json(body): Json<Value>| {
+                    Plea::from(seat).kind(kind, body)
+                },
+            ),
         )
         .route(
             "/batch",

@@ -14,15 +14,46 @@ pub(crate) struct Knot {
     tie: i64,
 }
 
-#[derive(Deserialize)]
-pub(crate) struct Body {
-    q: String,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Kind {
+    Relation,
+}
+
+impl Kind {
+    fn parse(name: &str) -> Option<Self> {
+        match name {
+            "relation" => Some(Self::Relation),
+            _ => None,
+        }
+    }
 }
 
 impl<W: Wire> Plea<W> {
-    pub(crate) async fn run(self, body: Body) -> Result<Json<Value>, Fault> {
+    pub(crate) async fn alias(self, body: Value) -> Result<Json<Value>, Fault> {
+        self.over(Kind::Relation, body).await
+    }
+
+    pub(crate) async fn kind(self, kind: String, body: Value) -> Result<Json<Value>, Fault> {
+        let held = Kind::parse(&kind).ok_or_else(|| Fault {
+            status: StatusCode::NOT_FOUND,
+            note: format!("no such kind: {kind}"),
+        })?;
+        self.over(held, body).await
+    }
+
+    async fn over(self, kind: Kind, body: Value) -> Result<Json<Value>, Fault> {
+        match kind {
+            Kind::Relation => self.relation(body).await,
+        }
+    }
+
+    async fn relation(self, body: Value) -> Result<Json<Value>, Fault> {
+        let q = body
+            .get("q")
+            .and_then(Value::as_str)
+            .ok_or_else(|| Fault::bad("relation needs a q string".into()))?;
         let face = self.face("see").await?;
-        let tree = crate::query::parse(&body.q).map_err(Fault::from)?;
+        let tree = crate::query::parse(q).map_err(Fault::from)?;
         let units = tree.involved(self.core.plan()).map_err(Fault::from)?;
         if self.core.plan().shrouds(&units) || units.iter().any(|unit| crate::cap::closed(unit)) {
             return Err(Fault {

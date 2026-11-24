@@ -6,5 +6,6 @@ mod web;
 mod closed;
 mod course;
 mod desk;
+mod query;
 mod smoke;
 mod store;

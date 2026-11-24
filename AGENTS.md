@@ -85,7 +85,12 @@ business authoring surfaces.
   envelope: candidates authorized through the caller's Face before payload is
   read, bounded costs refused rather than truncated, stable error kinds, and a
   stated ordering and snapshot scope. A description is data, never a grammar:
-  no package adds a text query language, and the engine parses no query text.
+  no package adds a text query language. The engine's relation grammar is the
+  one text form Keel parses.
+- `/query/{kind}` answers one query family: `relation` today, and another kind
+  only once its model can answer it. Each kind owns its body and its predicates;
+  the envelope, the error states and paging stay shared. `/query` is a
+  permanent alias for `/query/relation`.
 - Preserve the six engine verbs. New ceremonies compose verbs; they do not
   create private write paths.
 - A `Core` serves a cached read only while its `Wire` epoch is unchanged since
