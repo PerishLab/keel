@@ -1472,9 +1472,9 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "plumb"
-version = "0.155.0"
+version = "0.157.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "10fdeb1772e95b5b1641b06c24695b5ab4b9643b20a80611f0840b4627c08d7c"
+checksum = "955abf14f606905e31597a64de800ee2ac3c8ca12b7293d4100255dd82c62844"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -1499,9 +1499,9 @@ dependencies = [
 
 [[package]]
 name = "plumb-macro"
-version = "0.155.0"
+version = "0.157.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "e9e9e2795c71e40acc9f7bea39d642199bc0ecf781876323f69f6cf9838360bd"
+checksum = "0fdd6261994457bbb82a8e67715f02b1f04a9b0bf10a80851d32326107cd54e9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1575,9 +1575,9 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "radicula-config"
-version = "0.18.0"
+version = "0.20.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "13fa59bf78b96d077c9a12c0742dbeeb2a7437d501cc17522a511fd6286cd01d"
+checksum = "7a4d4b96d7f9fdc8f31d0708ec12ddc2ee9c3cdcb5109e9bba206c14769e34fb"
 dependencies = [
  "radicula-config-macros",
  "serde",
@@ -1586,9 +1586,9 @@ dependencies = [
 
 [[package]]
 name = "radicula-config-macros"
-version = "0.18.0"
+version = "0.20.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "10db2e2c4f7ded942022b2b137370f9861fb8de857a980e4d446bea9d618741e"
+checksum = "9d4071418dba8b87b5e5c7f14c97ce7b29c9c2290e00db4710368256fadff8f7"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -1598,39 +1598,39 @@ dependencies = [
 
 [[package]]
 name = "radicula-context"
-version = "0.18.0"
+version = "0.20.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "7d52204e3b1d482609eaf4dd41ba4cd2faeb5ec677bfbdaffa77419d8a8fd468"
+checksum = "740b514efcd3507578923f6248b7de744decdb8ea093caee583f00bfb94f0351"
 dependencies = [
  "pin-project-lite",
 ]
 
 [[package]]
 name = "radicula-document"
-version = "0.18.0"
+version = "0.20.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "b64fe4d02445526b8faff68e9f50126a7e6d825a6f48fefc41297c64d879d28c"
+checksum = "f78842a3d320111211b4152b6c3ae8d4f57f67edb148ee822e2370d677491090"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "radicula-git"
-version = "0.18.0"
+version = "0.20.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "ba5417e1f8c740d4df335ab8caef3d12083bf627887f85d9a5d3aefb7a0b7ad5"
+checksum = "479b9e4a4a5faa0dbf9ce7caba9467f4b448f988411897b92122ce40558f0b68"
 
 [[package]]
 name = "radicula-lock"
-version = "0.18.0"
+version = "0.20.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "cc31b200b2f005403db3901f38943581feaeb4ecd7b42a6187659fc36cf89831"
+checksum = "a117cb6ddb2a6665ddf12114bdb67333a85c93d1692274e825fe522fde31e9ae"
 
 [[package]]
 name = "radicula-process"
-version = "0.18.0"
+version = "0.20.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "8482ac1645469df5faa3fdac3bf3bcc95f0828975215b122677331391e846014"
+checksum = "33e0d70fe2d73bd7c04344aba7afcc0bde152d53805c92563f00030c21b33061"
 dependencies = [
  "libc",
  "serde",
