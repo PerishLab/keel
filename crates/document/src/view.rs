@@ -51,11 +51,12 @@ impl<W: Wire> View<'_, W> {
 
     pub async fn read(&self, collection: &str, id: i64) -> Result<Record, Error> {
         self.store.model().collection(collection)?;
-        self.transact(async |tx| {
-            let row = self.row(tx, collection, id).await?;
-            self.record(&row, collection).await
-        })
-        .await
+        let row = self
+            .face
+            .one(&self.anchor(collection, id))
+            .await?
+            .ok_or(Error::Missing)?;
+        self.record(&row, collection).await
     }
 
     pub async fn edit(&self, head: &Head, operations: &[Operation]) -> Result<Record, Error> {
@@ -90,12 +91,17 @@ impl<W: Wire> View<'_, W> {
         .await
     }
 
-    async fn row(&self, tx: &mut Tx<'_, W>, collection: &str, id: i64) -> Result<Row, Error> {
-        let tree = form(DOCUMENT)
+    fn anchor(&self, collection: &str, id: i64) -> keel::query::Tree {
+        form(DOCUMENT)
             .when("id", Op::Eq, &id.to_string())
             .when("store", Op::Eq, &self.store.binding.root.to_string())
-            .when("collection", Op::Eq, collection);
-        tx.one(&tree).await?.ok_or(Error::Missing)
+            .when("collection", Op::Eq, collection)
+    }
+
+    async fn row(&self, tx: &mut Tx<'_, W>, collection: &str, id: i64) -> Result<Row, Error> {
+        tx.one(&self.anchor(collection, id))
+            .await?
+            .ok_or(Error::Missing)
     }
 
     async fn record(&self, row: &Row, collection: &str) -> Result<Record, Error> {
