@@ -1,4 +1,5 @@
 mod cell;
+mod description;
 mod engine;
 mod index;
 mod output;
@@ -8,6 +9,7 @@ mod store;
 use super::Filter;
 use crate::{Error, Value};
 use arrow_array::{BooleanArray, RecordBatch};
+use serde::{Deserialize, Serialize};
 
 pub type Output<'a> = dyn FnMut(Batch) -> Result<(), Error> + Send + 'a;
 
@@ -36,13 +38,15 @@ impl Side {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Mode {
     Inner,
     Left,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Limit {
     pub scan: super::Limit,
     pub build: u64,
