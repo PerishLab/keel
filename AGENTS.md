@@ -179,7 +179,9 @@ business authoring surfaces.
   and grant administration are trusted operations. Grant a machine or reader
   native `see` on the appropriate Channel row. Each `Store::of(operator, source)`
   operation resolves that live row through the store estate's Face. The scoped
-  view exposes append and raw scan only. Access refusals can be identified by
+  view exposes append, raw scan, query and join; query and join intersect the
+  source axis before execution and refuse a filter or condition that names
+  another source. Access refusals can be identified by
   `Error::refused()`. Keep the possession Store private.
 - The source is the value of the table's declared grain key. The view checks
   the whole batch against that key before writing and intersects every scan
@@ -251,6 +253,11 @@ business authoring surfaces.
   published without overwriting; an existing path refuses. Scans select by a
   `[from, to)` window and exact key values, prune by row-group statistics and
   bloom filters, and return raw bytes in sort order within a part.
+- `Query::describe` and `Query::parse` round-trip one canonical description of a
+  scan, and `join::Query` does the same for a join: format 1, at most 1 MiB;
+  unknown versions, kinds, fields, condition kinds, value tags, duplicate keys,
+  duplicate columns and duplicate conditions refuse. A description is data,
+  never a grammar.
 - `Table::query` and `Store::query` validate a `Query` before storage reads,
   including an empty store: a nonempty half-open time window when both bounds
   are given, declared exact key predicates, distinct declared projection

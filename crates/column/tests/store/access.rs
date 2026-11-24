@@ -137,6 +137,124 @@ async fn scoped() {
 }
 
 #[tokio::test]
+async fn queried() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, store) = open(dir.path()).await;
+    let reader = core.put("Actor", &[("name", "reader")]).await.unwrap();
+    store
+        .append(
+            "one",
+            vec![record("split", b"first"), record("pixel", b"second")],
+        )
+        .await
+        .unwrap();
+    assert!(
+        store
+            .of(reader, "split")
+            .query(&keel_column::Query::count(Filter::default()), &mut |_| {
+                unreachable!()
+            })
+            .await
+            .unwrap_err()
+            .refused()
+    );
+    permit(&core, reader, "scan").await;
+    let mut found = Vec::new();
+    store
+        .of(reader, "split")
+        .query(
+            &keel_column::Query::select(Filter::default(), &["raw"]),
+            &mut |batch| {
+                let raw = batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<arrow_array::BinaryArray>()
+                    .unwrap();
+                for index in 0..batch.num_rows() {
+                    found.push(raw.value(index).to_vec());
+                }
+                Ok(())
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(found, [b"first".to_vec()]);
+    let foreign = Filter {
+        keys: vec![("producer".into(), "pixel".into())],
+        ..Filter::default()
+    };
+    assert!(
+        store
+            .of(reader, "split")
+            .query(&keel_column::Query::count(foreign), &mut |_| {
+                unreachable!()
+            })
+            .await
+            .unwrap_err()
+            .refused()
+    );
+}
+
+#[tokio::test]
+async fn joined() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, store) = open(dir.path()).await;
+    let reader = core.put("Actor", &[("name", "reader")]).await.unwrap();
+    permit(&core, reader, "scan").await;
+    let mut split = Vec::new();
+    let mut pixel = Vec::new();
+    for trace in ["trace-1", "trace-2"] {
+        split.push(Record {
+            raw: format!("split-{trace}").into_bytes(),
+            time: 7,
+            keys: vec!["split".into(), trace.into()],
+        });
+        pixel.push(Record {
+            raw: format!("pixel-{trace}").into_bytes(),
+            time: 7,
+            keys: vec!["pixel".into(), trace.into()],
+        });
+    }
+    store.append("one", split).await.unwrap();
+    store.append("two", pixel).await.unwrap();
+    let side = || keel_column::join::Side::new(Filter::default(), "trace", &["raw"]);
+    let join = keel_column::join::Query::new(side(), side());
+    let mut pairs = 0;
+    store
+        .of(reader, "split")
+        .join(&join, &mut |batch| {
+            pairs += batch.left.num_rows();
+            Ok(())
+        })
+        .await
+        .unwrap();
+    assert_eq!(pairs, 2);
+    let mut bare = 0;
+    store
+        .join(&join, &mut |batch| {
+            bare += batch.left.num_rows();
+            Ok(())
+        })
+        .await
+        .unwrap();
+    assert_eq!(bare, 8);
+    let mut crossed = keel_column::join::Side::new(Filter::default(), "trace", &["raw"]);
+    crossed.when = vec![keel_column::join::Condition::Equal(
+        "producer".into(),
+        keel_column::Value::Text("pixel".into()),
+    )];
+    let join = keel_column::join::Query::new(crossed, side());
+    assert!(
+        store
+            .of(reader, "split")
+            .join(&join, &mut |_| unreachable!())
+            .await
+            .unwrap_err()
+            .refused()
+    );
+}
+
+#[tokio::test]
 async fn legacy() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("column");

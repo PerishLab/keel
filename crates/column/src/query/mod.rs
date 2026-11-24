@@ -1,13 +1,16 @@
+mod description;
 pub mod join;
 mod meter;
 mod plan;
 mod reader;
 pub(crate) mod scan;
 mod store;
+mod wire;
 
 use crate::Error;
 use arrow_array::RecordBatch;
 pub use scan::Filter;
+use serde::{Deserialize, Serialize};
 
 pub type Output<'a> = dyn FnMut(RecordBatch) -> Result<(), Error> + Send + 'a;
 
@@ -17,7 +20,8 @@ pub enum Projection {
     Count,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Limit {
     pub candidates: u64,
     pub bytes: u64,

@@ -1,4 +1,5 @@
 mod cases;
+mod description;
 #[path = "../support/mod.rs"]
 mod support;
 
