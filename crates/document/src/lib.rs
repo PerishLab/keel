@@ -9,7 +9,7 @@ mod store;
 mod view;
 
 pub use manifest::stock;
-pub use query::{Condition, Projection, Query, Selection};
+pub use query::{Condition, Limit, Projection, Query, Selection, Stats};
 pub use store::{Head, Record, Store};
 pub use view::View;
 
