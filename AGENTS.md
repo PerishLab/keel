@@ -79,6 +79,8 @@ business authoring surfaces.
   public faces and never receive a privileged backchannel.
 - Keep stores behind `Wire`. Driver row types, SQL dialects, and backend
   identity must not leak into model or lifecycle semantics.
+- `Postgres` exposes no schema reset operation. Tests that need a vacant
+  Postgres store provision a fresh scratch database outside Keel.
 - A package that declares a query surface owes a canonical description of it:
   bounded text, round-trip `describe` and `parse`, and explicit refusal of
   unknown versions, fields and constructs. Every such query keeps the engine's
