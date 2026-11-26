@@ -194,10 +194,3 @@ fn sql(err: sqlx::Error) -> Error {
         _ => Store::Fault(text),
     })
 }
-
-impl Postgres {
-    pub async fn wipe(&mut self) -> Result<(), Error> {
-        self.script("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
-            .await
-    }
-}
