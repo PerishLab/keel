@@ -60,3 +60,13 @@ image = "ghcr.io/perishlab/keel"
 authority = "https://depot.seatrial.perish.uk"
 product = "seatrial"
 channel = "beta"
+
+[[ectropy.boundary]]
+allow = ["path", "comment"]
+note = "runseal operator adapters are guarded by deno fmt and deno check instead"
+paths = [".runseal/**"]
+
+[sidecar.project]
+name = "keel"
+namespace = "dev"
+root = "."
