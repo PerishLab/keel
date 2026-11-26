@@ -67,7 +67,7 @@ impl Wire for Sqlite {
             "BEGIN" => {
                 SqliteTransactionManager::begin(
                     &mut self.conn,
-                    Some(sqlx::SqlStr::from_static("BEGIN")),
+                    Some(sqlx::SqlStr::from_static("BEGIN IMMEDIATE")),
                 )
                 .await
             }

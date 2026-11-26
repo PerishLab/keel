@@ -214,3 +214,59 @@ async fn custody() {
     );
     check(&core, 1).await;
 }
+
+async fn pair() -> (tempfile::TempDir, Sqlite, Sqlite) {
+    let dir = tempfile::tempdir().expect("dir");
+    let path = dir.path().join("keel.sqlite");
+    let mut first = Sqlite::file(&path).await.expect("first");
+    first
+        .script("CREATE TABLE note (id INTEGER PRIMARY KEY, body TEXT NOT NULL)")
+        .await
+        .expect("table");
+    let second = Sqlite::file(&path).await.expect("second");
+    (dir, first, second)
+}
+
+async fn append(wire: &mut Sqlite, body: &str) -> Result<(), Error> {
+    wire.script("BEGIN").await?;
+    let out = async {
+        wire.rows("SELECT count(*) FROM note", &[]).await?;
+        wire.run(
+            "INSERT INTO note (body) VALUES (?)",
+            &[Val::Text(body.into())],
+        )
+        .await?;
+        wire.script("COMMIT").await
+    }
+    .await;
+    if out.is_err() {
+        let _ = wire.script("ROLLBACK").await;
+    }
+    out
+}
+
+#[tokio::test]
+async fn upgrade() {
+    let (_dir, mut first, mut second) = pair().await;
+    first.script("BEGIN").await.expect("begin");
+    first
+        .run("INSERT INTO note (body) VALUES ('held')", &[])
+        .await
+        .expect("held");
+    let late = tokio::spawn(async move {
+        let out = append(&mut second, "late").await;
+        (second, out)
+    });
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    first.script("COMMIT").await.expect("commit");
+    let (mut second, out) = tokio::time::timeout(Duration::from_secs(10), late)
+        .await
+        .expect("bounded")
+        .expect("joined");
+    out.expect("a read-then-write batch waits for the writer instead of failing with code 5");
+    let rows = second
+        .rows("SELECT body FROM note ORDER BY id", &[])
+        .await
+        .expect("rows");
+    assert_eq!(rows.len(), 2);
+}
