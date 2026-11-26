@@ -1,33 +1,39 @@
+mod bucket;
+mod catalog;
+mod collect;
 mod make;
+mod upload;
+
+pub use catalog::catalog;
 
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use bucket::Store;
+use catalog::{Binding, by};
 use keel::Wire;
+use keel::adapt::Error;
 use keel::{Core, Operator};
-use rusty_s3::actions::S3Action;
-use rusty_s3::{Bucket, Credentials, UrlStyle};
 use serde_json::{Map, Value, json};
 use std::sync::Arc;
-use std::time::Duration;
-use url::Url;
+use upload::Upload;
 
 pub const TTL: u64 = 60 * 10;
 
 pub struct Vault<W: Wire> {
     core: Arc<Core<W>>,
-    bucket: Bucket,
-    creds: Credentials,
+    store: Arc<Store>,
+    prefix: Arc<str>,
 }
 
 impl<W: Wire> Clone for Vault<W> {
     fn clone(&self) -> Self {
         Self {
             core: self.core.clone(),
-            bucket: self.bucket.clone(),
-            creds: self.creds.clone(),
+            store: self.store.clone(),
+            prefix: self.prefix.clone(),
         }
     }
 }
@@ -41,24 +47,16 @@ pub struct Shed<'a> {
 }
 
 impl<W: Wire + 'static> Vault<W> {
-    pub fn open(core: Arc<Core<W>>, shed: Shed<'_>) -> Result<Self, keel::adapt::Error> {
-        let base: Url = shed
-            .endpoint
-            .parse()
-            .map_err(|_| keel::adapt::Error::Adapt("bad s3 endpoint".into()))?;
-        let bucket = Bucket::new(
-            base,
-            UrlStyle::Path,
-            shed.name.to_string(),
-            shed.region.to_string(),
-        )
-        .map_err(|_| keel::adapt::Error::Adapt("bad s3 bucket".into()))?;
-        let creds = Credentials::new(shed.key, shed.secret);
-        Ok(Self {
+    pub async fn open(core: Arc<Core<W>>, shed: Shed<'_>) -> Result<Self, Error> {
+        let store = Store::open(shed).await?;
+        let prefix = catalog::prefix(&core, store.address()).await?;
+        let vault = Self {
             core,
-            bucket,
-            creds,
-        })
+            store: Arc::new(store),
+            prefix: prefix.into(),
+        };
+        vault.watch();
+        Ok(vault)
     }
 
     pub fn shelf(self, router: Router) -> Router {
@@ -71,22 +69,6 @@ impl<W: Wire + 'static> Vault<W> {
             .route("/asset/{id}", get(fetch::<W>))
             .with_state(self.clone())
     }
-
-    fn put(&self, id: i64) -> Url {
-        self.bucket
-            .put_object(Some(&self.creds), &object(id))
-            .sign(Duration::from_secs(TTL))
-    }
-
-    fn get(&self, id: i64) -> Url {
-        self.bucket
-            .get_object(Some(&self.creds), &object(id))
-            .sign(Duration::from_secs(TTL))
-    }
-}
-
-fn object(id: i64) -> String {
-    format!("asset/{id}")
 }
 
 async fn stow<W: Wire + 'static>(
@@ -97,6 +79,8 @@ async fn stow<W: Wire + 'static>(
     let who = op
         .map(|axum::Extension(Operator(id))| id)
         .ok_or(Fault::shut())?;
+    let upload = Upload::read(&body)?;
+    let object = format!("{}{}", vault.prefix, catalog::nonce().map_err(Fault::from)?);
     let fields = flat(&body)?;
     let pairs: Vec<(&str, &str)> = fields
         .iter()
@@ -108,9 +92,19 @@ async fn stow<W: Wire + 'static>(
         .put("Asset", &pairs)
         .await
         .map_err(Fault::from)?;
+    let bound = Binding {
+        asset: id.to_string(),
+        object,
+        size: upload.size,
+        hash: upload.hash.clone(),
+    };
+    bound.record(&vault.core).await.map_err(Fault::from)?;
+    let headers = upload.headers();
+    let put = vault.store.put(&bound.object, &headers);
+    let headers: std::collections::BTreeMap<_, _> = headers.into_iter().collect();
     Ok((
         StatusCode::CREATED,
-        Json(json!({ "id": id, "put": vault.put(id).to_string() })),
+        Json(json!({ "id": id, "put": put.as_str(), "headers": headers })),
     ))
 }
 
@@ -120,25 +114,33 @@ async fn fetch<W: Wire + 'static>(
     op: Option<axum::Extension<Operator>>,
 ) -> Result<Response, Fault> {
     let who = op.map(|axum::Extension(Operator(id))| id);
-    let seen = match who {
-        Some(who) => vault
-            .core
-            .of(who)
-            .query(&format!(r#"from Asset where id = "{id}""#))
-            .await
-            .map_err(Fault::from)?,
-        None => vault
-            .core
-            .anon()
-            .query(&format!(r#"from Asset where id = "{id}""#))
-            .await
-            .map_err(Fault::from)?,
+    let target = id.to_string();
+    let query = by("Asset", "id", &target);
+    let face = match who {
+        Some(who) => vault.core.of(who),
+        None => vault.core.anon(),
     };
-    if seen.rows().first().map(|row| row.key()) != Some(id) {
+    let asset = face
+        .one(&query)
+        .await
+        .map_err(Fault::from)?
+        .ok_or_else(Fault::miss)?;
+    let bound = vault
+        .core
+        .sudo()
+        .one(&by(catalog::PARCEL, "asset", &target))
+        .await
+        .map_err(Fault::from)?
+        .ok_or_else(Fault::miss)?;
+    let binding = Binding::read(&bound).map_err(Fault::from)?;
+    if !binding.matches(&asset, &vault.prefix) {
         return Err(Fault::miss());
     }
     let mut headers = HeaderMap::new();
-    headers.insert(header::LOCATION, vault.get(id).to_string().parse().unwrap());
+    headers.insert(
+        header::LOCATION,
+        vault.store.get(&binding.object).as_str().parse().unwrap(),
+    );
     Ok((StatusCode::FOUND, headers).into_response())
 }
 
@@ -209,3 +211,6 @@ impl IntoResponse for Fault {
         (self.status, Json(json!({ "error": self.note }))).into_response()
     }
 }
+
+#[cfg(test)]
+mod tests;
