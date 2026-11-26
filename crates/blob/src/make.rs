@@ -17,6 +17,7 @@ macro_rules! blob {
 
         pub fn stock(graph: &mut ::keel::Graph) {
             graph.plug::<Asset>();
+            $crate::catalog(graph);
         }
     };
 }

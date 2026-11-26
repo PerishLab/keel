@@ -181,6 +181,32 @@ business authoring surfaces.
 - A public semantic change updates this document and re-affirms it with
   `plumb affirm --write` in the same change when it moves a claim here.
 
+## keel-blob
+
+- `blob!` adds veiled catalog resources beside the existing Asset. `Vault::open`
+  is async and requires a successful signed HeadBucket. It binds one bucket
+  address to a random estate namespace stored in Keel. The bucket credentials
+  need list, get, put and delete access. Every issued upload has
+  its own random name and an immutable catalog binding. A restore keeps the
+  bindings present in its snapshot. A reset creates a fresh namespace.
+- POST `/asset` accepts a nonnegative byte size and a lowercase hexadecimal
+  SHA-256 digest. It creates the Asset through the operator Face and returns the
+  existing `id` and `put` fields plus the required `headers` for the signed
+  upload. The S3 endpoint verifies the signed content length and SHA-256
+  checksum. The client sends the returned checksum header and a body of the
+  declared length. Fetch requires Face visibility and an unchanged size and
+  digest in the catalog binding. A failed catalog write can leave an Asset
+  without an upload or download capability. Legacy Asset rows lack a binding
+  and fetch returns 404 for them.
+- The Vault periodically lists its bucket prefix in bounded pages. It deletes
+  an object only when its exact binding exists in this estate and its Asset is
+  no longer live, including after root cascade or lease expiry. The catalog
+  retains these identities so failed or late uploads and failed deletions can
+  be revisited after restart. Physical byte reclamation in versioned buckets
+  requires the bucket's noncurrent-version lifecycle. A restored snapshot
+  shares the objects it restored, so keep one authoritative estate for those
+  rows. Operators own objects and bindings outside the restored snapshot.
+
 ## keel-column
 
 - Embedders can add the frozen `keel_column::Channel` resource to their graph

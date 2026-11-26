@@ -15,6 +15,7 @@ bytes = "1"
 arrow-array = "60"
 arrow-schema = "60"
 axum = "0.8"
+base64 = "0.22"
 getrandom = "0.3"
 http-body-util = "0.1"
 keel = { path = "crates/keel", version = "=0.0.0", registry = "perish" }
@@ -29,11 +30,13 @@ parquet = { version = "60", default-features = false, features = ["arrow", "zstd
 proc-macro2 = "1"
 quote = "1"
 serde = { version = "1", features = ["derive"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 rusty-s3 = "0.7"
 serde_json = "1"
 url = "2"
 sha2 = "0.10"
 tempfile = "3"
+time = { version = "0.3", features = ["macros", "parsing"] }
 syn = { version = "2", features = ["full"] }
 tower = { version = "0.5", features = ["util"] }
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
