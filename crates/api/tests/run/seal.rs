@@ -32,7 +32,7 @@ async fn again() {
     let site = Site::new();
     site.sealed().await;
     let out = api::seal(site.wire().await, graph(), &site.at("second")).await;
-    assert_eq!(out.err(), Some(Error::Estate(Fault::Occupied)));
+    assert!(!out.expect("already sealed"));
     assert!(!site.at("second").exists());
 }
 

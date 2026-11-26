@@ -12,7 +12,7 @@ mod guard;
 mod projection;
 mod tables;
 
-pub(crate) use catalog::{Catalog, bootstrap};
+pub(crate) use catalog::{Catalog, bootstrap, custody};
 pub use cleanup::{Gone, Hook, Purge};
 pub(crate) use clock::next;
 

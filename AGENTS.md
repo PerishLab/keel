@@ -31,13 +31,20 @@ business authoring surfaces.
   `KEEL_PREFIX`. On SIGTERM or SIGINT it stops accepting connections, drains
   in-flight requests and exits 0. `keel bootstrap` seals a vacant estate from
   a manifest file and writes the sudo token only to a new custody file, mode
-  0600, removing it if the seal fails; `keel status` reports vacant, sealed or
-  unknown; `keel model` prints the canonical manifest of a file or of a sealed
-  estate.
+  0600. A retry with the same model reports an already-sealed estate without
+  writing custody. The CLI removes a new file on definite failure and keeps it
+  if the store becomes unavailable during commit. `keel status` reports vacant,
+  sealed or unknown. `keel model` prints the canonical manifest of a file or of
+  a sealed estate.
 - Ordinary `bind` never initializes an empty namespace. `bootstrap` exposes
-  status, possession mint, and transactional seal hotspots while the caller
-  owns custody. `adopt` is the explicit exact-projection exception for an
-  unsealed namespace.
+  status, possession mint, and transactional seal while the caller owns custody.
+  `Bootstrap::custody` serializes bootstrap attempts and calls the caller's
+  sink once, after staging genesis and before committing. It returns the new
+  Core on first seal. An exact, already-sealed model returns `None` without
+  minting or calling the sink. A partial estate or different model refuses.
+  A sink error rolls genesis back. The sink owns its external side effects,
+  which can survive interruption or a commit failure. `adopt` is the explicit
+  exact-projection exception for an unsealed namespace.
 - `bind.rename(from, to)` explicitly migrates one pure leaf resource rename
   between exact qualified keys. Fields, mode, outgoing point relations, root,
   and all other resources must remain equal. Serial fields, many-to-many and
