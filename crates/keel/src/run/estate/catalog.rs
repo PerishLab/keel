@@ -93,36 +93,67 @@ pub(crate) async fn bootstrap<W: Wire>(
     wire: &mut W,
 ) -> Result<(), Error> {
     wire.script("BEGIN").await?;
-    let out = open(plan, manifest, token, wire).await;
-    match out {
-        Ok(()) => {
-            wire.script("COMMIT").await?;
-            Ok(())
+    let out = async {
+        if vacant(wire, manifest).await? {
+            return seed(plan, manifest, token, wire).await;
         }
-        Err(err) => {
-            let _ = wire.script("ROLLBACK").await;
-            Err(err)
-        }
-    }
-}
-
-async fn open<W: Wire>(
-    plan: &Plan,
-    manifest: &Manifest,
-    token: &str,
-    wire: &mut W,
-) -> Result<(), Error> {
-    if Catalog(wire).present().await? {
-        let bound = super::verify(wire).await?;
-        if bound.digest != manifest.digest() || !crate::cap::sealed(plan, wire, token).await? {
+        if !crate::cap::sealed(plan, wire, token).await? {
             return Err(Error::Estate(super::Fault::Occupied));
         }
-        return Ok(());
+        Ok(())
+    }
+    .await;
+    finish(wire, out).await
+}
+
+pub(crate) async fn custody<W: Wire>(
+    plan: &Plan,
+    manifest: &Manifest,
+    wire: &mut W,
+    sink: impl FnOnce(&str) -> Result<(), Error> + Send,
+) -> Result<bool, Error> {
+    wire.script("BEGIN").await?;
+    let out = async {
+        if !vacant(wire, manifest).await? {
+            return Ok(false);
+        }
+        let token = crate::cap::wild()?;
+        seed(plan, manifest, &token, wire).await?;
+        sink(&token)?;
+        Ok(true)
+    }
+    .await;
+    finish(wire, out).await
+}
+
+async fn finish<W: Wire, T>(wire: &mut W, out: Result<T, Error>) -> Result<T, Error> {
+    let result = match out {
+        Ok(value) => wire.script("COMMIT").await.map(|()| value),
+        Err(error) => Err(error),
+    };
+    if result.is_err() {
+        let _ = wire.script("ROLLBACK").await;
+    }
+    result
+}
+
+async fn vacant<W: Wire>(wire: &mut W, manifest: &Manifest) -> Result<bool, Error> {
+    if wire.grain() == Grain::Pg {
+        wire.script(
+            "SELECT pg_advisory_xact_lock(hashtext('keel bootstrap'), hashtext(current_schema()::text))",
+        )
+        .await?;
+    }
+    if Catalog(wire).present().await? {
+        if super::verify(wire).await?.digest != manifest.digest() {
+            return Err(Error::Estate(super::Fault::Occupied));
+        }
+        return Ok(false);
     }
     if !Catalog(wire).empty().await? {
         return Err(Error::Estate(super::Fault::Unsealed));
     }
-    seed(plan, manifest, token, wire).await
+    Ok(true)
 }
 
 async fn seed<W: Wire>(

@@ -34,15 +34,20 @@ pub async fn configured<W: Wire + 'static>(
     Ok(keel::app(Arc::new(core), prefix))
 }
 
-pub async fn seal<W: Wire + 'static>(wire: W, graph: Graph, custody: &Path) -> Result<(), Error> {
-    let mut boot = keel::bootstrap(graph, wire)?;
-    let token = boot.mint().await?;
-    keep(custody, &token)?;
-    if let Err(error) = boot.seal(&token).await {
+pub async fn seal<W: Wire + 'static>(wire: W, graph: Graph, custody: &Path) -> Result<bool, Error> {
+    let mut kept = false;
+    let result = keel::bootstrap(graph, wire)?
+        .custody(|token| {
+            keep(custody, token)?;
+            kept = true;
+            Ok(())
+        })
+        .await;
+    if kept && result.is_err() && !matches!(result, Err(Error::Store(keel::adapt::Store::Down(_))))
+    {
         let _ = std::fs::remove_file(custody);
-        return Err(error);
     }
-    Ok(())
+    result.map(|core| core.is_some())
 }
 
 pub async fn status<W: Wire>(mut wire: W) -> Result<&'static str, Error> {

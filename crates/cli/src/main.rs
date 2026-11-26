@@ -69,11 +69,15 @@ async fn run(deed: Deed) -> Result<String, Error> {
             custody,
         } => {
             let graph = api::model(&model)?;
-            match api::open(&store).await? {
+            let sealed = match api::open(&store).await? {
                 api::Store::Lite(wire) => api::seal(wire, graph, &custody).await?,
                 api::Store::Pg(wire) => api::seal(*wire, graph, &custody).await?,
-            }
-            Ok(format!("sealed; token in {}", custody.display()))
+            };
+            Ok(if sealed {
+                format!("sealed; token in {}", custody.display())
+            } else {
+                "already sealed".into()
+            })
         }
         Deed::Status { store } => Ok(match api::open(&store).await? {
             api::Store::Lite(wire) => api::status(wire).await?,

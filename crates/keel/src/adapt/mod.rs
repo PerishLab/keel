@@ -115,6 +115,21 @@ impl<W: Wire> Bootstrap<W> {
         crate::cap::wild()
     }
 
+    pub async fn custody(
+        mut self,
+        sink: impl FnOnce(&str) -> Result<(), Error> + Send,
+    ) -> Result<Option<crate::face::Core<W>>, Error>
+    where
+        W: 'static,
+    {
+        self.estate.collection.check()?;
+        if crate::estate::custody(&self.plan, &self.manifest, &mut self.wire, sink).await? {
+            Ok(Some(self.core()))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub async fn seal(mut self, token: &str) -> Result<crate::face::Core<W>, Error>
     where
         W: 'static,
@@ -124,10 +139,14 @@ impl<W: Wire> Bootstrap<W> {
             return Err(Error::Estate(crate::estate::Fault::Token));
         }
         crate::estate::bootstrap(&self.plan, &self.manifest, token, &mut self.wire).await?;
-        Ok(
-            crate::face::Core::new(self.plan, self.wire)
-                .collect(self.estate.collection, None::<()>),
-        )
+        Ok(self.core())
+    }
+
+    fn core(self) -> crate::face::Core<W>
+    where
+        W: 'static,
+    {
+        crate::face::Core::new(self.plan, self.wire).collect(self.estate.collection, None::<()>)
     }
 }
 
