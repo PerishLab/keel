@@ -7,7 +7,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
-use support::{batch, everything, store, temp};
+use support::{batch, estate, everything, store, temp};
 
 const HOME: &str = "KEEL_COLUMN_WRITER";
 const START: &str = "KEEL_COLUMN_START";
@@ -50,6 +50,9 @@ fn writer() {
 #[test]
 fn killed() {
     let home = temp("killed");
+    tokio::runtime::Runtime::new()
+        .expect("runtime")
+        .block_on(async { drop(estate(&home).await) });
     let mut ledger = Ledger::default();
     let mut start = 0;
     for round in 0..ROUNDS {
