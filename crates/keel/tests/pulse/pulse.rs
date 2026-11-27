@@ -79,15 +79,7 @@ async fn blame() {
         .expect("bind");
     let ada = core.put("Actor", &[("login", "ada")]).await.expect("ada");
     core.sudo()
-        .put(
-            "@grant",
-            &[
-                ("who", &ada.to_string()),
-                ("verb", "put"),
-                ("unit", "Actor"),
-                ("scope", "all"),
-            ],
-        )
+        .grant(keel::Grant::new(&ada.to_string(), "put", "Actor", "all"))
         .await
         .expect("seed");
     let mark = core.flow(0).await.expect("flow").last().expect("g").key();
@@ -118,17 +110,9 @@ async fn heard() {
     let ada = sudo.put("Actor", &[("login", "ada")]).await.expect("ada");
     let bob = sudo.put("Actor", &[("login", "bob")]).await.expect("bob");
     let seed = async |who: String, verb: &str, unit: &str, scope: String| {
-        sudo.put(
-            "@grant",
-            &[
-                ("who", &who),
-                ("verb", verb),
-                ("unit", unit),
-                ("scope", &scope),
-            ],
-        )
-        .await
-        .expect("seed");
+        sudo.grant(keel::Grant::new(&who, verb, unit, &scope))
+            .await
+            .expect("seed");
     };
     seed(ada.to_string(), "see", "Actor", format!("row {ada}")).await;
     seed(bob.to_string(), "see", "Room", "all".into()).await;

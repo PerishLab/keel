@@ -80,15 +80,12 @@ async fn authority() {
     let actor = core.put("Actor", &[("login", "alice")]).await.unwrap();
     let root = core.live("documentstore").await.unwrap()[0].key();
     let grant = core
-        .put(
-            "@grant",
-            &[
-                ("who", &actor.to_string()),
-                ("verb", "*"),
-                ("unit", "documentstore"),
-                ("scope", &format!("row {root}")),
-            ],
-        )
+        .grant(keel::Grant::new(
+            &actor.to_string(),
+            "*",
+            "documentstore",
+            &format!("row {root}"),
+        ))
         .await
         .unwrap();
     let record = store
@@ -115,7 +112,7 @@ async fn authority() {
         .edit(&record.head, &[set("/theme", "null")])
         .await
         .unwrap();
-    core.end("@grant", grant).await.unwrap();
+    core.revoke(grant).await.unwrap();
     assert!(
         store
             .of(actor)
@@ -125,22 +122,19 @@ async fn authority() {
     );
     let bob = core.put("Actor", &[("login", "bob")]).await.unwrap();
     let see = core
-        .put(
-            "@grant",
-            &[
-                ("who", &bob.to_string()),
-                ("verb", "see"),
-                ("unit", "documentstore:document"),
-                ("scope", &format!("row {}", record.head.id)),
-            ],
-        )
+        .grant(keel::Grant::new(
+            &bob.to_string(),
+            "see",
+            "documentstore:document",
+            &format!("row {}", record.head.id),
+        ))
         .await
         .unwrap();
     let (seen, stats) = store.of(bob).query(&query).await.unwrap();
     assert_eq!(seen.len(), 1);
     assert_eq!(stats.candidates, 2);
     assert_eq!(stats.admitted, 1);
-    core.end("@grant", see).await.unwrap();
+    core.revoke(see).await.unwrap();
     assert!(store.of(bob).query(&query).await.unwrap().0.is_empty());
 }
 

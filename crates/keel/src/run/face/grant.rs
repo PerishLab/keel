@@ -1,6 +1,6 @@
 use super::*;
 use crate::adapt::Error;
-use crate::cap;
+use crate::cap::{self, Grant};
 use crate::life::{Cell, Work};
 use crate::query::{self};
 use crate::wire::Wire;
@@ -16,27 +16,20 @@ impl<W: Wire> Tx<'_, W> {
             .identity()
             .ok_or_else(|| Error::Adapt("no identity unit".into()))?
             .to_string();
-        let key = self.craft(&unit, fields).await?;
-        self.craft(
-            cap::GRANT,
-            &[
-                ("who", &key.to_string()),
-                ("verb", "*"),
-                ("unit", &unit),
-                ("scope", &format!("row {key}")),
-            ],
-        )
+        let key = self.put(&unit, fields).await?;
+        self.grant(Grant::new(
+            &key.to_string(),
+            "*",
+            &unit,
+            &format!("row {key}"),
+        ))
         .await?;
         Ok(key)
     }
 
     pub async fn put(&mut self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {
+        let unit = self.resource(name)?;
         if self.free() {
-            return self.craft(name, fields).await;
-        }
-        let unit = query::resolve(self.plan(), name)?;
-        if unit == cap::GRANT {
-            self.narrow(fields).await?;
             return self.craft(&unit, fields).await;
         }
         let cells = cap::mold(self.plan(), &unit, fields);
@@ -50,15 +43,20 @@ impl<W: Wire> Tx<'_, W> {
         Ok(key)
     }
 
+    pub async fn grant(&mut self, grant: Grant<'_>) -> Result<i64, Error> {
+        let fields = grant.fields();
+        if !self.free() {
+            self.narrow(fields).await?;
+        }
+        self.craft(cap::GRANT, fields).await
+    }
+
     pub(super) async fn mint(
         &mut self,
         unit: &str,
         key: i64,
         cells: &BTreeMap<String, Cell>,
     ) -> Result<(), Error> {
-        if unit == cap::GRANT {
-            return Ok(());
-        }
         let who = match self.who {
             Who::Op(op) => op,
             Who::Anon if self.core.identity() == Some(unit) => key,
@@ -69,12 +67,7 @@ impl<W: Wire> Tx<'_, W> {
         }
         self.craft(
             cap::GRANT,
-            &[
-                ("who", &who.to_string()),
-                ("verb", "*"),
-                ("unit", unit),
-                ("scope", &format!("row {key}")),
-            ],
+            Grant::new(&who.to_string(), "*", unit, &format!("row {key}")).fields(),
         )
         .await?;
         Ok(())
@@ -102,7 +95,10 @@ impl<W: Wire> Tx<'_, W> {
             .await
     }
 
-    pub(super) async fn revoke(&mut self, key: i64) -> Result<(), Error> {
+    pub async fn revoke(&mut self, key: i64) -> Result<(), Error> {
+        if self.free() {
+            return self.fell(cap::GRANT, key, None).await;
+        }
         let plan = self.core.plan();
         let node = plan.find(cap::GRANT)?;
         let row = Work::new(&mut self.seat.wire, plan)

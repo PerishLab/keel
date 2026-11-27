@@ -115,17 +115,9 @@ async fn routes() {
         .rename("root:old", "root:new")
         .await
         .expect("rename");
-    core.put(
-        "@grant",
-        &[
-            ("who", "anon"),
-            ("verb", "see"),
-            ("unit", "*"),
-            ("scope", "all"),
-        ],
-    )
-    .await
-    .expect("grant");
+    core.grant(keel::Grant::new("anon", "see", "*", "all"))
+        .await
+        .expect("grant");
     let app = keel::app(core.share(), "");
     for (path, expected) in [
         ("/root:old", StatusCode::NOT_FOUND),

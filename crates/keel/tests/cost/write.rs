@@ -16,17 +16,9 @@ async fn estate() -> Core<Sqlite> {
 pub(crate) async fn open<W: Wire>(core: &Core<W>) {
     let sudo = core.sudo();
     for unit in ["Flat", "Deep", "Deeper"] {
-        sudo.put(
-            "@grant",
-            &[
-                ("who", "all"),
-                ("verb", "*"),
-                ("unit", unit),
-                ("scope", "all"),
-            ],
-        )
-        .await
-        .expect("seed");
+        sudo.grant(keel::Grant::new("all", "*", unit, "all"))
+            .await
+            .expect("seed");
     }
 }
 
@@ -198,17 +190,9 @@ async fn covered() {
         .await
         .expect("root")
         .to_string();
-    sudo.put(
-        "@grant",
-        &[
-            ("who", "1"),
-            ("verb", "*"),
-            ("unit", "Flat"),
-            ("scope", &format!("row {root}")),
-        ],
-    )
-    .await
-    .expect("row grant");
+    sudo.grant(keel::Grant::new("1", "*", "Flat", &format!("row {root}")))
+        .await
+        .expect("row grant");
     let face = core.of(1);
     let started = Instant::now();
     for spot in 0..ROUNDS {

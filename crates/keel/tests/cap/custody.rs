@@ -15,17 +15,9 @@ async fn core(cached: bool) -> (Core<Sqlite>, i64) {
         .put("Actor", &[("login", "operator")])
         .await
         .expect("actor");
-    core.put(
-        "@grant",
-        &[
-            ("who", &actor.to_string()),
-            ("verb", "put"),
-            ("unit", "Actor"),
-            ("scope", "all"),
-        ],
-    )
-    .await
-    .expect("put grant");
+    core.grant(keel::Grant::new(&actor.to_string(), "put", "Actor", "all"))
+        .await
+        .expect("put grant");
     (core, actor)
 }
 

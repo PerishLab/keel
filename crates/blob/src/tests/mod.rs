@@ -37,17 +37,9 @@ async fn open(path: &Path) -> Estate {
 
 async fn operator(core: &Core<Sqlite>, name: &str) -> i64 {
     let id = core.put("Actor", &[("name", name)]).await.unwrap();
-    core.put(
-        "@grant",
-        &[
-            ("who", &id.to_string()),
-            ("unit", "Asset"),
-            ("verb", "put"),
-            ("scope", "all"),
-        ],
-    )
-    .await
-    .unwrap();
+    core.grant(keel::Grant::new(&id.to_string(), "put", "Asset", "all"))
+        .await
+        .unwrap();
     id
 }
 

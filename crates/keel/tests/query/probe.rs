@@ -78,15 +78,12 @@ async fn flat() {
             .await
             .expect("put");
     }
-    core.put(
-        "@grant",
-        &[
-            ("who", "all"),
-            ("verb", "see"),
-            ("unit", "Org"),
-            ("scope", r#"pred name != "zzz""#),
-        ],
-    )
+    core.grant(keel::Grant::new(
+        "all",
+        "see",
+        "Org",
+        r#"pred name != "zzz""#,
+    ))
     .await
     .expect("grant");
 
@@ -121,17 +118,9 @@ async fn bared() {
         .expect("bind")
         .bare();
     core.put("Org", &[("name", "lab")]).await.expect("org");
-    core.put(
-        "@grant",
-        &[
-            ("who", "all"),
-            ("verb", "see"),
-            ("unit", "Org"),
-            ("scope", "all"),
-        ],
-    )
-    .await
-    .expect("grant");
+    core.grant(keel::Grant::new("all", "see", "Org", "all"))
+        .await
+        .expect("grant");
 
     tally.grants.store(0, Ordering::Relaxed);
     core.of(1).query("from Org").await.expect("one");
@@ -165,15 +154,12 @@ async fn rooted() {
         .await
         .expect("put");
     }
-    core.put(
-        "@grant",
-        &[
-            ("who", "all"),
-            ("verb", "see"),
-            ("unit", "Org"),
-            ("scope", r#"pred name = "lab""#),
-        ],
-    )
+    core.grant(keel::Grant::new(
+        "all",
+        "see",
+        "Org",
+        r#"pred name = "lab""#,
+    ))
     .await
     .expect("grant");
 
@@ -204,19 +190,11 @@ async fn fresh() {
     assert_eq!(seen(&core).await, 0);
 
     let deed = core
-        .put(
-            "@grant",
-            &[
-                ("who", "all"),
-                ("verb", "see"),
-                ("unit", "Org"),
-                ("scope", "all"),
-            ],
-        )
+        .grant(keel::Grant::new("all", "see", "Org", "all"))
         .await
         .expect("grant");
     assert_eq!(seen(&core).await, 1);
 
-    core.end("@grant", deed).await.expect("revoke");
+    core.revoke(deed).await.expect("revoke");
     assert_eq!(seen(&core).await, 0);
 }

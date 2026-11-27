@@ -2,6 +2,45 @@ use super::*;
 use crate::adapt::Error;
 use crate::plan::Plan;
 use crate::query;
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Grant<'a> {
+    fields: Fields<'a>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum Fields<'a> {
+    Named([(&'a str, &'a str); 4]),
+    #[cfg(feature = "http")]
+    Projected(&'a [(&'a str, &'a str)]),
+}
+
+impl<'a> Grant<'a> {
+    pub fn new(who: &'a str, verb: &'a str, unit: &'a str, scope: &'a str) -> Self {
+        Self {
+            fields: Fields::Named([
+                ("who", who),
+                ("verb", verb),
+                ("unit", unit),
+                ("scope", scope),
+            ]),
+        }
+    }
+
+    #[cfg(feature = "http")]
+    pub(crate) fn project(fields: &'a [(&'a str, &'a str)]) -> Self {
+        Self {
+            fields: Fields::Projected(fields),
+        }
+    }
+
+    pub(crate) fn fields(&self) -> &[(&'a str, &'a str)] {
+        match &self.fields {
+            Fields::Named(fields) => fields,
+            #[cfg(feature = "http")]
+            Fields::Projected(fields) => fields,
+        }
+    }
+}
 
 pub fn vet(plan: &Plan, fields: &[(&str, &str)]) -> Result<(), Error> {
     let verb = get(fields, "verb");

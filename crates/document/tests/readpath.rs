@@ -40,15 +40,12 @@ async fn scoped() {
         .create("settings", "b", document("{}"))
         .await
         .unwrap();
-    core.put(
-        "@grant",
-        &[
-            ("who", &actor.to_string()),
-            ("verb", "see"),
-            ("unit", "documentstore:document"),
-            ("scope", &format!("row {}", first.head.id)),
-        ],
-    )
+    core.grant(keel::Grant::new(
+        &actor.to_string(),
+        "see",
+        "documentstore:document",
+        &format!("row {}", first.head.id),
+    ))
     .await
     .unwrap();
     let query = Query {

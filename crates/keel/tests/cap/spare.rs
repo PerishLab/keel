@@ -12,17 +12,9 @@ async fn stage() -> (keel::Core<Sqlite>, i64, i64) {
     let ada = sudo.put("Actor", &[("login", "ada")]).await.expect("ada");
     let bob = sudo.put("Actor", &[("login", "bob")]).await.expect("bob");
     let seed = async |who: &str, verb: &str, unit: &str, scope: &str| {
-        sudo.put(
-            "@grant",
-            &[
-                ("who", who),
-                ("verb", verb),
-                ("unit", unit),
-                ("scope", scope),
-            ],
-        )
-        .await
-        .expect("seed");
+        sudo.grant(keel::Grant::new(who, verb, unit, scope))
+            .await
+            .expect("seed");
     };
     seed(&ada.to_string(), "*", "Actor", &format!("row {ada}")).await;
     seed(&bob.to_string(), "*", "Actor", &format!("row {bob}")).await;
@@ -96,15 +88,12 @@ async fn handed() {
     let repo = den(&her, ada).await;
     assert_eq!(him.live("Repo").await.expect("stranger").len(), 0);
     assert!(
-        him.put(
-            "@grant",
-            &[
-                ("who", &ada.to_string()),
-                ("verb", "end"),
-                ("unit", "Repo"),
-                ("scope", &format!("row {repo}")),
-            ],
-        )
+        him.grant(keel::Grant::new(
+            &ada.to_string(),
+            "end",
+            "Repo",
+            &format!("row {repo}")
+        ))
         .await
         .is_err()
     );

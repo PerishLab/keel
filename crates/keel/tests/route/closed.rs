@@ -100,3 +100,40 @@ async fn units() {
     let asked = rig.post("/query", json!({ "q": "from @grant" })).await;
     assert_eq!(asked.status, StatusCode::OK, "{}", asked.body);
 }
+
+#[tokio::test]
+async fn grants() {
+    let rig = rig().await;
+    let fields = json!({ "who": 7, "verb": "see", "unit": "Topic", "scope": "all" });
+    let id = rig.made("/@grant", fields.clone()).await;
+    let path = format!("/@grant/{id}");
+    assert_eq!(rig.get(&path).await.body["who"], "7");
+    let edit = rig.patch(&path, json!({ "verb": "put" })).await;
+    assert_eq!(edit.status, StatusCode::BAD_REQUEST, "{}", edit.body);
+    assert_eq!(rig.end(&path).await.status, StatusCode::NO_CONTENT);
+    assert_eq!(rig.get(&path).await.status, StatusCode::NOT_FOUND);
+
+    let batch = rig
+        .post(
+            "/batch",
+            json!({ "deeds": [
+            { "verb": "put", "unit": "@grant", "fields": fields }
+        ] }),
+        )
+        .await;
+    assert_eq!(batch.status, StatusCode::OK, "{}", batch.body);
+    let id = batch.body["ids"][0].as_i64().expect("grant id");
+    let batch = rig
+        .post(
+            "/batch",
+            json!({ "deeds": [
+            { "verb": "end", "unit": "@grant", "id": id }
+        ] }),
+        )
+        .await;
+    assert_eq!(batch.status, StatusCode::OK, "{}", batch.body);
+    assert_eq!(
+        rig.get(&format!("/@grant/{id}")).await.status,
+        StatusCode::NOT_FOUND
+    );
+}

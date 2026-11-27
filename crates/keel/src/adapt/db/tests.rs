@@ -186,16 +186,8 @@ async fn custody() {
         .expect("retained");
     assert!(core.of(7).live("Item").await.expect("before").is_empty());
     let work = core.batch(async |tx| {
-        tx.put(
-            "@grant",
-            &[
-                ("who", "all"),
-                ("verb", "see"),
-                ("unit", "Item"),
-                ("scope", "all"),
-            ],
-        )
-        .await?;
+        tx.grant(crate::Grant::new("all", "see", "Item", "all"))
+            .await?;
         assert_eq!(tx.query("from Item").await?.rows().len(), 1);
         std::future::pending::<()>().await;
         Ok(())

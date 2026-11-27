@@ -1,5 +1,6 @@
 use super::*;
 use crate::adapt::Error;
+use crate::cap::Grant;
 use crate::life::{Ends, Row, Tie};
 use crate::query::{self, Pack, Tree};
 use crate::wire::Wire;
@@ -50,6 +51,14 @@ impl<W: Wire> Face<'_, W> {
                 Err(err)
             }
         }
+    }
+
+    pub async fn grant(&self, grant: Grant<'_>) -> Result<i64, Error> {
+        self.write(async |tx| tx.grant(grant).await).await
+    }
+
+    pub async fn revoke(&self, key: i64) -> Result<(), Error> {
+        self.write(async |tx| tx.revoke(key).await).await
     }
 
     pub async fn put(&self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {

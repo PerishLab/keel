@@ -20,6 +20,14 @@ impl<W: Wire> Tx<'_, W> {
         self.core.plan()
     }
 
+    pub(super) fn resource(&self, name: &str) -> Result<String, Error> {
+        let unit = query::resolve(self.plan(), name)?;
+        if unit == cap::GRANT {
+            return Err(Error::Grant);
+        }
+        Ok(unit)
+    }
+
     pub(super) async fn craft(
         &mut self,
         name: &str,

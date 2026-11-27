@@ -43,6 +43,7 @@ mod shape;
 
 pub(crate) use chain::*;
 pub(crate) use check::*;
+pub use grant::Grant;
 pub(crate) use grant::*;
 pub(crate) use seal::*;
 pub(crate) use shape::*;

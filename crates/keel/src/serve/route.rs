@@ -1,4 +1,5 @@
 use super::*;
+use crate::cap::{GRANT, Grant};
 use crate::wire::Wire;
 use axum::Json;
 use axum::http::StatusCode;
@@ -54,7 +55,12 @@ impl<W: Wire> Plea<W> {
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
         let face = self.face("put").await?;
-        let key = face.put(&name, &pairs).await.map_err(Fault::from)?;
+        let key = if name == GRANT {
+            face.grant(Grant::project(&pairs)).await
+        } else {
+            face.put(&name, &pairs).await
+        }
+        .map_err(Fault::from)?;
         Ok((StatusCode::CREATED, Json(json!({ "id": key }))))
     }
 
@@ -84,7 +90,9 @@ impl<W: Wire> Plea<W> {
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
         let face = self.face("set").await?;
-        face.set(&name, id, &pairs).await.map_err(Fault::from)?;
+        face.batch(async |tx| tx.edit(&name, id, &pairs).await)
+            .await
+            .map_err(Fault::from)?;
         let q = format!(r#"from {name} where id = "{id}""#);
         let pack = face.query(&q).await.map_err(Fault::from)?;
         match pack.rows().first() {
@@ -96,7 +104,12 @@ impl<W: Wire> Plea<W> {
     pub(crate) async fn remove(self, (unit, id): (String, i64)) -> Result<StatusCode, Fault> {
         let name = self.core.unit(&unit)?;
         let face = self.face("end").await?;
-        face.end(&name, id).await.map_err(Fault::from)?;
+        if name == GRANT {
+            face.revoke(id).await
+        } else {
+            face.end(&name, id).await
+        }
+        .map_err(Fault::from)?;
         Ok(StatusCode::NO_CONTENT)
     }
 

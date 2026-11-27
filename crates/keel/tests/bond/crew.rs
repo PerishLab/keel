@@ -47,15 +47,12 @@ async fn group() {
         .put("Repo", &[("name", "vault"), ("owner", &boss.to_string())])
         .await
         .expect("repo");
-    sudo.put(
-        "@grant",
-        &[
-            ("who", &format!("team {crew}")),
-            ("verb", "see"),
-            ("unit", "Repo"),
-            ("scope", &format!("row {vault}")),
-        ],
-    )
+    sudo.grant(keel::Grant::new(
+        &format!("team {crew}"),
+        "see",
+        "Repo",
+        &format!("row {vault}"),
+    ))
     .await
     .expect("group grant");
 
@@ -98,16 +95,8 @@ async fn group() {
     assert_eq!(held.len(), 1);
 
     assert!(
-        sudo.put(
-            "@grant",
-            &[
-                ("who", "ghost 9"),
-                ("verb", "see"),
-                ("unit", "Repo"),
-                ("scope", "all"),
-            ],
-        )
-        .await
-        .is_err()
+        sudo.grant(keel::Grant::new("ghost 9", "see", "Repo", "all"))
+            .await
+            .is_err()
     );
 }

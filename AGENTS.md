@@ -96,7 +96,11 @@ business authoring surfaces.
   stated ordering and snapshot scope. A description is data, never a grammar:
   no package adds a text query language, and the engine parses no query text.
 - Preserve the six engine verbs. New ceremonies compose verbs; they do not
-  create private write paths.
+  create private write paths. Rust callers create grants with
+  `grant(Grant::new(who, verb, unit, scope))` and revoke them with
+  `revoke(id)` on `Core`, `Face` or `Tx`. Name-dispatched Rust row
+  writes to `@grant` return `Error::Grant`. Grant reads and the
+  existing HTTP resource and batch projections retain their contracts.
 - A `Core` serves a cached read only while its `Wire` epoch is unchanged since
   the cached read: SQLite's `data_version`, Postgres's current snapshot. Commits
   from other connections, including other processes, therefore invalidate it.

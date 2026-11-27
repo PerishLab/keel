@@ -43,16 +43,8 @@ impl<W: Wire + 'static> Relay<W> {
             ))
             .await?;
         if held.count() == Some(0) {
-            sudo.put(
-                "@grant",
-                &[
-                    ("who", &svc.to_string()),
-                    ("verb", "see"),
-                    ("unit", "Hook"),
-                    ("scope", "all"),
-                ],
-            )
-            .await?;
+            sudo.grant(keel::Grant::new(&svc.to_string(), "see", "Hook", "all"))
+                .await?;
         }
         Ok(Self { core, svc })
     }

@@ -90,16 +90,8 @@ impl<W: Wire + 'static> Gate<W> {
         let sudo = self.core.sudo();
         for seed in seeds {
             if !held(&sudo, seed).await? {
-                sudo.put(
-                    "@grant",
-                    &[
-                        ("who", seed.who),
-                        ("verb", seed.verb),
-                        ("unit", seed.unit),
-                        ("scope", seed.scope),
-                    ],
-                )
-                .await?;
+                sudo.grant(keel::Grant::new(seed.who, seed.verb, seed.unit, seed.scope))
+                    .await?;
             }
         }
         Ok(())

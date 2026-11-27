@@ -1,5 +1,6 @@
 use super::*;
 use crate::adapt::Error;
+use crate::cap::{GRANT, Grant};
 use crate::face::Tx;
 use crate::life::Ends;
 use crate::wire::Wire;
@@ -121,10 +122,14 @@ impl Deed {
         cells: &BTreeMap<String, String>,
     ) -> Result<Option<i64>, Error> {
         match self {
+            Deed::Put { unit, .. } if unit == GRANT => {
+                tx.grant(Grant::project(&pairs(cells))).await.map(Some)
+            }
             Deed::Put { unit, .. } => tx.put(unit, &pairs(cells)).await.map(Some),
-            Deed::Set { unit, id, .. } => tx.set(unit, *id, &pairs(cells)).await.map(|()| None),
+            Deed::Set { unit, id, .. } => tx.edit(unit, *id, &pairs(cells)).await.map(|()| None),
             Deed::End { unit, id, at } => match at {
-                Some(at) => tx.lease(unit, *id, *at).await.map(|()| None),
+                Some(at) => tx.expire(unit, *id, *at).await.map(|()| None),
+                None if unit == GRANT => tx.revoke(*id).await.map(|()| None),
                 None => tx.end(unit, *id).await.map(|()| None),
             },
             Deed::Tie {

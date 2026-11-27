@@ -161,17 +161,9 @@ async fn owned() {
     let ids = seed(&core, &["ada", "bob", "cy"]).await;
     let (ada, bob, cy) = (ids[0], ids[1], ids[2]);
     for verb in ["see", "tie", "cut"] {
-        core.put(
-            "@grant",
-            &[
-                ("who", &ada.to_string()),
-                ("verb", verb),
-                ("unit", "Actor"),
-                ("scope", "all"),
-            ],
-        )
-        .await
-        .expect("grant");
+        core.grant(keel::Grant::new(&ada.to_string(), verb, "Actor", "all"))
+            .await
+            .expect("grant");
     }
     let face = core.of(ada);
     face.tie("Actor", "members", ends(ada, bob), &[])

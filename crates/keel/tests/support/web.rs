@@ -34,7 +34,9 @@ impl Rig {
     pub async fn over<W: Wire + 'static>(graph: Graph, wire: W) -> Rig {
         let core = crate::support::boot(graph, wire).await.expect("boot");
         let core = core.share();
-        core.put("@grant", &grant()).await.expect("grant");
+        core.grant(keel::Grant::new("anon", "*", "*", "all"))
+            .await
+            .expect("grant");
         Rig {
             app: keel::app(core, ""),
         }
@@ -104,15 +106,6 @@ pub fn root(pack: &Value) -> String {
         .and_then(Value::as_str)
         .expect("root")
         .to_string()
-}
-
-fn grant() -> [(&'static str, &'static str); 4] {
-    [
-        ("who", "anon"),
-        ("verb", "*"),
-        ("unit", "*"),
-        ("scope", "all"),
-    ]
 }
 
 fn read(bytes: &[u8]) -> Value {
