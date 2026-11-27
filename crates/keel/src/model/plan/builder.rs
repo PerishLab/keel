@@ -1,6 +1,22 @@
 use super::super::spec::*;
 use crate::{atom, bond};
 
+struct Wale {
+    name: String,
+    kind: bond::Kind,
+    target: String,
+    cast: Cast,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Cast {
+    Bond,
+    Free,
+    Root,
+    Crew,
+    Closure,
+}
+
 impl Builder {
     pub fn field(self, name: impl Into<String>, kind: atom::Kind) -> Self {
         self.scalar(name, kind, Only::Free, true)

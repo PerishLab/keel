@@ -1,5 +1,4 @@
-use crate::atom;
-use crate::bond;
+use crate::{atom, bond};
 
 pub trait Resource {
     fn name() -> &'static str;
@@ -14,22 +13,6 @@ pub struct Spec {
     veil: bool,
     frozen: bool,
     faults: Vec<String>,
-}
-
-struct Wale {
-    name: String,
-    kind: bond::Kind,
-    target: String,
-    cast: Cast,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Cast {
-    Bond,
-    Free,
-    Root,
-    Crew,
-    Closure,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -297,3 +280,7 @@ impl Bond {
 
 #[path = "plan/builder.rs"]
 mod builder;
+#[path = "plan/target.rs"]
+mod target;
+
+pub use target::{Named, Plain, Probe};

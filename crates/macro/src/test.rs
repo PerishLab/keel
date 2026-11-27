@@ -172,7 +172,7 @@ fn renamed() {
     );
     assert!(
         code.contains(
-            ". root (\"sales_order\" , :: keel :: bond :: Kind :: Many2one , < Order as :: keel :: spec :: Resource > :: name ())"
+            ". root (\"sales_order\" , :: keel :: bond :: Kind :: Many2one , { # [allow (unused_imports)] use :: keel :: spec :: { Named as _ , Plain as _ } ; (& :: keel :: spec :: Probe :: < Order > :: NEW) . pick (\"Order\") })"
         ),
         "{code}"
     );
@@ -233,7 +233,7 @@ fn relations() {
     )
     .expect("relations");
     assert!(
-        code.contains("< team :: Team as :: keel :: spec :: Resource > :: name ()"),
+        code.contains("(& :: keel :: spec :: Probe :: < team :: Team > :: NEW) . pick (\"Team\")"),
         "{code}"
     );
     assert!(
@@ -248,6 +248,36 @@ fn relations() {
     );
     assert!(
         code.contains("(\"name\" , :: keel :: atom :: Kind :: Text)"),
+        "{code}"
+    );
+}
+
+#[test]
+fn targets() {
+    let code = emitted(
+        parse_quote!(),
+        parse_quote! {
+            struct Entry {
+                #[relation(Marker, many2one, root)]
+                marker: Marker,
+                #[relation(Custom, many2one)]
+                custom: Custom,
+                #[relation(Leaf, many2one, opt)]
+                leaf: sub::Leaf,
+            }
+        },
+    )
+    .expect("targets");
+    assert!(
+        code.contains("(& :: keel :: spec :: Probe :: < Marker > :: NEW) . pick (\"Marker\")"),
+        "{code}"
+    );
+    assert!(
+        code.contains("(& :: keel :: spec :: Probe :: < Custom > :: NEW) . pick (\"Custom\")"),
+        "{code}"
+    );
+    assert!(
+        code.contains("(& :: keel :: spec :: Probe :: < sub :: Leaf > :: NEW) . pick (\"Leaf\")"),
         "{code}"
     );
 }

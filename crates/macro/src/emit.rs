@@ -41,6 +41,19 @@ fn serial(
     quote! { .serial(#label, #scope) }
 }
 
+fn aim(target: Aim) -> proc_macro2::TokenStream {
+    match target {
+        Aim::Fixed(text) => quote! { #text },
+        Aim::Type(ty, text) => quote! {
+            {
+                #[allow(unused_imports)]
+                use ::keel::spec::{Named as _, Plain as _};
+                (&::keel::spec::Probe::<#ty>::NEW).pick(#text)
+            }
+        },
+    }
+}
+
 fn wire(label: &str, link: Link) -> proc_macro2::TokenStream {
     let Link {
         card,
@@ -52,10 +65,7 @@ fn wire(label: &str, link: Link) -> proc_macro2::TokenStream {
         closure,
         ..
     } = link;
-    let target = match target {
-        Aim::Fixed(text) => quote! { #text },
-        Aim::Type(ty) => quote! { <#ty as ::keel::spec::Resource>::name() },
-    };
+    let target = aim(target);
     let pairs = slots.iter().map(|(n, k)| {
         quote! { (#n, ::keel::atom::Kind::#k) }
     });
