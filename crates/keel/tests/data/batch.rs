@@ -27,28 +27,12 @@ async fn whole() {
         .await
         .expect("bind");
     let ada = core.put("Actor", &[("login", "ada")]).await.expect("ada");
-    core.put(
-        "@grant",
-        &[
-            ("who", &ada.to_string()),
-            ("verb", "put"),
-            ("unit", "Actor"),
-            ("scope", "all"),
-        ],
-    )
-    .await
-    .expect("seed");
-    core.put(
-        "@grant",
-        &[
-            ("who", "all"),
-            ("verb", "see"),
-            ("unit", "Actor"),
-            ("scope", "all"),
-        ],
-    )
-    .await
-    .expect("see seed");
+    core.grant(keel::Grant::new(&ada.to_string(), "put", "Actor", "all"))
+        .await
+        .expect("seed");
+    core.grant(keel::Grant::new("all", "see", "Actor", "all"))
+        .await
+        .expect("see seed");
     let boss = core.of(ada);
 
     let (org, team) = boss
@@ -67,15 +51,12 @@ async fn whole() {
                 &[],
             )
             .await?;
-            tx.put(
-                "@grant",
-                &[
-                    ("who", &format!("team {team}")),
-                    ("verb", "see"),
-                    ("unit", "Actor"),
-                    ("scope", &format!("row {org}")),
-                ],
-            )
+            tx.grant(keel::Grant::new(
+                &format!("team {team}"),
+                "see",
+                "Actor",
+                &format!("row {org}"),
+            ))
             .await?;
             Ok((org, team))
         })

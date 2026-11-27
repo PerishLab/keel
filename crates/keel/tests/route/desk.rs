@@ -32,17 +32,9 @@ impl Desk {
         let mut boot = bootstrap(graph, wire).expect("bootstrap");
         let token = boot.mint().await.expect("mint");
         let core = boot.seal(&token).await.expect("seal").share();
-        core.put(
-            "@grant",
-            &[
-                ("who", "anon"),
-                ("verb", "*"),
-                ("unit", "*"),
-                ("scope", "all"),
-            ],
-        )
-        .await
-        .expect("grant");
+        core.grant(keel::Grant::new("anon", "*", "*", "all"))
+            .await
+            .expect("grant");
         Desk {
             app: keel::app(core.clone(), "/api"),
             core,

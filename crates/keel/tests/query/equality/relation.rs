@@ -214,21 +214,18 @@ async fn authority() {
     let tree = form("Note").when("owner", Op::Eq, &owner.to_string());
     assert!(core.of(owner).one(&tree).await.unwrap().is_none());
     let grant = core
-        .put(
-            "@grant",
-            &[
-                ("who", "all"),
-                ("verb", "see"),
-                ("unit", "Note"),
-                ("scope", "pred label = \"visible\""),
-            ],
-        )
+        .grant(keel::Grant::new(
+            "all",
+            "see",
+            "Note",
+            "pred label = \"visible\"",
+        ))
         .await
         .unwrap();
     assert_eq!(
         core.of(owner).one(&tree).await.unwrap().unwrap().key(),
         wanted
     );
-    core.end("@grant", grant).await.unwrap();
+    core.revoke(grant).await.unwrap();
     assert!(core.of(owner).one(&tree).await.unwrap().is_none());
 }

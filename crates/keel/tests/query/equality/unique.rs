@@ -135,15 +135,12 @@ async fn authority() {
     assert!(core.one(&closed).await.expect("possession").is_some());
     assert!(core.of(1).one(&open).await.expect("no grant").is_none());
     let grant = core
-        .put(
-            "@grant",
-            &[
-                ("who", "all"),
-                ("verb", "see"),
-                ("unit", "Ticket"),
-                ("scope", "pred tag = \"visible\""),
-            ],
-        )
+        .grant(keel::Grant::new(
+            "all",
+            "see",
+            "Ticket",
+            "pred tag = \"visible\"",
+        ))
         .await
         .expect("grant");
     assert_eq!(
@@ -156,6 +153,6 @@ async fn authority() {
         visible
     );
     assert!(core.of(1).one(&closed).await.expect("hidden").is_none());
-    core.end("@grant", grant).await.expect("revoke");
+    core.revoke(grant).await.expect("revoke");
     assert!(core.of(1).one(&open).await.expect("revoked").is_none());
 }

@@ -1,5 +1,5 @@
 use crate::world::*;
-use keel::adapt::db::Sqlite;
+use keel::adapt::{Error, Sqlite};
 use keel::{Graph, Who};
 
 #[tokio::test]
@@ -13,15 +13,7 @@ async fn grant() {
     assert_eq!(sudo.who(), Who::Sudo);
 
     let row = sudo
-        .put(
-            "@grant",
-            &[
-                ("who", "anon"),
-                ("verb", "see"),
-                ("unit", "Actor"),
-                ("scope", "all"),
-            ],
-        )
+        .grant(keel::Grant::new("anon", "see", "Actor", "all"))
         .await
         .expect("seed");
     let rows = sudo.live("@grant").await.expect("live");
@@ -31,10 +23,34 @@ async fn grant() {
     let pack = sudo.query("from @grant count").await.expect("audit");
     assert_eq!(pack.count(), Some(1));
 
-    sudo.end("@grant", row).await.expect("revoke");
-    assert_eq!(sudo.live("@grant").await.expect("live").len(), 0);
+    let fields = [
+        ("who", "anon"),
+        ("verb", "see"),
+        ("unit", "Actor"),
+        ("scope", "all"),
+    ];
+    assert_eq!(core.put("@grant", &fields).await, Err(Error::Grant));
+    assert_eq!(core.end("@grant", row).await, Err(Error::Grant));
+    let face = core.of(1);
+    assert_eq!(face.put("@grant", &fields).await, Err(Error::Grant));
+    assert_eq!(face.end("@grant", row).await, Err(Error::Grant));
+    core.batch(async |tx| {
+        assert_eq!(tx.put("@grant", &fields).await, Err(Error::Grant));
+        assert_eq!(tx.end("@grant", row).await, Err(Error::Grant));
+        assert_eq!(tx.lease("@grant", row, 99).await, Err(Error::Grant));
+        assert_eq!(tx.unset("@grant", row, &["verb"]).await, Err(Error::Grant));
+        assert_eq!(
+            tx.set("@grant", row, &[("verb", "put")]).await,
+            Err(Error::Grant)
+        );
+        Ok(())
+    })
+    .await
+    .expect("batch");
+    assert_eq!(sudo.live("@grant").await.expect("unchanged").len(), 1);
 
-    assert!(sudo.set("@grant", row, &[("verb", "put")]).await.is_err());
+    sudo.revoke(row).await.expect("revoke");
+    assert_eq!(sudo.live("@grant").await.expect("live").len(), 0);
 }
 
 #[tokio::test]
@@ -46,16 +62,7 @@ async fn vet() {
         .expect("bind");
     let sudo = core.sudo();
     let seed = async |who: &str, verb: &str, unit: &str, scope: &str| {
-        sudo.put(
-            "@grant",
-            &[
-                ("who", who),
-                ("verb", verb),
-                ("unit", unit),
-                ("scope", scope),
-            ],
-        )
-        .await
+        sudo.grant(keel::Grant::new(who, verb, unit, scope)).await
     };
     assert!(seed("anon", "grow", "Actor", "all").await.is_err());
     assert!(seed("someone", "see", "Actor", "all").await.is_err());

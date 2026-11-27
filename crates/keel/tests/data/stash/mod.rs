@@ -168,15 +168,7 @@ async fn foreign() {
         0
     );
     let grant = far
-        .put(
-            "@grant",
-            &[
-                ("who", "anon"),
-                ("verb", "see"),
-                ("unit", "Actor"),
-                ("scope", "all"),
-            ],
-        )
+        .grant(keel::Grant::new("anon", "see", "Actor", "all"))
         .await
         .expect("grant");
     assert_eq!(
@@ -188,7 +180,7 @@ async fn foreign() {
             .len(),
         1
     );
-    far.end("@grant", grant).await.expect("revoke");
+    far.revoke(grant).await.expect("revoke");
     assert_eq!(
         near.anon()
             .query("from Actor")

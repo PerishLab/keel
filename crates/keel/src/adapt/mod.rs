@@ -12,6 +12,7 @@ pub use db::Sqlite;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Error {
     Missing(String),
+    Grant,
     Adapt(String),
     Estate(crate::estate::Fault),
     Store(Store),
@@ -46,6 +47,7 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Missing(name) => write!(f, "missing resource: {name}"),
+            Self::Grant => write!(f, "use the typed grant API"),
             Self::Adapt(note) => write!(f, "adapt: {note}"),
             Self::Estate(fault) => write!(f, "{fault}"),
             Self::Store(store) => write!(f, "{store}"),

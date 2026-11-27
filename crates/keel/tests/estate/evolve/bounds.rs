@@ -86,17 +86,9 @@ async fn authority() {
     let core = crate::support::boot(graph("Old"), Sqlite::file(&path).await.expect("wire"))
         .await
         .expect("boot");
-    core.put(
-        "@grant",
-        &[
-            ("who", "all"),
-            ("verb", "see"),
-            ("unit", "root:old"),
-            ("scope", "all"),
-        ],
-    )
-    .await
-    .expect("grant");
+    core.grant(keel::Grant::new("all", "see", "root:old", "all"))
+        .await
+        .expect("grant");
     drop(core);
     assert!(
         bind(graph("New"), Sqlite::file(&path).await.expect("wire"))

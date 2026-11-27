@@ -12,6 +12,16 @@ impl<W: Wire> Tx<'_, W> {
         key: i64,
         fields: &[(&str, &str)],
     ) -> Result<(), Error> {
+        let unit = self.resource(name)?;
+        self.edit(&unit, key, fields).await
+    }
+
+    pub(crate) async fn edit(
+        &mut self,
+        name: &str,
+        key: i64,
+        fields: &[(&str, &str)],
+    ) -> Result<(), Error> {
         if self.free() {
             return self.shift(name, key, fields).await;
         }
@@ -33,10 +43,10 @@ impl<W: Wire> Tx<'_, W> {
     }
 
     pub async fn unset(&mut self, name: &str, key: i64, fields: &[&str]) -> Result<(), Error> {
+        let unit = self.resource(name)?;
         if self.free() {
-            return self.loosen(name, key, fields).await;
+            return self.loosen(&unit, key, fields).await;
         }
-        let unit = query::resolve(self.plan(), name)?;
         let pre = self.seen(&unit, key).await?;
         let mark = cap::Mark {
             key: Some(key),
@@ -56,12 +66,9 @@ impl<W: Wire> Tx<'_, W> {
     }
 
     pub async fn end(&mut self, name: &str, key: i64) -> Result<(), Error> {
+        let unit = self.resource(name)?;
         if self.free() {
-            return self.fell(name, key, None).await;
-        }
-        let unit = query::resolve(self.plan(), name)?;
-        if unit == cap::GRANT {
-            return self.revoke(key).await;
+            return self.fell(&unit, key, None).await;
         }
         let row = self.seen(&unit, key).await?;
         let mark = cap::Mark {
@@ -73,6 +80,11 @@ impl<W: Wire> Tx<'_, W> {
     }
 
     pub async fn lease(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
+        let unit = self.resource(name)?;
+        self.expire(&unit, key, at).await
+    }
+
+    pub(crate) async fn expire(&mut self, name: &str, key: i64, at: i64) -> Result<(), Error> {
         if self.free() {
             return self.fell(name, key, Some(at)).await;
         }

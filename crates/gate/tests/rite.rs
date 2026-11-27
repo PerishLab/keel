@@ -31,15 +31,7 @@ async fn rites() {
         .expect("identify")
         .share();
     core.sudo()
-        .put(
-            "@grant",
-            &[
-                ("who", "anon"),
-                ("verb", "put"),
-                ("unit", "Actor"),
-                ("scope", "all"),
-            ],
-        )
+        .grant(keel::Grant::new("anon", "put", "Actor", "all"))
         .await
         .expect("seed");
     let ada = core

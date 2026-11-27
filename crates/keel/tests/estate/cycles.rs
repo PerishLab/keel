@@ -49,15 +49,7 @@ async fn authority() {
     .await
     .expect("bind");
     let grant = core
-        .put(
-            "@grant",
-            &[
-                ("who", "all"),
-                ("verb", "see"),
-                ("unit", "Alpha"),
-                ("scope", "all"),
-            ],
-        )
+        .grant(keel::Grant::new("all", "see", "Alpha", "all"))
         .await
         .expect("grant");
     drop(core);
@@ -77,7 +69,7 @@ async fn authority() {
     )
     .await
     .expect("reopen");
-    core.end("@grant", grant).await.expect("end grant");
+    core.revoke(grant).await.expect("end grant");
     drop(core);
     let core = bind(graph::<Beta>(), Sqlite::file(&path).await.expect("evolve"))
         .await

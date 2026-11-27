@@ -39,15 +39,12 @@ async fn permit(core: &Core<Sqlite>, actor: i64, mode: &str) -> i64 {
         .put("Channel", &[("source", "split"), ("mode", mode)])
         .await
         .unwrap();
-    core.put(
-        "@grant",
-        &[
-            ("who", &actor.to_string()),
-            ("unit", "Channel"),
-            ("verb", "see"),
-            ("scope", &format!("row {row}")),
-        ],
-    )
+    core.grant(keel::Grant::new(
+        &actor.to_string(),
+        "see",
+        "Channel",
+        &format!("row {row}"),
+    ))
     .await
     .unwrap()
 }
@@ -122,7 +119,7 @@ async fn scoped() {
         .await
         .unwrap();
     assert_eq!(read(&store, reader, "split").await.unwrap(), [raw]);
-    core.end("@grant", grant).await.unwrap();
+    core.revoke(grant).await.unwrap();
     assert!(
         view.append("device", vec![record("split", raw)])
             .await

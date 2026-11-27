@@ -29,6 +29,7 @@ impl From<Error> for Fault {
     fn from(err: Error) -> Self {
         match err {
             Error::Missing(name) => Self::miss(&name),
+            Error::Grant => Self::bad(err.to_string()),
             Error::Adapt(note) if note.starts_with("missing row") => Self {
                 status: StatusCode::NOT_FOUND,
                 note,

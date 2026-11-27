@@ -15,6 +15,7 @@ pub use graph::Graph;
 pub use keel_macro::resource;
 pub use model::atom::{int, string, url};
 pub use model::spec::Resource;
+pub use run::cap::Grant;
 pub use run::face::{Core, Face, Tx, Who};
 pub use run::life::{Cell, Ends, Row, Tie};
 pub use run::query::{Ask, Bag, Op, Pack, Pred, Rank, Slice, Sort, Tree, form};

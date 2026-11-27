@@ -54,17 +54,9 @@ async fn birth() {
         .identify("Actor")
         .expect("identify");
     let sudo = core.sudo();
-    sudo.put(
-        "@grant",
-        &[
-            ("who", "anon"),
-            ("verb", "put"),
-            ("unit", "Actor"),
-            ("scope", "all"),
-        ],
-    )
-    .await
-    .expect("register seed");
+    sudo.grant(keel::Grant::new("anon", "put", "Actor", "all"))
+        .await
+        .expect("register seed");
 
     let eve = core
         .anon()

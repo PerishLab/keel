@@ -1,6 +1,6 @@
 use super::*;
 use crate::adapt::Error;
-use crate::cap;
+use crate::cap::{self, Grant};
 use crate::ddl::Grain;
 use crate::life::{Ends, Row, Tie};
 use crate::plan::Plan;
@@ -64,6 +64,14 @@ impl<W: Wire> Core<W> {
             seat.stale = false;
         }
         Ok(seat)
+    }
+
+    pub async fn grant(&self, grant: Grant<'_>) -> Result<i64, Error> {
+        self.sudo().grant(grant).await
+    }
+
+    pub async fn revoke(&self, key: i64) -> Result<(), Error> {
+        self.sudo().revoke(key).await
     }
 
     pub async fn put(&self, name: &str, fields: &[(&str, &str)]) -> Result<i64, Error> {

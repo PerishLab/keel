@@ -13,17 +13,9 @@ async fn cover() {
     let ada = sudo.put("Actor", &[("login", "ada")]).await.expect("ada");
     let bob = sudo.put("Actor", &[("login", "bob")]).await.expect("bob");
     let seed = async |who: &str, verb: &str, unit: &str, scope: &str| {
-        sudo.put(
-            "@grant",
-            &[
-                ("who", who),
-                ("verb", verb),
-                ("unit", unit),
-                ("scope", scope),
-            ],
-        )
-        .await
-        .expect("seed");
+        sudo.grant(keel::Grant::new(who, verb, unit, scope))
+            .await
+            .expect("seed");
     };
     seed(&ada.to_string(), "put", "Repo", "all").await;
     seed("anon", "see", "Repo", r#"pred visibility = "public""#).await;
@@ -121,42 +113,23 @@ async fn cover() {
         .await
         .expect("subtree covers bob issue");
 
-    her.put(
-        "@grant",
-        &[
-            ("who", &bob.to_string()),
-            ("verb", "see"),
-            ("unit", "Repo"),
-            ("scope", &format!("row {repo}")),
-        ],
-    )
+    her.grant(keel::Grant::new(
+        &bob.to_string(),
+        "see",
+        "Repo",
+        &format!("row {repo}"),
+    ))
     .await
     .expect("attenuated grant");
     assert!(
-        him.put(
-            "@grant",
-            &[
-                ("who", "all"),
-                ("verb", "put"),
-                ("unit", "Repo"),
-                ("scope", "all"),
-            ],
-        )
-        .await
-        .is_err()
+        him.grant(keel::Grant::new("all", "put", "Repo", "all"))
+            .await
+            .is_err()
     );
     assert!(
-        her.put(
-            "@grant",
-            &[
-                ("who", "all"),
-                ("verb", "see"),
-                ("unit", "*"),
-                ("scope", "all"),
-            ],
-        )
-        .await
-        .is_err()
+        her.grant(keel::Grant::new("all", "see", "*", "all"))
+            .await
+            .is_err()
     );
 
     assert_eq!(her.live("Issue").await.expect("live").len(), 2);
@@ -174,15 +147,12 @@ async fn descend() {
     let sudo = core.sudo();
     let ada = sudo.put("Actor", &[("login", "ada")]).await.expect("ada");
     let bob = sudo.put("Actor", &[("login", "bob")]).await.expect("bob");
-    sudo.put(
-        "@grant",
-        &[
-            ("who", "all"),
-            ("verb", "see"),
-            ("unit", "Repo"),
-            ("scope", r#"pred visibility = "public""#),
-        ],
-    )
+    sudo.grant(keel::Grant::new(
+        "all",
+        "see",
+        "Repo",
+        r#"pred visibility = "public""#,
+    ))
     .await
     .expect("seed");
 
@@ -250,15 +220,12 @@ async fn confine() {
     let sudo = core.sudo();
     let ada = sudo.put("Actor", &[("login", "ada")]).await.expect("ada");
     let bob = sudo.put("Actor", &[("login", "bob")]).await.expect("bob");
-    sudo.put(
-        "@grant",
-        &[
-            ("who", "all"),
-            ("verb", "put"),
-            ("unit", "Repo"),
-            ("scope", r#"pred visibility = "public""#),
-        ],
-    )
+    sudo.grant(keel::Grant::new(
+        "all",
+        "put",
+        "Repo",
+        r#"pred visibility = "public""#,
+    ))
     .await
     .expect("seed");
     let open = sudo
