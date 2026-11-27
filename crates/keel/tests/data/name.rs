@@ -151,3 +151,115 @@ async fn twin() {
     assert!(core.has("team_tag").await.expect("has team tag"));
     assert!(core.has("team_note_tags").await.expect("has join"));
 }
+
+#[tokio::test]
+async fn explicit() {
+    use keel::atom::int;
+    use keel::spec::Resource;
+
+    #[resource(name = "IssueAnchor")]
+    struct Anchor {
+        #[field(string, name = "node_id", unique)]
+        node: string,
+    }
+
+    #[resource(name = "IssueMember", veil)]
+    struct Member {
+        #[field(string)]
+        branch: string,
+        #[relation(Anchor, one2one, root, name = "issue_anchor")]
+        anchor: Anchor,
+    }
+
+    #[resource(name = "IssueClaim", frozen)]
+    struct Claim {
+        #[field(string, name = "file_path", unique = member)]
+        path: string,
+        #[field(int, name = "base_version", min = 1)]
+        version: int,
+        #[field(serial, scope = member, name = "claim_no")]
+        number: int,
+        #[relation(Member, many2one, root, name = "issue_member")]
+        member: Member,
+    }
+
+    assert_eq!(Anchor::name(), "IssueAnchor");
+    assert_eq!(Member::name(), "IssueMember");
+    assert_eq!(Claim::name(), "IssueClaim");
+    assert!(Member::spec().veiled());
+    assert!(Claim::spec().frozen());
+
+    let mut graph = Graph::new();
+    graph.plug::<Anchor>().plug::<Member>().plug::<Claim>();
+    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind");
+
+    let member = core
+        .plan()
+        .units()
+        .values()
+        .find(|u| u.name() == "IssueMember")
+        .expect("IssueMember");
+    assert_eq!(member.key(), "issueanchor:issuemember");
+    assert_eq!(member.table(), "issueanchor_issuemember");
+
+    let claim = core
+        .plan()
+        .units()
+        .values()
+        .find(|u| u.name() == "IssueClaim")
+        .expect("IssueClaim");
+    assert_eq!(claim.key(), "issuemember:issueclaim");
+    assert_eq!(claim.table(), "issuemember_issueclaim");
+
+    let anchor = core
+        .put("IssueAnchor", &[("node_id", "n1")])
+        .await
+        .expect("anchor");
+    let joined = core
+        .put(
+            "IssueMember",
+            &[("branch", "main"), ("issue_anchor", &anchor.to_string())],
+        )
+        .await
+        .expect("member");
+    core.put(
+        "IssueClaim",
+        &[
+            ("file_path", "src/lib.rs"),
+            ("base_version", "1"),
+            ("issue_member", &joined.to_string()),
+        ],
+    )
+    .await
+    .expect("claim");
+    assert!(
+        core.put(
+            "IssueClaim",
+            &[
+                ("file_path", "src/lib.rs"),
+                ("base_version", "2"),
+                ("issue_member", &joined.to_string()),
+            ],
+        )
+        .await
+        .is_err()
+    );
+    let pack = core.query("from IssueClaim").await.expect("pack");
+    assert_eq!(pack.rows().len(), 1);
+    assert_eq!(
+        pack.rows()[0]
+            .cells()
+            .get("claim_no")
+            .map(|cell| cell.show()),
+        Some("1".to_string())
+    );
+    assert!(core.has("issueanchor").await.expect("has anchor"));
+    assert!(
+        core.has("issueanchor_issuemember")
+            .await
+            .expect("has member")
+    );
+    assert!(core.has("issuemember_issueclaim").await.expect("has claim"));
+}

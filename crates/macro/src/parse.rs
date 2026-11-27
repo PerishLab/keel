@@ -1,45 +1,11 @@
+use crate::head::{place, put};
 use crate::*;
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Expr, ExprAssign, Ident, Meta, Token, Type};
-
-pub(crate) struct Link {
-    pub card: Ident,
-    pub target: String,
-    pub slots: Vec<(String, Ident)>,
-    pub need: bool,
-    pub root: bool,
-    pub crew: bool,
-    pub closure: bool,
-}
-
-impl Link {
-    fn shape(&self, attr: &Attribute) -> syn::Result<()> {
-        if self.card != "Many2many" && !self.slots.is_empty() {
-            return Err(syn::Error::new_spanned(attr, "only many2many takes fields"));
-        }
-        if self.card == "Many2many" && (!self.need || self.root) {
-            return Err(syn::Error::new_spanned(
-                attr,
-                "opt and root are for single refs only",
-            ));
-        }
-        if self.crew && self.card != "Many2many" {
-            return Err(syn::Error::new_spanned(attr, "crew is many2many only"));
-        }
-        if self.closure && self.card != "Many2many" {
-            return Err(syn::Error::new_spanned(attr, "closure is many2many only"));
-        }
-        if self.root && !self.need {
-            return Err(syn::Error::new_spanned(attr, "root is always required"));
-        }
-        Ok(())
-    }
-}
+use syn::{Attribute, Expr, ExprAssign, Ident, Meta, Token};
 
 pub(crate) trait Spell {
     fn ident(&self) -> syn::Result<Ident>;
-    fn tail(&self) -> syn::Result<String>;
     fn head(&self) -> syn::Result<Ident>;
     fn slot(&self) -> syn::Result<(String, Ident)>;
 }
@@ -54,19 +20,6 @@ impl Spell for Expr {
                 .ok_or_else(|| syn::Error::new_spanned(self, "expected ident")),
             _ => Err(syn::Error::new_spanned(self, "expected ident")),
         }
-    }
-
-    fn tail(&self) -> syn::Result<String> {
-        let Expr::Path(path) = self else {
-            return Ok(self.head()?.to_string());
-        };
-        let segs = &path.path.segments;
-        if segs.len() == 2 {
-            let root = segs[0].ident.to_string().to_ascii_lowercase();
-            let name = segs[1].ident.to_string().to_ascii_lowercase();
-            return Ok(format!("{root}:{name}"));
-        }
-        Ok(self.head()?.to_string())
     }
 
     fn head(&self) -> syn::Result<Ident> {
@@ -126,8 +79,8 @@ impl Coin for Ident {
 pub(crate) trait Read {
     fn items(&self, hint: &str) -> syn::Result<Punctuated<Expr, Token![,]>>;
     fn only(&self, item: &Expr) -> syn::Result<Only>;
-    fn scopes(&self, expr: &Expr) -> syn::Result<Vec<String>>;
-    fn tally(&self, items: &Punctuated<Expr, Token![,]>) -> syn::Result<String>;
+    fn scopes(&self, expr: &Expr) -> syn::Result<Vec<Scope>>;
+    fn tally(&self, items: &Punctuated<Expr, Token![,]>) -> syn::Result<Tally>;
 }
 
 impl Read for Attribute {
@@ -155,13 +108,13 @@ impl Read for Attribute {
         ))
     }
 
-    fn scopes(&self, expr: &Expr) -> syn::Result<Vec<String>> {
+    fn scopes(&self, expr: &Expr) -> syn::Result<Vec<Scope>> {
         let Expr::Tuple(tuple) = expr else {
-            return Ok(vec![expr.ident()?.to_string()]);
+            return Ok(vec![place(expr, "unique scope")?]);
         };
         let mut out = Vec::new();
         for item in &tuple.elems {
-            out.push(item.ident()?.to_string());
+            out.push(place(item, "unique scope")?);
         }
         if out.is_empty() {
             return Err(syn::Error::new_spanned(self, "unique scope is empty"));
@@ -169,93 +122,132 @@ impl Read for Attribute {
         Ok(out)
     }
 
-    fn tally(&self, items: &Punctuated<Expr, Token![,]>) -> syn::Result<String> {
+    fn tally(&self, items: &Punctuated<Expr, Token![,]>) -> syn::Result<Tally> {
         let hint = "serial needs scope = rel";
-        if items.len() != 2 {
-            return Err(syn::Error::new_spanned(self, hint));
+        let mut name = None;
+        let mut scope = None;
+        for item in items.iter().skip(1) {
+            tally(item, &mut name, &mut scope, hint)?;
         }
-        let Expr::Assign(ExprAssign { left, right, .. }) = &items[1] else {
-            return Err(syn::Error::new_spanned(self, hint));
-        };
-        if left.ident()? != "scope" {
-            return Err(syn::Error::new_spanned(self, hint));
+        let scope = scope.ok_or_else(|| syn::Error::new_spanned(self, hint))?;
+        Ok(Tally { name, scope })
+    }
+}
+
+fn tally(
+    item: &Expr,
+    name: &mut Option<String>,
+    scope: &mut Option<Scope>,
+    hint: &str,
+) -> syn::Result<()> {
+    let Expr::Assign(ExprAssign { left, right, .. }) = item else {
+        return Err(syn::Error::new_spanned(item, hint));
+    };
+    match left.ident()?.to_string().as_str() {
+        "scope" => {
+            if scope.is_some() {
+                return Err(syn::Error::new_spanned(item, "duplicate serial scope"));
+            }
+            *scope = Some(place(right, "serial scope")?);
+            Ok(())
         }
-        Ok(right.ident()?.to_string())
+        "name" => put(name, right, item, "field name"),
+        _ => Err(syn::Error::new_spanned(item, hint)),
     }
 }
 
 pub(crate) fn atom(attrs: &[Attribute]) -> syn::Result<Option<Made>> {
     let hint = "use #[field(string)] or #[field(string, default = \"ready\", values = [\"ready\", \"done\"])]";
+    let mut found = None;
     for attr in attrs {
         if !attr.path().is_ident("field") {
             continue;
         }
+        if found.is_some() {
+            return Err(syn::Error::new_spanned(
+                attr,
+                "duplicate #[field(...)] attribute",
+            ));
+        }
+        found = Some(Bud::parse(attr, hint)?);
+    }
+    Ok(found)
+}
+
+impl Bud {
+    fn parse(attr: &Attribute, hint: &str) -> syn::Result<Made> {
         let items = attr.items(hint)?;
         if items.is_empty() {
             return Err(syn::Error::new_spanned(attr, "field takes one atom"));
         }
         let first = items[0].ident()?;
         if first == "serial" {
-            return Ok(Some(Made::Serial(attr.tally(&items)?)));
+            return Ok(Made::Serial(attr.tally(&items)?));
         }
-        let kind = first.atom()?;
-        let mut only = Only::Free;
-        let mut need = true;
-        let mut guard = Guard::default();
+        let mut bud = Bud {
+            name: None,
+            kind: first.atom()?,
+            only: Only::Free,
+            need: true,
+            guard: Guard::default(),
+        };
         for item in items.iter().skip(1) {
-            if item.ident().is_ok_and(|word| word == "opt") {
-                need = false;
-                continue;
-            }
-            if crate::rule::read(attr, item, &mut only, &mut guard)? {
-                continue;
-            }
-            only = attr.only(item)?;
+            bud.option(attr, item)?;
         }
-        return Ok(Some(Made::Atom(crate::Bud {
-            kind,
-            only,
-            need,
-            guard,
-        })));
+        Ok(Made::Atom(bud))
     }
-    Ok(None)
+
+    fn option(&mut self, attr: &Attribute, item: &Expr) -> syn::Result<()> {
+        if let Ok(word) = item.ident() {
+            return self.bare(attr, item, &word);
+        }
+        if let Expr::Assign(assign) = item {
+            return self.keyed(attr, item, assign);
+        }
+        self.only = attr.only(item)?;
+        Ok(())
+    }
+
+    fn bare(&mut self, attr: &Attribute, item: &Expr, word: &Ident) -> syn::Result<()> {
+        match word.to_string().as_str() {
+            "opt" => {
+                if !self.need {
+                    return Err(syn::Error::new_spanned(item, "duplicate field option: opt"));
+                }
+                self.need = false;
+                Ok(())
+            }
+            "unique" => sole(&mut self.only, Only::All, item),
+            "name" => Err(syn::Error::new_spanned(
+                item,
+                "field name needs name = \"...\"",
+            )),
+            _ => {
+                self.only = attr.only(item)?;
+                Ok(())
+            }
+        }
+    }
+
+    fn keyed(&mut self, attr: &Attribute, item: &Expr, assign: &ExprAssign) -> syn::Result<()> {
+        match assign.left.ident()?.to_string().as_str() {
+            "name" => put(&mut self.name, &assign.right, item, "field name"),
+            "unique" => sole(&mut self.only, Only::Per(attr.scopes(&assign.right)?), item),
+            _ => {
+                let _ = crate::rule::read(attr, item, &mut self.only, &mut self.guard)?;
+                Ok(())
+            }
+        }
+    }
 }
 
-pub(crate) fn link(attrs: &[Attribute], ty: &Type) -> syn::Result<Option<Link>> {
-    let hint = "use #[relation(Type, many2many, field = atom)] or #[relation(Type, many2one, opt)]";
-    for attr in attrs {
-        if !attr.path().is_ident("relation") {
-            continue;
-        }
-        let items = attr.items(hint)?;
-        if items.len() < 2 {
-            return Err(syn::Error::new_spanned(
-                attr,
-                "use #[relation(Type, many2many)]",
-            ));
-        }
-        let mut link = Link {
-            card: items[1].head()?.card()?,
-            target: items[0].tail()?,
-            slots: Vec::new(),
-            need: true,
-            root: false,
-            crew: false,
-            closure: false,
-        };
-        for item in items.iter().skip(2) {
-            match item.ident().ok().map(|word| word.to_string()).as_deref() {
-                Some("opt") => link.need = false,
-                Some("root") => link.root = true,
-                Some("crew") => link.crew = true,
-                Some("closure") => link.closure = true,
-                _ => link.slots.push(item.slot()?),
-            }
-        }
-        link.shape(attr)?;
-        let _ = ty;
-        return Ok(Some(link));
+fn sole(only: &mut Only, next: Only, item: &Expr) -> syn::Result<()> {
+    if !matches!(only, Only::Free) {
+        return Err(syn::Error::new_spanned(
+            item,
+            "duplicate field option: unique",
+        ));
     }
-    Ok(None)
+    *only = next;
+    Ok(())
 }
