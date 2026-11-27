@@ -1,7 +1,13 @@
 use keel::adapt::db::Sqlite;
 use keel::atom::string;
 use keel::resource;
-use keel::{Ends, Graph};
+use keel::{Core, Ends, Graph};
+
+async fn boot(graph: Graph) -> Core<Sqlite> {
+    crate::support::boot(graph, Sqlite::memory().await.expect("db"))
+        .await
+        .expect("bind")
+}
 
 #[tokio::test]
 async fn rooted() {
@@ -21,30 +27,18 @@ async fn rooted() {
 
     let mut graph = Graph::new();
     graph.plug::<Org>().plug::<Label>();
-    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
-        .await
-        .expect("bind");
-    let label = core
-        .plan()
-        .units()
-        .values()
-        .find(|u| u.name() == "Label")
-        .expect("Label");
+    let core = boot(graph).await;
+    let units = core.plan().units();
+    let label = units.values().find(|u| u.name() == "Label").expect("Label");
     assert_eq!(label.key(), "org:label");
     assert_eq!(label.table(), "org_label");
-    let org = core
-        .plan()
-        .units()
-        .values()
-        .find(|u| u.name() == "Org")
-        .expect("Org");
+    let org = units.values().find(|u| u.name() == "Org").expect("Org");
     assert_eq!(org.key(), "org");
     assert_eq!(org.table(), "org");
 
     let acme = core.put("Org", &[("name", "acme")]).await.expect("org");
-    core.put("Label", &[("tag", "bug"), ("org", &acme.to_string())])
-        .await
-        .expect("label");
+    let pair = [("tag", "bug"), ("org", &acme.to_string())];
+    core.put("Label", &pair).await.expect("label");
     let pack = core.query("from Label").await.expect("pack");
     assert_eq!(pack.rows().len(), 1);
     assert!(core.has("org_label").await.expect("has"));
@@ -102,13 +96,10 @@ async fn twin() {
         .plug::<team::Team>()
         .plug::<team::Tag>()
         .plug::<Note>();
-    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
-        .await
-        .expect("bind");
+    let core = boot(graph).await;
 
-    let keys: Vec<String> = core
-        .plan()
-        .units()
+    let units = core.plan().units();
+    let keys: Vec<String> = units
         .values()
         .filter(|u| u.name() == "Tag")
         .map(|u| u.key())
@@ -123,25 +114,15 @@ async fn twin() {
 
     let acme = core.put("Shop", &[("sign", "acme")]).await.expect("shop");
     let red = core.put("Team", &[("handle", "red")]).await.expect("team");
-    let tag = core
-        .put("shop:tag", &[("word", "sale"), ("shop", &acme.to_string())])
-        .await
-        .expect("tag");
-    let note = core
-        .put("Note", &[("body", "hi"), ("team", &red.to_string())])
-        .await
-        .expect("note");
-    core.tie(
-        "Note",
-        "tags",
-        Ends {
-            left: note,
-            right: tag,
-        },
-        &[],
-    )
-    .await
-    .expect("tie");
+    let fields = [("word", "sale"), ("shop", &acme.to_string())];
+    let tag = core.put("shop:tag", &fields).await.expect("tag");
+    let fields = [("body", "hi"), ("team", &red.to_string())];
+    let note = core.put("Note", &fields).await.expect("note");
+    let ends = Ends {
+        left: note,
+        right: tag,
+    };
+    core.tie("Note", "tags", ends, &[]).await.expect("tie");
     let pack = core
         .query(r#"from Note where team = "1" link tags"#)
         .await
@@ -191,22 +172,17 @@ async fn explicit() {
 
     let mut graph = Graph::new();
     graph.plug::<Anchor>().plug::<Member>().plug::<Claim>();
-    let core = crate::support::boot(graph, Sqlite::memory().await.expect("db"))
-        .await
-        .expect("bind");
+    let core = boot(graph).await;
 
-    let member = core
-        .plan()
-        .units()
+    let units = core.plan().units();
+    let member = units
         .values()
         .find(|u| u.name() == "IssueMember")
         .expect("IssueMember");
     assert_eq!(member.key(), "issueanchor:issuemember");
     assert_eq!(member.table(), "issueanchor_issuemember");
 
-    let claim = core
-        .plan()
-        .units()
+    let claim = units
         .values()
         .find(|u| u.name() == "IssueClaim")
         .expect("IssueClaim");
@@ -217,35 +193,22 @@ async fn explicit() {
         .put("IssueAnchor", &[("node_id", "n1")])
         .await
         .expect("anchor");
-    let joined = core
-        .put(
-            "IssueMember",
-            &[("branch", "main"), ("issue_anchor", &anchor.to_string())],
-        )
-        .await
-        .expect("member");
-    core.put(
-        "IssueClaim",
-        &[
-            ("file_path", "src/lib.rs"),
-            ("base_version", "1"),
-            ("issue_member", &joined.to_string()),
-        ],
-    )
-    .await
-    .expect("claim");
-    assert!(
-        core.put(
-            "IssueClaim",
-            &[
-                ("file_path", "src/lib.rs"),
-                ("base_version", "2"),
-                ("issue_member", &joined.to_string()),
-            ],
-        )
-        .await
-        .is_err()
-    );
+    let link = anchor.to_string();
+    let row = [("branch", "main"), ("issue_anchor", link.as_str())];
+    let joined = core.put("IssueMember", &row).await.expect("member");
+    let link = joined.to_string();
+    let row = [
+        ("file_path", "src/lib.rs"),
+        ("base_version", "1"),
+        ("issue_member", link.as_str()),
+    ];
+    core.put("IssueClaim", &row).await.expect("claim");
+    let dup = [
+        ("file_path", "src/lib.rs"),
+        ("base_version", "2"),
+        ("issue_member", link.as_str()),
+    ];
+    assert!(core.put("IssueClaim", &dup).await.is_err());
     let pack = core.query("from IssueClaim").await.expect("pack");
     assert_eq!(pack.rows().len(), 1);
     assert_eq!(
@@ -256,10 +219,52 @@ async fn explicit() {
         Some("1".to_string())
     );
     assert!(core.has("issueanchor").await.expect("has anchor"));
-    assert!(
-        core.has("issueanchor_issuemember")
-            .await
-            .expect("has member")
-    );
-    assert!(core.has("issuemember_issueclaim").await.expect("has claim"));
+    assert!(core.has("issueanchor_issuemember").await.expect("member"));
+    assert!(core.has("issuemember_issueclaim").await.expect("claim"));
+}
+
+#[tokio::test]
+async fn marker() {
+    use keel::atom::Kind::Text;
+    use keel::spec::{Resource, Spec};
+
+    struct Marker;
+    #[resource(name = "CustomRoot")]
+    struct Custom {
+        #[field(string)]
+        tag: string,
+    }
+    #[resource]
+    struct Item {
+        #[field(string)]
+        code: string,
+        #[relation(Marker, many2one, root)]
+        marker: Marker,
+        #[relation(Custom, many2one)]
+        custom: Custom,
+    }
+    assert_eq!(Item::spec().stem(), Some("Marker"));
+    let bonds = Item::spec().bonds().to_vec();
+    assert!(bonds.iter().any(|b| b.target() == "CustomRoot"));
+
+    let mut graph = Graph::new();
+    graph
+        .add(Spec::build("Marker").sole("tag", Text).seal())
+        .plug::<Custom>()
+        .plug::<Item>();
+    let core = boot(graph).await;
+    let root = core.put("Marker", &[("tag", "m1")]).await.expect("marker");
+    let custom = core
+        .put("CustomRoot", &[("tag", "c1")])
+        .await
+        .expect("custom");
+    let root = root.to_string();
+    let custom = custom.to_string();
+    let row = [
+        ("code", "i1"),
+        ("marker", root.as_str()),
+        ("custom", custom.as_str()),
+    ];
+    core.put("Item", &row).await.expect("item");
+    assert!(core.has("marker_item").await.expect("has"));
 }

@@ -13,7 +13,7 @@ pub(crate) struct Head {
 
 pub(crate) enum Aim {
     Fixed(String),
-    Type(Type),
+    Type(Box<Type>, String),
 }
 
 pub(crate) fn head(tokens: proc_macro2::TokenStream) -> syn::Result<Head> {
@@ -166,7 +166,7 @@ pub(crate) fn aim(expr: &Expr, ty: &Type) -> syn::Result<Aim> {
     }
     let head = expr.head()?;
     if same(ty, &head) {
-        return Ok(Aim::Type(ty.clone()));
+        return Ok(Aim::Type(Box::new(ty.clone()), head.to_string()));
     }
     Ok(Aim::Fixed(head.to_string()))
 }
